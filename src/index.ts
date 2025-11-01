@@ -14,7 +14,7 @@ import {
 } from 'discord.js';
 import dotenv from 'dotenv';
 
-const MAX_PARTICIPANTS = 1;
+const MAX_PARTICIPANTS = 2;
 
 const parsed = dotenv.config();
 const token = parsed.parsed?.BOT_TOKEN;
@@ -42,6 +42,7 @@ async function startEvent(message: Message, participantSet: Set<string>) {
 	timerData.hasStarted = true;
 
 	const finishButton = new ButtonBuilder()
+		.setEmoji('🏁')
 		.setCustomId('finish')
 		.setLabel('Finish Event')
 		.setStyle(ButtonStyle.Success);
@@ -60,7 +61,7 @@ async function startEvent(message: Message, participantSet: Set<string>) {
 		}
 	});
 
-	embed.setColor(0x00ff00);
+	embed.setColor('#1cff5c');
 	embed.setFields(existingFields);
 	await message.edit({ embeds: [embed], components: [row] });
 
@@ -107,13 +108,9 @@ const rest = new REST({ version: '10' }).setToken(token);
 client.once('clientReady', async () => {
 	if (!client.user) return;
 
-	try {
-		await rest.put(Routes.applicationCommands(client.user.id), {
-			body: commands,
-		});
-	} catch (error) {
-		console.error('Error registering commands:', error);
-	}
+	await rest.put(Routes.applicationCommands(client.user.id), {
+		body: commands,
+	});
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -137,6 +134,7 @@ client.on('interactionCreate', async (interaction) => {
 
 			buttons.push(
 				new ButtonBuilder()
+					.setEmoji('📝')
 					.setCustomId('signup')
 					.setLabel('Sign Up')
 					.setStyle(ButtonStyle.Primary),
@@ -144,6 +142,7 @@ client.on('interactionCreate', async (interaction) => {
 
 			buttons.push(
 				new ButtonBuilder()
+					.setEmoji('🚪')
 					.setCustomId('signout')
 					.setLabel('Sign Out')
 					.setStyle(ButtonStyle.Danger),
@@ -151,6 +150,7 @@ client.on('interactionCreate', async (interaction) => {
 
 			buttons.push(
 				new ButtonBuilder()
+					.setEmoji('❌')
 					.setCustomId('cancel')
 					.setLabel('Cancel Event')
 					.setStyle(ButtonStyle.Secondary),
@@ -159,6 +159,7 @@ client.on('interactionCreate', async (interaction) => {
 			if (timeInMinutes) {
 				buttons.push(
 					new ButtonBuilder()
+						.setEmoji('▶️')
 						.setCustomId('startnow')
 						.setLabel('Start Now')
 						.setStyle(ButtonStyle.Success),
@@ -173,27 +174,26 @@ client.on('interactionCreate', async (interaction) => {
 				{ name: 'Participants (1)', value: `<@${interaction.user.id}>` },
 			];
 
-			if (timeInMinutes) {
-				embedFields.push({
-					name: 'Start',
-					value: `<t:${Math.floor((startTime + timeInMinutes * 60 * 1000) / 1000)}:R>`,
-				});
-			} else {
-				embedFields.push({
-					name: 'Start',
-					value: 'When 8 players have signed up',
-				});
-			}
+			embedFields.push({
+				name: 'Start',
+				value: timeInMinutes
+					? `<t:${Math.floor((startTime + timeInMinutes * 60 * 1000) / 1000)}:R>`
+					: 'When 8 players have signed up',
+			});
 
 			embedFields.push({
 				name: 'Status',
-				value: '🟢 Open for Sign Ups',
+				value: '🟢 Open for sign ups',
 			});
 
 			const embed = new EmbedBuilder()
+				.setAuthor({
+					name: interaction.user.username,
+					iconURL: interaction.user.displayAvatarURL(),
+				})
 				.setTitle('8s Sign Up')
 				.addFields(embedFields)
-				.setColor(0x5865f2);
+				.setColor('#626CE9');
 
 			const message = await interaction.reply({
 				embeds: [embed],
@@ -251,7 +251,7 @@ client.on('interactionCreate', async (interaction) => {
 		if (interaction.customId === 'startnow') {
 			if (userId !== creatorId) {
 				await interaction.reply({
-					content: 'Only the event creator can start the event now.',
+					content: 'Only the event creator can start the event.',
 					flags: ['Ephemeral'],
 				});
 				return;
@@ -284,11 +284,11 @@ client.on('interactionCreate', async (interaction) => {
 
 			existingFields.forEach((field) => {
 				if (field.name === 'Status') {
-					field.value = '❌ Event Cancelled';
+					field.value = '❌ Event cancelled';
 				}
 			});
 
-			embed.setColor(0xff0000);
+			embed.setColor('#ff1c1c');
 			embed.setFields(existingFields);
 			await interaction.message.edit({ embeds: [embed], components: [] });
 			await interaction.deferUpdate();
@@ -327,7 +327,7 @@ client.on('interactionCreate', async (interaction) => {
 				}
 			});
 
-			embed.setColor(0xff0000);
+			embed.setColor('#ff1c1c');
 			embed.setFields(existingFields);
 			await interaction.message.edit({ embeds: [embed], components: [] });
 			await interaction.deferUpdate();
@@ -372,11 +372,6 @@ client.on('interactionCreate', async (interaction) => {
 		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
 		const existingFields = embed.data.fields || [];
 
-		const participantList =
-			participantSet.size > 0
-				? Array.from(participantSet).join('\n')
-				: '-# No one signed up yet';
-
 		existingFields.forEach((field) => {
 			if (field.name === 'Status') {
 				field.value =
@@ -386,7 +381,7 @@ client.on('interactionCreate', async (interaction) => {
 			}
 			if (field.name.includes('Participants')) {
 				field.name = `Participants (${participantSet.size})`;
-				field.value = participantList;
+				field.value = Array.from(participantSet).join('\n');
 			}
 		});
 
