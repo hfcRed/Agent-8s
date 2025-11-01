@@ -195,11 +195,11 @@ client.on('interactionCreate', async (interaction) => {
 				.addFields(embedFields)
 				.setColor('#626CE9');
 
-			const message = await interaction.reply({
+			const reply = await interaction.reply({
 				embeds: [embed],
 				components: [row],
-				fetchReply: true,
 			});
+			const message = await reply.fetch();
 
 			participants.set(message.id, new Set([`<@${interaction.user.id}>`]));
 			eventCreators.set(message.id, interaction.user.id);
