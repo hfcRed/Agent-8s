@@ -1,8 +1,10 @@
 import {
 	ActionRowBuilder,
 	ButtonBuilder,
+	type ButtonInteraction,
 	ButtonStyle,
 	ChannelType,
+	type ChatInputCommandInteraction,
 	Client,
 	EmbedBuilder,
 	GatewayIntentBits,
@@ -13,8 +15,13 @@ import {
 	type TextChannel,
 } from 'discord.js';
 import dotenv from 'dotenv';
-
-const MAX_PARTICIPANTS = 2;
+import {
+	COLORS,
+	ERROR_MESSAGES,
+	MAX_PARTICIPANTS,
+	STATUS_MESSAGES,
+} from './constants.js';
+import type { EventTimer } from './types.js';
 
 const parsed = dotenv.config();
 const token = parsed.parsed?.BOT_TOKEN;
@@ -24,45 +31,363 @@ if (!token) {
 	process.exit(1);
 }
 
+const commands = [
+	new SlashCommandBuilder()
+		.setName('create')
+		.setDescription('Create a new 8s event')
+		.addIntegerOption((option) =>
+			option
+				.setName('time')
+				.setDescription(
+					'Time in minutes before the event starts. If not specified, event starts when 8 players sign up.',
+				)
+				.setRequired(false)
+				.setMinValue(1),
+		)
+		.toJSON(),
+];
+
+const rest = new REST({ version: '10' }).setToken(token);
+
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
 });
 
+client.once('clientReady', async () => {
+	if (!client.user) return;
+
+	await rest.put(Routes.applicationCommands(client.user.id), {
+		body: commands,
+	});
+});
+
 const participants = new Map<string, Set<string>>();
 const eventCreators = new Map<string, string>();
-const eventTimers = new Map<
-	string,
-	{ startTime: number; duration: number; hasStarted: boolean }
->();
+const eventTimers = new Map<string, EventTimer>();
 const eventThreads = new Map<string, string>();
+
+client.on('interactionCreate', async (interaction) => {
+	try {
+		if (
+			interaction.isChatInputCommand() &&
+			interaction.commandName === 'create'
+		) {
+			await handleCreateCommand(interaction);
+		}
+
+		if (interaction.isButton()) {
+			const messageId = interaction.message.id;
+			const userId = interaction.user.id;
+
+			const participantSet = participants.get(messageId);
+			const timerData = eventTimers.get(messageId);
+			const creatorId = eventCreators.get(messageId);
+
+			if (!participantSet || !timerData || !creatorId) return;
+
+			switch (interaction.customId) {
+				case 'signup':
+					await handleSignUpButton(
+						interaction,
+						userId,
+						participantSet,
+						timerData,
+					);
+					break;
+				case 'signout':
+					await handleSignOutButton(
+						interaction,
+						userId,
+						participantSet,
+						creatorId,
+						timerData,
+					);
+					break;
+				case 'cancel':
+					await handleCancelButton(interaction, userId, creatorId);
+					break;
+				case 'startnow':
+					await handleStartNowButton(
+						interaction,
+						userId,
+						participantSet,
+						creatorId,
+					);
+					break;
+				case 'finish':
+					await handleFinishButton(interaction, userId, creatorId);
+					break;
+			}
+		}
+	} catch (error) {
+		console.error(error);
+
+		if (interaction.isRepliable() && !interaction.replied) {
+			await interaction.reply({
+				content: 'An error occurred while processing your request.',
+				flags: ['Ephemeral'],
+			});
+		}
+	}
+});
+
+async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
+	if (isUserInAnyEvent(interaction.user.id)) {
+		await interaction.reply({
+			content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	const timeInMinutes = interaction.options.getInteger('time', false);
+	const startTime = Date.now();
+	const userMention = createUserMention(interaction.user.id);
+
+	const buttons = [
+		new ButtonBuilder()
+			.setEmoji('📝')
+			.setCustomId('signup')
+			.setLabel('Sign Up')
+			.setStyle(ButtonStyle.Primary),
+		new ButtonBuilder()
+			.setEmoji('🚪')
+			.setCustomId('signout')
+			.setLabel('Sign Out')
+			.setStyle(ButtonStyle.Danger),
+		new ButtonBuilder()
+			.setEmoji('❌')
+			.setCustomId('cancel')
+			.setLabel('Cancel Event')
+			.setStyle(ButtonStyle.Secondary),
+	];
+
+	if (timeInMinutes) {
+		buttons.push(
+			new ButtonBuilder()
+				.setEmoji('▶️')
+				.setCustomId('startnow')
+				.setLabel('Start Now')
+				.setStyle(ButtonStyle.Success),
+		);
+	}
+
+	const row = new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons);
+
+	const embedFields = [
+		{ name: 'Participants (1)', value: `- ${userMention}` },
+		{
+			name: 'Start',
+			value: timeInMinutes
+				? `<t:${Math.floor((startTime + timeInMinutes * 60 * 1000) / 1000)}:R>`
+				: 'When 8 players have signed up',
+		},
+		{ name: 'Status', value: STATUS_MESSAGES.OPEN },
+	];
+
+	const embed = new EmbedBuilder()
+		.setAuthor({
+			name: interaction.user.username,
+			iconURL: interaction.user.displayAvatarURL(),
+		})
+		.setTitle('8s Sign Up')
+		.addFields(embedFields)
+		.setColor(COLORS.OPEN);
+
+	const reply = await interaction.reply({
+		embeds: [embed],
+		components: [row],
+	});
+	const message = await reply.fetch();
+
+	participants.set(message.id, new Set([userMention]));
+	eventCreators.set(message.id, interaction.user.id);
+	eventTimers.set(message.id, {
+		startTime,
+		duration: timeInMinutes ? timeInMinutes * 60 * 1000 : 0,
+		hasStarted: false,
+	});
+
+	if (timeInMinutes) {
+		setTimeout(
+			async () => {
+				const participantSet = participants.get(message.id);
+				const timerData = eventTimers.get(message.id);
+				if (!participantSet || !timerData || timerData.hasStarted) return;
+
+				if (participantSet.size === MAX_PARTICIPANTS) {
+					await startEvent(message, participantSet);
+				} else {
+					const embed = EmbedBuilder.from(message.embeds[0]);
+					updateEmbedField(embed, 'Start', 'When 8 players have signed up');
+					await message.edit({ embeds: [embed] });
+				}
+			},
+			timeInMinutes * 60 * 1000,
+		);
+	}
+}
+
+async function handleSignUpButton(
+	interaction: ButtonInteraction,
+	userId: string,
+	participantSet: Set<string>,
+	timerData: EventTimer,
+) {
+	const userMention = createUserMention(userId);
+
+	if (
+		participantSet.size >= MAX_PARTICIPANTS &&
+		!participantSet.has(userMention)
+	) {
+		await interaction.deferUpdate();
+		return;
+	}
+
+	if (isUserInAnyEvent(userId)) {
+		await interaction.reply({
+			content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	participantSet.add(userMention);
+
+	await updateParticipantEmbed(interaction, participantSet, timerData);
+}
+
+async function handleSignOutButton(
+	interaction: ButtonInteraction,
+	userId: string,
+	participantSet: Set<string>,
+	creatorId: string,
+	timerData: EventTimer,
+) {
+	if (userId === creatorId) {
+		await interaction.reply({
+			content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	const userMention = createUserMention(userId);
+	participantSet.delete(userMention);
+
+	await updateParticipantEmbed(interaction, participantSet, timerData);
+}
+
+async function handleCancelButton(
+	interaction: ButtonInteraction,
+	userId: string,
+	creatorId: string,
+) {
+	if (userId !== creatorId) {
+		await interaction.reply({
+			content: ERROR_MESSAGES.CREATOR_ONLY_CANCEL,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	const messageId = interaction.message.id;
+
+	participants.delete(messageId);
+	eventTimers.delete(messageId);
+	eventCreators.delete(messageId);
+
+	const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+		COLORS.CANCELLED,
+	);
+
+	updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
+
+	await interaction.message.edit({ embeds: [embed], components: [] });
+	await interaction.deferUpdate();
+}
+
+async function handleStartNowButton(
+	interaction: ButtonInteraction,
+	userId: string,
+	participantSet: Set<string>,
+	creatorId: string,
+) {
+	if (userId !== creatorId) {
+		await interaction.reply({
+			content: ERROR_MESSAGES.CREATOR_ONLY_START,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	if (participantSet.size !== MAX_PARTICIPANTS) {
+		await interaction.deferUpdate();
+		return;
+	}
+
+	await startEvent(interaction.message, participantSet);
+}
+
+async function handleFinishButton(
+	interaction: ButtonInteraction,
+	userId: string,
+	creatorId: string,
+) {
+	if (userId !== creatorId) {
+		await interaction.reply({
+			content: ERROR_MESSAGES.CREATOR_ONLY_FINISH,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	const messageId = interaction.message.id;
+
+	participants.delete(messageId);
+	eventTimers.delete(messageId);
+	eventCreators.delete(messageId);
+
+	const threadId = eventThreads.get(messageId);
+	const channel = interaction.channel as TextChannel | null;
+	if (threadId && channel) {
+		const thread = await channel.threads.fetch(threadId);
+		if (thread) {
+			await thread.setLocked(true);
+			await thread.setArchived(true);
+		}
+	}
+	eventThreads.delete(messageId);
+
+	const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+		COLORS.FINISHED,
+	);
+
+	updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
+
+	await interaction.message.edit({ embeds: [embed], components: [] });
+	await interaction.deferUpdate();
+}
 
 async function startEvent(message: Message, participantSet: Set<string>) {
 	const timerData = eventTimers.get(message.id);
 	if (!timerData || timerData.hasStarted) return;
+
 	timerData.hasStarted = true;
 
-	const finishButton = new ButtonBuilder()
-		.setEmoji('🏁')
-		.setCustomId('finish')
-		.setLabel('Finish Event')
-		.setStyle(ButtonStyle.Success);
+	const embed = EmbedBuilder.from(message.embeds[0]).setColor(COLORS.STARTED);
 
-	const row = new ActionRowBuilder<ButtonBuilder>().addComponents(finishButton);
+	updateEmbedField(embed, 'Status', STATUS_MESSAGES.STARTED);
+	updateEmbedField(embed, 'Start', `<t:${Math.floor(Date.now() / 1000)}:R>`);
 
-	const embed = EmbedBuilder.from(message.embeds[0]);
-	const existingFields = embed.data.fields || [];
+	const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+		new ButtonBuilder()
+			.setEmoji('🏁')
+			.setCustomId('finish')
+			.setLabel('Finish Event')
+			.setStyle(ButtonStyle.Success),
+	);
 
-	existingFields.forEach((field) => {
-		if (field.name === 'Status') {
-			field.value = '✅ Event Started!';
-		}
-		if (field.name === 'Start') {
-			field.value = `<t:${Math.floor(Date.now() / 1000)}:R>`;
-		}
-	});
-
-	embed.setColor('#1cff5c');
-	embed.setFields(existingFields);
 	await message.edit({ embeds: [embed], components: [row] });
 
 	const channel = message.channel as TextChannel;
@@ -87,315 +412,81 @@ async function startEvent(message: Message, participantSet: Set<string>) {
 	}
 }
 
-const commands = [
-	new SlashCommandBuilder()
-		.setName('create')
-		.setDescription('Create a new 8s event')
-		.addIntegerOption((option) =>
-			option
-				.setName('time')
-				.setDescription(
-					'Time in minutes before the event starts. If not specified, event starts when 8 players sign up.',
-				)
-				.setRequired(false)
-				.setMinValue(1),
-		)
-		.toJSON(),
-];
+function updateEmbedField(
+	embed: EmbedBuilder,
+	fieldName: string,
+	newValue: string,
+) {
+	const fields = embed.data.fields || [];
+	const field = fields.find((f) => f.name === fieldName);
+	if (field) {
+		field.value = newValue;
+	}
+	embed.setFields(fields);
+}
 
-const rest = new REST({ version: '10' }).setToken(token);
+function updateEmbedFieldByMatch(
+	embed: EmbedBuilder,
+	partialName: string,
+	newName: string,
+	newValue: string,
+) {
+	const fields = embed.data.fields || [];
+	const field = fields.find((f) => f.name.includes(partialName));
+	if (field) {
+		field.name = newName;
+		field.value = newValue;
+	}
+	embed.setFields(fields);
+}
 
-client.once('clientReady', async () => {
-	if (!client.user) return;
+async function updateParticipantEmbed(
+	interaction: ButtonInteraction,
+	participantSet: Set<string>,
+	timerData: EventTimer,
+) {
+	await interaction.deferUpdate();
 
-	await rest.put(Routes.applicationCommands(client.user.id), {
-		body: commands,
-	});
-});
+	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
 
-client.on('interactionCreate', async (interaction) => {
-	if (interaction.isChatInputCommand()) {
-		if (interaction.commandName === 'create') {
-			for (const [_, participantSet] of participants.entries()) {
-				if (participantSet.has(`<@${interaction.user.id}>`)) {
-					await interaction.reply({
-						content:
-							'You are already signed up for an event. Please sign out, cancel, or wait for the event to finish before joining a new one.',
-						flags: ['Ephemeral'],
-					});
-					return;
-				}
-			}
+	const status =
+		participantSet.size === MAX_PARTICIPANTS
+			? STATUS_MESSAGES.READY
+			: STATUS_MESSAGES.OPEN;
+	updateEmbedField(embed, 'Status', status);
 
-			const timeInMinutes = interaction.options.getInteger('time', false);
-			const startTime = Date.now();
+	updateEmbedFieldByMatch(
+		embed,
+		'Participants',
+		`Participants (${participantSet.size})`,
+		Array.from(participantSet)
+			.map((p) => `- ${p}`)
+			.join('\n'),
+	);
 
-			const buttons = [];
+	await interaction.message.edit({ embeds: [embed] });
 
-			buttons.push(
-				new ButtonBuilder()
-					.setEmoji('📝')
-					.setCustomId('signup')
-					.setLabel('Sign Up')
-					.setStyle(ButtonStyle.Primary),
-			);
+	const timeElapsed = Date.now() - timerData.startTime;
+	const timeIsUpOrNotSet =
+		timerData.duration === 0 || timeElapsed >= timerData.duration;
 
-			buttons.push(
-				new ButtonBuilder()
-					.setEmoji('🚪')
-					.setCustomId('signout')
-					.setLabel('Sign Out')
-					.setStyle(ButtonStyle.Danger),
-			);
+	if (participantSet.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
+		await startEvent(interaction.message, participantSet);
+	}
+}
 
-			buttons.push(
-				new ButtonBuilder()
-					.setEmoji('❌')
-					.setCustomId('cancel')
-					.setLabel('Cancel Event')
-					.setStyle(ButtonStyle.Secondary),
-			);
-
-			if (timeInMinutes) {
-				buttons.push(
-					new ButtonBuilder()
-						.setEmoji('▶️')
-						.setCustomId('startnow')
-						.setLabel('Start Now')
-						.setStyle(ButtonStyle.Success),
-				);
-			}
-
-			const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-				...buttons,
-			);
-
-			const embedFields = [
-				{ name: 'Participants (1)', value: `<@${interaction.user.id}>` },
-			];
-
-			embedFields.push({
-				name: 'Start',
-				value: timeInMinutes
-					? `<t:${Math.floor((startTime + timeInMinutes * 60 * 1000) / 1000)}:R>`
-					: 'When 8 players have signed up',
-			});
-
-			embedFields.push({
-				name: 'Status',
-				value: '🟢 Open for sign ups',
-			});
-
-			const embed = new EmbedBuilder()
-				.setAuthor({
-					name: interaction.user.username,
-					iconURL: interaction.user.displayAvatarURL(),
-				})
-				.setTitle('8s Sign Up')
-				.addFields(embedFields)
-				.setColor('#626CE9');
-
-			const reply = await interaction.reply({
-				embeds: [embed],
-				components: [row],
-			});
-			const message = await reply.fetch();
-
-			participants.set(message.id, new Set([`<@${interaction.user.id}>`]));
-			eventCreators.set(message.id, interaction.user.id);
-			eventTimers.set(message.id, {
-				startTime,
-				duration: timeInMinutes ? timeInMinutes * 60 * 1000 : 0,
-				hasStarted: false,
-			});
-
-			if (timeInMinutes) {
-				setTimeout(
-					async () => {
-						const participantSet = participants.get(message.id);
-						const timerData = eventTimers.get(message.id);
-						if (!participantSet || !timerData || timerData.hasStarted) return;
-
-						if (participantSet.size === MAX_PARTICIPANTS) {
-							await startEvent(message, participantSet);
-						} else {
-							const embed = EmbedBuilder.from(message.embeds[0]);
-							const existingFields = embed.data.fields || [];
-
-							existingFields.forEach((field) => {
-								if (field.name === 'Start') {
-									field.value = 'When 8 players have signed up';
-								}
-							});
-
-							embed.setFields(existingFields);
-							await message.edit({ embeds: [embed] });
-						}
-					},
-					timeInMinutes * 60 * 1000,
-				);
-			}
+function isUserInAnyEvent(userId: string): boolean {
+	const mention = createUserMention(userId);
+	for (const [_, participantSet] of participants.entries()) {
+		if (participantSet.has(mention)) {
+			return true;
 		}
 	}
+	return false;
+}
 
-	if (interaction.isButton()) {
-		const messageId = interaction.message.id;
-		const userId = interaction.user.id;
-
-		const participantSet = participants.get(messageId);
-		const timerData = eventTimers.get(messageId);
-		const creatorId = eventCreators.get(messageId);
-
-		if (!participantSet || !timerData || !creatorId) return;
-
-		if (interaction.customId === 'startnow') {
-			if (userId !== creatorId) {
-				await interaction.reply({
-					content: 'Only the event creator can start the event.',
-					flags: ['Ephemeral'],
-				});
-				return;
-			}
-
-			if (participantSet.size !== MAX_PARTICIPANTS) {
-				await interaction.deferUpdate();
-				return;
-			}
-
-			await startEvent(interaction.message, participantSet);
-			return;
-		}
-
-		if (interaction.customId === 'cancel') {
-			if (userId !== creatorId) {
-				await interaction.reply({
-					content: 'Only the event creator can cancel this event.',
-					flags: ['Ephemeral'],
-				});
-				return;
-			}
-
-			participants.delete(messageId);
-			eventTimers.delete(messageId);
-			eventCreators.delete(messageId);
-
-			const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-			const existingFields = embed.data.fields || [];
-
-			existingFields.forEach((field) => {
-				if (field.name === 'Status') {
-					field.value = '❌ Event cancelled';
-				}
-			});
-
-			embed.setColor('#ff1c1c');
-			embed.setFields(existingFields);
-			await interaction.message.edit({ embeds: [embed], components: [] });
-			await interaction.deferUpdate();
-			return;
-		}
-
-		if (interaction.customId === 'finish') {
-			if (userId !== creatorId) {
-				await interaction.reply({
-					content: 'Only the event creator can finish this event.',
-					flags: ['Ephemeral'],
-				});
-
-				return;
-			}
-
-			participants.delete(messageId);
-			eventTimers.delete(messageId);
-			eventCreators.delete(messageId);
-
-			const threadId = eventThreads.get(messageId);
-			const channel = interaction.channel as TextChannel | null;
-			if (threadId && channel) {
-				const thread = await channel.threads.fetch(threadId);
-				if (thread) {
-					await thread.setLocked(true);
-					await thread.setArchived(true);
-				}
-			}
-
-			const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-			const existingFields = embed.data.fields || [];
-			existingFields.forEach((field) => {
-				if (field.name === 'Status') {
-					field.value = '🏁 Event Finished';
-				}
-			});
-
-			embed.setColor('#ff1c1c');
-			embed.setFields(existingFields);
-			await interaction.message.edit({ embeds: [embed], components: [] });
-			await interaction.deferUpdate();
-			return;
-		}
-
-		if (interaction.customId === 'signup') {
-			if (participantSet.size >= 8 && !participantSet.has(`<@${userId}>`)) {
-				await interaction.deferUpdate();
-				return;
-			}
-
-			for (const [_, participantSet] of participants.entries()) {
-				if (participantSet.has(`<@${interaction.user.id}>`)) {
-					await interaction.reply({
-						content:
-							'You are already signed up for an event. Please sign out, cancel, or wait for the event to finish before joining a new one.',
-						flags: ['Ephemeral'],
-					});
-					return;
-				}
-			}
-
-			participantSet.add(`<@${userId}>`);
-		}
-
-		if (interaction.customId === 'signout') {
-			if (userId === creatorId) {
-				await interaction.reply({
-					content:
-						'The event creator cannot sign out. Please cancel the event instead.',
-					flags: ['Ephemeral'],
-				});
-				return;
-			}
-
-			participantSet.delete(`<@${userId}>`);
-		}
-
-		await interaction.deferUpdate();
-
-		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-		const existingFields = embed.data.fields || [];
-
-		existingFields.forEach((field) => {
-			if (field.name === 'Status') {
-				field.value =
-					participantSet.size === MAX_PARTICIPANTS
-						? '✅ Ready to Start!'
-						: '🟢 Open for Sign Ups';
-			}
-			if (field.name.includes('Participants')) {
-				field.name = `Participants (${participantSet.size})`;
-				field.value = Array.from(participantSet).join('\n');
-			}
-		});
-
-		embed.setFields(existingFields);
-		await interaction.message.edit({ embeds: [embed] });
-
-		const timeElapsed = Date.now() - timerData.startTime;
-		const timeIsUpOrNotSet =
-			timerData.duration === 0 || timeElapsed >= timerData.duration;
-
-		if (participantSet.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
-			await startEvent(interaction.message, participantSet);
-		}
-	}
-});
+function createUserMention(userId: string) {
+	return `<@${userId}>`;
+}
 
 client.login(token);
