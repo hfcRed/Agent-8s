@@ -3,3 +3,11 @@ export interface EventTimer {
 	duration: number;
 	hasStarted: boolean;
 }
+
+export interface TelemetryEvent {
+	event: string;
+	guildId: string;
+	eventId: string;
+	timestamp: number;
+	data: Record<string, unknown>;
+}

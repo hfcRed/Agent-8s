@@ -22,15 +22,23 @@ import {
 	PING_ROLE_NAMES,
 	STATUS_MESSAGES,
 } from './constants.js';
+import { TelemetryService } from './telemetry.js';
 import type { EventTimer } from './types.js';
 
 const parsed = dotenv.config();
-const token = parsed.parsed?.BOT_TOKEN;
+const botToken = parsed.parsed?.BOT_TOKEN;
+const telemetryUrl = parsed.parsed?.TELEMETRY_URL;
+const telemetryToken = parsed.parsed?.TELEMETRY_TOKEN;
 
-if (!token) {
+if (!botToken) {
 	console.error('BOT_TOKEN not found in .env file');
 	process.exit(1);
 }
+
+const telemetry =
+	telemetryUrl && telemetryToken
+		? new TelemetryService(telemetryUrl, telemetryToken)
+		: null;
 
 const commands = [
 	new SlashCommandBuilder()
@@ -48,7 +56,7 @@ const commands = [
 		.toJSON(),
 ];
 
-const rest = new REST({ version: '10' }).setToken(token);
+const rest = new REST({ version: '10' }).setToken(botToken);
 
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
@@ -213,6 +221,13 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		hasStarted: false,
 	});
 
+	telemetry?.trackEventCreated(
+		interaction.guild?.id || 'unknown',
+		message.id,
+		interaction.user.id,
+		timeInMinutes || undefined,
+	);
+
 	if (timeInMinutes) {
 		setTimeout(
 			async () => {
@@ -259,6 +274,13 @@ async function handleSignUpButton(
 
 	participantSet.add(userMention);
 
+	telemetry?.trackUserSignUp(
+		interaction.guild?.id || 'unknown',
+		interaction.message.id,
+		interaction.user.id,
+		userIdsFromMentions(participantSet),
+	);
+
 	await updateParticipantEmbed(interaction, participantSet, timerData);
 }
 
@@ -280,6 +302,13 @@ async function handleSignOutButton(
 	const userMention = createUserMention(userId);
 	participantSet.delete(userMention);
 
+	telemetry?.trackUserSignOut(
+		interaction.guild?.id || 'unknown',
+		interaction.message.id,
+		interaction.user.id,
+		userIdsFromMentions(participantSet),
+	);
+
 	await updateParticipantEmbed(interaction, participantSet, timerData);
 }
 
@@ -297,11 +326,6 @@ async function handleCancelButton(
 	}
 
 	const messageId = interaction.message.id;
-
-	participants.delete(messageId);
-	eventTimers.delete(messageId);
-	eventCreators.delete(messageId);
-
 	const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
 		COLORS.CANCELLED,
 	);
@@ -310,6 +334,16 @@ async function handleCancelButton(
 
 	await interaction.message.edit({ embeds: [embed], components: [] });
 	await interaction.deferUpdate();
+
+	telemetry?.trackEventCancelled(
+		interaction.guild?.id || 'unknown',
+		messageId,
+		userIdsFromMentions(participants.get(messageId) || new Set<string>()),
+	);
+
+	participants.delete(messageId);
+	eventTimers.delete(messageId);
+	eventCreators.delete(messageId);
 }
 
 async function handleStartNowButton(
@@ -349,10 +383,6 @@ async function handleFinishButton(
 
 	const messageId = interaction.message.id;
 
-	participants.delete(messageId);
-	eventTimers.delete(messageId);
-	eventCreators.delete(messageId);
-
 	const threadId = eventThreads.get(messageId);
 	const channel = interaction.channel as TextChannel | null;
 	if (threadId && channel) {
@@ -362,7 +392,6 @@ async function handleFinishButton(
 			await thread.setArchived(true);
 		}
 	}
-	eventThreads.delete(messageId);
 
 	const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
 		COLORS.FINISHED,
@@ -372,6 +401,17 @@ async function handleFinishButton(
 
 	await interaction.message.edit({ embeds: [embed], components: [] });
 	await interaction.deferUpdate();
+
+	telemetry?.trackEventFinished(
+		interaction.guild?.id || 'unknown',
+		messageId,
+		userIdsFromMentions(participants.get(messageId) || new Set<string>()),
+	);
+
+	participants.delete(messageId);
+	eventTimers.delete(messageId);
+	eventCreators.delete(messageId);
+	eventThreads.delete(messageId);
 }
 
 async function startEvent(message: Message, participantSet: Set<string>) {
@@ -408,13 +448,17 @@ async function startEvent(message: Message, participantSet: Set<string>) {
 
 	eventThreads.set(message.id, thread.id);
 
-	const userIds = Array.from(participantSet).map((mention) =>
-		mention.replace(/[<@>]/g, ''),
-	);
+	const userIds = userIdsFromMentions(participantSet);
 
 	for (const id of userIds) {
 		await thread.members.add(id);
 	}
+
+	telemetry?.trackEventStarted(
+		message.guild?.id || 'unknown',
+		message.id,
+		userIds,
+	);
 }
 
 function updateEmbedField(
@@ -494,6 +538,12 @@ function createUserMention(userId: string) {
 	return `<@${userId}>`;
 }
 
+function userIdsFromMentions(mentions: Set<string>) {
+	return Array.from(mentions.values()).map((mention) =>
+		mention.replace(/[<@>]/g, ''),
+	);
+}
+
 function getPingsForServer(
 	interaction: ChatInputCommandInteraction,
 ): string | null {
@@ -508,4 +558,4 @@ function getPingsForServer(
 	return roles.map((role) => `||<@&${role.id}>||`).join(' ');
 }
 
-client.login(token);
+client.login(botToken);
