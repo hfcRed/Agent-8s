@@ -75,6 +75,7 @@ const participants = new Map<string, Set<string>>();
 const eventCreators = new Map<string, string>();
 const eventTimers = new Map<string, EventTimer>();
 const eventThreads = new Map<string, string>();
+const eventTimeouts = new Map<string, NodeJS.Timeout>();
 
 client.on('interactionCreate', async (interaction) => {
 	try {
@@ -229,11 +230,14 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	);
 
 	if (timeInMinutes) {
-		setTimeout(
+		const timeout = setTimeout(
 			async () => {
 				const participantSet = participants.get(message.id);
 				const timerData = eventTimers.get(message.id);
-				if (!participantSet || !timerData || timerData.hasStarted) return;
+				if (!participantSet || !timerData || timerData.hasStarted) {
+					eventTimeouts.delete(message.id);
+					return;
+				}
 
 				if (participantSet.size === MAX_PARTICIPANTS) {
 					await startEvent(message, participantSet);
@@ -242,9 +246,13 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 					updateEmbedField(embed, 'Start', 'When 8 players have signed up');
 					await message.edit({ embeds: [embed] });
 				}
+
+				eventTimeouts.delete(message.id);
 			},
 			timeInMinutes * 60 * 1000,
 		);
+
+		eventTimeouts.set(message.id, timeout);
 	}
 }
 
@@ -341,9 +349,7 @@ async function handleCancelButton(
 		userIdsFromMentions(participants.get(messageId) || new Set<string>()),
 	);
 
-	participants.delete(messageId);
-	eventTimers.delete(messageId);
-	eventCreators.delete(messageId);
+	cleanupEvent(messageId);
 }
 
 async function handleStartNowButton(
@@ -408,10 +414,7 @@ async function handleFinishButton(
 		userIdsFromMentions(participants.get(messageId) || new Set<string>()),
 	);
 
-	participants.delete(messageId);
-	eventTimers.delete(messageId);
-	eventCreators.delete(messageId);
-	eventThreads.delete(messageId);
+	cleanupEvent(messageId);
 }
 
 async function startEvent(message: Message, participantSet: Set<string>) {
@@ -419,6 +422,12 @@ async function startEvent(message: Message, participantSet: Set<string>) {
 	if (!timerData || timerData.hasStarted) return;
 
 	timerData.hasStarted = true;
+
+	const timeout = eventTimeouts.get(message.id);
+	if (timeout) {
+		clearTimeout(timeout);
+		eventTimeouts.delete(message.id);
+	}
 
 	const embed = EmbedBuilder.from(message.embeds[0]).setColor(COLORS.STARTED);
 
@@ -558,4 +567,63 @@ function getPingsForServer(
 	return roles.map((role) => `||<@&${role.id}>||`).join(' ');
 }
 
+function cleanupEvent(messageId: string) {
+	const timeout = eventTimeouts.get(messageId);
+	if (timeout) {
+		clearTimeout(timeout);
+		eventTimeouts.delete(messageId);
+	}
+
+	participants.delete(messageId);
+	eventCreators.delete(messageId);
+	eventTimers.delete(messageId);
+	eventThreads.delete(messageId);
+}
+
+async function cleanupStaleEvents() {
+	const MAX_EVENT_LIFETIME = 24 * 60 * 60 * 1000;
+	const now = Date.now();
+
+	for (const [messageId, timerData] of eventTimers.entries()) {
+		if (now - timerData.startTime < MAX_EVENT_LIFETIME) return;
+
+		try {
+			for (const [_, channel] of client.channels.cache) {
+				if (!channel.isTextBased() || channel.isDMBased()) continue;
+
+				const message = await channel.messages.fetch(messageId);
+
+				const embed = EmbedBuilder.from(message.embeds[0]).setColor(
+					COLORS.CANCELLED,
+				);
+				updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
+
+				await message.edit({ embeds: [embed], components: [] });
+
+				const threadId = eventThreads.get(messageId);
+				if (threadId && channel.isThread() === false) {
+					const thread = await (channel as TextChannel).threads.fetch(threadId);
+					if (thread) {
+						await thread.setLocked(true);
+						await thread.setArchived(true);
+					}
+				}
+
+				telemetry?.trackEventExpired(
+					message.guild?.id || 'unknown',
+					messageId,
+					userIdsFromMentions(participants.get(messageId) || new Set<string>()),
+				);
+
+				break;
+			}
+		} catch (error) {
+			console.error(error);
+		} finally {
+			cleanupEvent(messageId);
+		}
+	}
+}
+
+setInterval(cleanupStaleEvents, 60 * 60 * 1000);
 client.login(botToken);

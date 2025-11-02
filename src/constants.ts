@@ -15,6 +15,7 @@ export const STATUS_MESSAGES = {
 	STARTED: '✅ Event Started!',
 	CANCELLED: '❌ Event cancelled',
 	FINISHED: '🏁 Event Finished',
+	EXPIRED: '⏰ Event Expired (24h timeout)',
 } as const;
 
 export const ERROR_MESSAGES = {

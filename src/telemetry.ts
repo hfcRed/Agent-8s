@@ -112,4 +112,18 @@ export class TelemetryService {
 			data: { participants },
 		});
 	}
+
+	async trackEventExpired(
+		guildId: string,
+		eventId: string,
+		participants: string[],
+	) {
+		await this.sendEvent({
+			event: 'event_expired',
+			guildId,
+			eventId,
+			timestamp: Date.now(),
+			data: { participants },
+		});
+	}
 }
