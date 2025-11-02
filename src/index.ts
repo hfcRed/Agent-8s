@@ -80,7 +80,8 @@ client.once('clientReady', async () => {
 	});
 });
 
-const participants = new Map<string, ParticipantMap>();
+// The key is the message ID of the bot message created for the event
+const eventParticipants = new Map<string, ParticipantMap>();
 const eventCreators = new Map<string, string>();
 const eventTimers = new Map<string, EventTimer>();
 const eventThreads = new Map<string, string>();
@@ -99,7 +100,7 @@ client.on('interactionCreate', async (interaction) => {
 
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
-		const participantMap = participants.get(messageId);
+		const participantMap = eventParticipants.get(messageId);
 
 		if (!participantMap) return;
 
@@ -260,7 +261,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	});
 	const message = await reply.fetch();
 
-	participants.set(
+	eventParticipants.set(
 		message.id,
 		new Map([[userMention, { userId: userMention, role: null }]]),
 	);
@@ -281,7 +282,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	if (timeInMinutes) {
 		const timeout = setTimeout(
 			async () => {
-				const participantSet = participants.get(message.id);
+				const participantSet = eventParticipants.get(message.id);
 				const timerData = eventTimers.get(message.id);
 				if (!participantSet || !timerData || timerData.hasStarted) {
 					eventTimeouts.delete(message.id);
@@ -396,7 +397,7 @@ async function handleCancelButton(
 		interaction.guild?.id || 'unknown',
 		messageId,
 		userMentionsToUserIds(
-			participants.get(messageId) ||
+			eventParticipants.get(messageId) ||
 				new Map<string, { userId: string; role: string | null }>(),
 		),
 	);
@@ -464,7 +465,7 @@ async function handleFinishButton(
 		interaction.guild?.id || 'unknown',
 		messageId,
 		userMentionsToUserIds(
-			participants.get(messageId) ||
+			eventParticipants.get(messageId) ||
 				new Map<string, { userId: string; role: string | null }>(),
 		),
 	);
@@ -630,7 +631,7 @@ async function updateParticipantEmbed(
 
 function isUserInAnyEvent(userId: string): boolean {
 	const mention = createUserMention(userId);
-	for (const [_, participantSet] of participants.entries()) {
+	for (const [_, participantSet] of eventParticipants.entries()) {
 		if (participantSet.has(mention)) {
 			return true;
 		}
@@ -675,7 +676,7 @@ function cleanupEvent(messageId: string) {
 		eventTimeouts.delete(messageId);
 	}
 
-	participants.delete(messageId);
+	eventParticipants.delete(messageId);
 	eventCreators.delete(messageId);
 	eventTimers.delete(messageId);
 	eventThreads.delete(messageId);
@@ -714,7 +715,7 @@ async function cleanupStaleEvents() {
 					message.guild?.id || 'unknown',
 					messageId,
 					userMentionsToUserIds(
-						participants.get(messageId) ||
+						eventParticipants.get(messageId) ||
 							new Map<string, { userId: string; role: string | null }>(),
 					),
 				);
