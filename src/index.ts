@@ -17,6 +17,7 @@ import {
 import dotenv from 'dotenv';
 import {
 	COLORS,
+	PING_ROLE_NAMES,
 	ERROR_MESSAGES,
 	MAX_PARTICIPANTS,
 	STATUS_MESSAGES,
@@ -51,6 +52,7 @@ const rest = new REST({ version: '10' }).setToken(token);
 
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+	allowedMentions: { parse: ['roles']}
 });
 
 client.once('clientReady', async () => {
@@ -184,7 +186,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		},
 		{ name: 'Status', value: STATUS_MESSAGES.OPEN },
 	];
-
+	
 	const embed = new EmbedBuilder()
 		.setAuthor({
 			name: interaction.user.username,
@@ -193,8 +195,11 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		.setTitle('8s Sign Up')
 		.addFields(embedFields)
 		.setColor(COLORS.OPEN);
+	
+	const rolePing = getPingsForServer(interaction);
 
 	const reply = await interaction.reply({
+		content: rolePing || undefined,
 		embeds: [embed],
 		components: [row],
 	});
@@ -487,6 +492,18 @@ function isUserInAnyEvent(userId: string): boolean {
 
 function createUserMention(userId: string) {
 	return `<@${userId}>`;
+}
+
+function getPingsForServer(interaction: ChatInputCommandInteraction): string | null {
+    if (!interaction.guild) return null;
+    
+    const roles = interaction.guild.roles.cache.filter(
+        role => PING_ROLE_NAMES.includes(role.name)
+    );
+    
+    if (roles.size === 0) return null;
+    
+    return roles.map(role => `||<@&${role.id}>||`).join(' ');
 }
 
 client.login(token);
