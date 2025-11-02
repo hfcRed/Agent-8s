@@ -26,4 +26,5 @@ export const ERROR_MESSAGES = {
 	CREATOR_ONLY_FINISH: 'Only the event creator can finish this event.',
 	CREATOR_CANNOT_SIGNOUT:
 		'The event creator cannot sign out. Please cancel the event instead.',
+	NOT_SIGNED_UP: 'You need to be signed up to perform this action.',
 } as const;

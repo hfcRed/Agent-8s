@@ -12,6 +12,9 @@ import {
 	REST,
 	Routes,
 	SlashCommandBuilder,
+	StringSelectMenuBuilder,
+	type StringSelectMenuInteraction,
+	StringSelectMenuOptionBuilder,
 	type TextChannel,
 } from 'discord.js';
 import dotenv from 'dotenv';
@@ -23,7 +26,7 @@ import {
 	STATUS_MESSAGES,
 } from './constants.js';
 import { TelemetryService } from './telemetry.js';
-import type { EventTimer } from './types.js';
+import type { EventTimer, ParticipantMap } from './types.js';
 
 const parsed = dotenv.config();
 const botToken = parsed.parsed?.BOT_TOKEN;
@@ -77,7 +80,7 @@ client.once('clientReady', async () => {
 	});
 });
 
-const participants = new Map<string, Set<string>>();
+const participants = new Map<string, ParticipantMap>();
 const eventCreators = new Map<string, string>();
 const eventTimers = new Map<string, EventTimer>();
 const eventThreads = new Map<string, string>();
@@ -92,22 +95,26 @@ client.on('interactionCreate', async (interaction) => {
 			await handleCreateCommand(interaction);
 		}
 
-		if (interaction.isButton()) {
-			const messageId = interaction.message.id;
-			const userId = interaction.user.id;
+		if (!interaction.isMessageComponent()) return;
 
-			const participantSet = participants.get(messageId);
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = participants.get(messageId);
+
+		if (!participantMap) return;
+
+		if (interaction.isButton()) {
 			const timerData = eventTimers.get(messageId);
 			const creatorId = eventCreators.get(messageId);
 
-			if (!participantSet || !timerData || !creatorId) return;
+			if (!timerData || !creatorId) return;
 
 			switch (interaction.customId) {
 				case 'signup':
 					await handleSignUpButton(
 						interaction,
 						userId,
-						participantSet,
+						participantMap,
 						timerData,
 					);
 					break;
@@ -115,7 +122,7 @@ client.on('interactionCreate', async (interaction) => {
 					await handleSignOutButton(
 						interaction,
 						userId,
-						participantSet,
+						participantMap,
 						creatorId,
 						timerData,
 					);
@@ -127,7 +134,7 @@ client.on('interactionCreate', async (interaction) => {
 					await handleStartNowButton(
 						interaction,
 						userId,
-						participantSet,
+						participantMap,
 						creatorId,
 					);
 					break;
@@ -135,6 +142,10 @@ client.on('interactionCreate', async (interaction) => {
 					await handleFinishButton(interaction, userId, creatorId);
 					break;
 			}
+		}
+
+		if (interaction.isStringSelectMenu()) {
+			await handleRoleSelection(interaction, userId, participantMap);
 		}
 	} catch (error) {
 		console.error(error);
@@ -190,10 +201,38 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		);
 	}
 
-	const row = new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons);
+	const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+		...buttons,
+	);
+
+	const select = new StringSelectMenuBuilder()
+		.setCustomId('select')
+		.setPlaceholder('Select a weapon role')
+		.addOptions(
+			new StringSelectMenuOptionBuilder().setLabel('Slayer').setValue('slayer'),
+			new StringSelectMenuOptionBuilder()
+				.setLabel('Support')
+				.setValue('support'),
+			new StringSelectMenuOptionBuilder()
+				.setLabel('Skirmisher')
+				.setValue('skirmisher'),
+			new StringSelectMenuOptionBuilder()
+				.setLabel('Backline')
+				.setValue('backline'),
+			new StringSelectMenuOptionBuilder().setLabel('Flex').setValue('flex'),
+			new StringSelectMenuOptionBuilder().setLabel('Cooler').setValue('cooler'),
+		);
+
+	const selectRow =
+		new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
 
 	const embedFields = [
-		{ name: 'Participants (1)', value: `- ${userMention}` },
+		{ name: 'Participants (1)', value: `- ${userMention}`, inline: true },
+		{
+			name: 'Role',
+			value: '- None',
+			inline: true,
+		},
 		{
 			name: 'Start',
 			value: timeInMinutes
@@ -217,11 +256,14 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	const reply = await interaction.reply({
 		content: rolePing || undefined,
 		embeds: [embed],
-		components: [row],
+		components: [buttonRow, selectRow],
 	});
 	const message = await reply.fetch();
 
-	participants.set(message.id, new Set([userMention]));
+	participants.set(
+		message.id,
+		new Map([[userMention, { userId: userMention, role: null }]]),
+	);
 	eventCreators.set(message.id, interaction.user.id);
 	eventTimers.set(message.id, {
 		startTime,
@@ -266,14 +308,14 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 async function handleSignUpButton(
 	interaction: ButtonInteraction,
 	userId: string,
-	participantSet: Set<string>,
+	participantMap: ParticipantMap,
 	timerData: EventTimer,
 ) {
 	const userMention = createUserMention(userId);
 
 	if (
-		participantSet.size >= MAX_PARTICIPANTS &&
-		!participantSet.has(userMention)
+		participantMap.size >= MAX_PARTICIPANTS &&
+		!participantMap.has(userMention)
 	) {
 		await interaction.deferUpdate();
 		return;
@@ -287,22 +329,22 @@ async function handleSignUpButton(
 		return;
 	}
 
-	participantSet.add(userMention);
+	participantMap.set(userMention, { userId: userMention, role: null });
 
 	telemetry?.trackUserSignUp(
 		interaction.guild?.id || 'unknown',
 		interaction.message.id,
 		interaction.user.id,
-		userIdsFromMentions(participantSet),
+		userMentionsToUserIds(participantMap),
 	);
 
-	await updateParticipantEmbed(interaction, participantSet, timerData);
+	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
 
 async function handleSignOutButton(
 	interaction: ButtonInteraction,
 	userId: string,
-	participantSet: Set<string>,
+	participantMap: ParticipantMap,
 	creatorId: string,
 	timerData: EventTimer,
 ) {
@@ -315,16 +357,16 @@ async function handleSignOutButton(
 	}
 
 	const userMention = createUserMention(userId);
-	participantSet.delete(userMention);
+	participantMap.delete(userMention);
 
 	telemetry?.trackUserSignOut(
 		interaction.guild?.id || 'unknown',
 		interaction.message.id,
 		interaction.user.id,
-		userIdsFromMentions(participantSet),
+		userMentionsToUserIds(participantMap),
 	);
 
-	await updateParticipantEmbed(interaction, participantSet, timerData);
+	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
 
 async function handleCancelButton(
@@ -347,13 +389,16 @@ async function handleCancelButton(
 
 	updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
 
-	await interaction.message.edit({ embeds: [embed], components: [] });
 	await interaction.deferUpdate();
+	await interaction.message.edit({ embeds: [embed], components: [] });
 
 	telemetry?.trackEventCancelled(
 		interaction.guild?.id || 'unknown',
 		messageId,
-		userIdsFromMentions(participants.get(messageId) || new Set<string>()),
+		userMentionsToUserIds(
+			participants.get(messageId) ||
+				new Map<string, { userId: string; role: string | null }>(),
+		),
 	);
 
 	cleanupEvent(messageId);
@@ -362,7 +407,7 @@ async function handleCancelButton(
 async function handleStartNowButton(
 	interaction: ButtonInteraction,
 	userId: string,
-	participantSet: Set<string>,
+	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
 	if (userId !== creatorId) {
@@ -373,12 +418,12 @@ async function handleStartNowButton(
 		return;
 	}
 
-	if (participantSet.size !== MAX_PARTICIPANTS) {
+	if (participantMap.size !== MAX_PARTICIPANTS) {
 		await interaction.deferUpdate();
 		return;
 	}
 
-	await startEvent(interaction.message, participantSet);
+	await startEvent(interaction.message, participantMap);
 }
 
 async function handleFinishButton(
@@ -412,19 +457,55 @@ async function handleFinishButton(
 
 	updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
 
-	await interaction.message.edit({ embeds: [embed], components: [] });
 	await interaction.deferUpdate();
+	await interaction.message.edit({ embeds: [embed], components: [] });
 
 	telemetry?.trackEventFinished(
 		interaction.guild?.id || 'unknown',
 		messageId,
-		userIdsFromMentions(participants.get(messageId) || new Set<string>()),
+		userMentionsToUserIds(
+			participants.get(messageId) ||
+				new Map<string, { userId: string; role: string | null }>(),
+		),
 	);
 
 	cleanupEvent(messageId);
 }
 
-async function startEvent(message: Message, participantSet: Set<string>) {
+async function handleRoleSelection(
+	interaction: StringSelectMenuInteraction,
+	userId: string,
+	participantMap: ParticipantMap,
+) {
+	const userMention = createUserMention(userId);
+	if (!participantMap.has(userMention)) {
+		await interaction.reply({
+			content: ERROR_MESSAGES.NOT_SIGNED_UP,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	const selectedValue = interaction.values[0];
+	const component = interaction.component;
+	const selectedOption = component.options.find(
+		(option) => option.value === selectedValue,
+	);
+	const selectedRole = selectedOption?.label || selectedValue;
+
+	participantMap.set(userMention, {
+		userId: userMention,
+		role: selectedRole,
+	});
+
+	const timerData = eventTimers.get(interaction.message.id);
+
+	if (!timerData) return;
+
+	await updateParticipantEmbed(interaction, participantMap, timerData);
+}
+
+async function startEvent(message: Message, participantMap: ParticipantMap) {
 	const timerData = eventTimers.get(message.id);
 	if (!timerData || timerData.hasStarted) return;
 
@@ -464,16 +545,16 @@ async function startEvent(message: Message, participantSet: Set<string>) {
 
 	eventThreads.set(message.id, thread.id);
 
-	const userIds = userIdsFromMentions(participantSet);
+	const newParticipantsMap = userMentionsToUserIds(participantMap);
 
-	for (const id of userIds) {
-		await thread.members.add(id);
+	for (const participant of newParticipantsMap) {
+		await thread.members.add(participant.userId);
 	}
 
 	telemetry?.trackEventStarted(
 		message.guild?.id || 'unknown',
 		message.id,
-		userIds,
+		newParticipantsMap,
 	);
 }
 
@@ -506,16 +587,14 @@ function updateEmbedFieldByMatch(
 }
 
 async function updateParticipantEmbed(
-	interaction: ButtonInteraction,
-	participantSet: Set<string>,
+	interaction: ButtonInteraction | StringSelectMenuInteraction,
+	participantMap: ParticipantMap,
 	timerData: EventTimer,
 ) {
-	await interaction.deferUpdate();
-
 	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
 
 	const status =
-		participantSet.size === MAX_PARTICIPANTS
+		participantMap.size === MAX_PARTICIPANTS
 			? STATUS_MESSAGES.READY
 			: STATUS_MESSAGES.OPEN;
 	updateEmbedField(embed, 'Status', status);
@@ -523,20 +602,29 @@ async function updateParticipantEmbed(
 	updateEmbedFieldByMatch(
 		embed,
 		'Participants',
-		`Participants (${participantSet.size})`,
-		Array.from(participantSet)
-			.map((p) => `- ${p}`)
+		`Participants (${participantMap.size})`,
+		Array.from(participantMap)
+			.map((p) => `- ${p[1].userId}`)
 			.join('\n'),
 	);
 
+	updateEmbedField(
+		embed,
+		'Role',
+		Array.from(participantMap.values())
+			.map((p) => `- ${p.role || 'None'}`)
+			.join('\n'),
+	);
+
+	await interaction.deferUpdate();
 	await interaction.message.edit({ embeds: [embed] });
 
 	const timeElapsed = Date.now() - timerData.startTime;
 	const timeIsUpOrNotSet =
 		timerData.duration === 0 || timeElapsed >= timerData.duration;
 
-	if (participantSet.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
-		await startEvent(interaction.message, participantSet);
+	if (participantMap.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
+		await startEvent(interaction.message, participantMap);
 	}
 }
 
@@ -554,10 +642,13 @@ function createUserMention(userId: string) {
 	return `<@${userId}>`;
 }
 
-function userIdsFromMentions(mentions: Set<string>) {
-	return Array.from(mentions.values()).map((mention) =>
-		mention.replace(/[<@>]/g, ''),
-	);
+function userMentionsToUserIds(mentions: ParticipantMap) {
+	return Array.from(mentions.values()).map((mention) => {
+		return {
+			userId: mention.userId.replace(/[<@>]/g, ''),
+			role: mention.role,
+		};
+	});
 }
 
 function getPingsForServer(
@@ -622,7 +713,10 @@ async function cleanupStaleEvents() {
 				telemetry?.trackEventExpired(
 					message.guild?.id || 'unknown',
 					messageId,
-					userIdsFromMentions(participants.get(messageId) || new Set<string>()),
+					userMentionsToUserIds(
+						participants.get(messageId) ||
+							new Map<string, { userId: string; role: string | null }>(),
+					),
 				);
 
 				break;

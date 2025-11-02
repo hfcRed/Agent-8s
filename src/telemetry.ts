@@ -1,4 +1,4 @@
-import type { TelemetryEvent } from './types';
+import type { ParticipantData, TelemetryEvent } from './types';
 
 export class TelemetryService {
 	private backendUrl: string;
@@ -45,7 +45,7 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		userId: string,
-		participants: string[],
+		participants: ParticipantData[],
 	) {
 		await this.sendEvent({
 			event: 'user_signed_up',
@@ -60,7 +60,7 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		userId: string,
-		participants: string[],
+		participants: ParticipantData[],
 	) {
 		await this.sendEvent({
 			event: 'user_signed_out',
@@ -74,7 +74,7 @@ export class TelemetryService {
 	async trackEventCancelled(
 		guildId: string,
 		eventId: string,
-		participants: string[],
+		participants: ParticipantData[],
 	) {
 		await this.sendEvent({
 			event: 'event_cancelled',
@@ -88,7 +88,7 @@ export class TelemetryService {
 	async trackEventStarted(
 		guildId: string,
 		eventId: string,
-		participants: string[],
+		participants: ParticipantData[],
 	) {
 		await this.sendEvent({
 			event: 'event_started',
@@ -102,7 +102,7 @@ export class TelemetryService {
 	async trackEventFinished(
 		guildId: string,
 		eventId: string,
-		participants: string[],
+		participants: ParticipantData[],
 	) {
 		await this.sendEvent({
 			event: 'event_finished',
@@ -116,7 +116,7 @@ export class TelemetryService {
 	async trackEventExpired(
 		guildId: string,
 		eventId: string,
-		participants: string[],
+		participants: ParticipantData[],
 	) {
 		await this.sendEvent({
 			event: 'event_expired',
