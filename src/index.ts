@@ -53,6 +53,12 @@ const commands = [
 				.setRequired(false)
 				.setMinValue(1),
 		)
+		.addBooleanOption((option) =>
+			option
+				.setName('casual')
+				.setDescription('Whether to ping casual roles.')
+				.setRequired(false),
+		)
 		.toJSON(),
 ];
 
@@ -151,6 +157,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		return;
 	}
 
+	const casual = !!interaction.options.getBoolean('casual', false);
 	const timeInMinutes = interaction.options.getInteger('time', false);
 	const startTime = Date.now();
 	const userMention = createUserMention(interaction.user.id);
@@ -201,11 +208,11 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 			name: interaction.user.username,
 			iconURL: interaction.user.displayAvatarURL(),
 		})
-		.setTitle('8s Sign Up')
+		.setTitle(`${casual ? '[Casual] ' : '[Competitive]'} 8s Sign Up`)
 		.addFields(embedFields)
 		.setColor(COLORS.OPEN);
 
-	const rolePing = getPingsForServer(interaction);
+	const rolePing = getPingsForServer(interaction, casual);
 
 	const reply = await interaction.reply({
 		content: rolePing || undefined,
@@ -555,11 +562,14 @@ function userIdsFromMentions(mentions: Set<string>) {
 
 function getPingsForServer(
 	interaction: ChatInputCommandInteraction,
+	casual: boolean,
 ): string | null {
 	if (!interaction.guild) return null;
 
-	const roles = interaction.guild.roles.cache.filter((role) =>
-		PING_ROLE_NAMES.includes(role.name),
+	const roles = interaction.guild.roles.cache.filter(
+		(role) =>
+			PING_ROLE_NAMES.includes(role.name) &&
+			(casual || !role.name.toLowerCase().includes('casual')),
 	);
 
 	if (roles.size === 0) return null;
