@@ -1,10 +1,6 @@
 import type { EventRecorder } from './event-recorder.js';
 import { recordTelemetryDispatch, recordTelemetryFailure } from './metrics.js';
-import type {
-	ParticipantData,
-	TelemetryContext,
-	TelemetryEvent,
-} from './types';
+import type { TelemetryEventData } from './types';
 
 /**
  * Class for forwarding events to a telemetry backend.
@@ -26,8 +22,8 @@ export class TelemetryService {
 			);
 	}
 
-	private async sendEvent(event: TelemetryEvent, context: TelemetryContext) {
-		await this.recorder?.record(event, context);
+	private async sendEvent(event: string, data: TelemetryEventData) {
+		await this.recorder?.record(event, data);
 
 		try {
 			const headers = {
@@ -41,146 +37,38 @@ export class TelemetryService {
 				body: JSON.stringify(event),
 			});
 
-			recordTelemetryDispatch(event.event, event.guildId, context.channelId);
+			recordTelemetryDispatch(event, data.guildId, data.channelId);
 		} catch (error) {
 			console.error(error);
-			recordTelemetryFailure(event.event, event.guildId, context.channelId);
+			recordTelemetryFailure(event, data.guildId, data.channelId);
 		}
 	}
 
-	async trackEventCreated(
-		guildId: string,
-		eventId: string,
-		userId: string,
-		channelId: string,
-		matchId: string,
-		timeToStart?: number,
-	) {
-		await this.sendEvent(
-			{
-				event: 'event_created',
-				guildId,
-				eventId,
-				timestamp: Date.now(),
-				data: { userId, timeToStart },
-			},
-			{ channelId, matchId },
-		);
+	async trackEventCreated(data: TelemetryEventData) {
+		await this.sendEvent('event_created', data);
 	}
 
-	async trackUserSignUp(
-		guildId: string,
-		eventId: string,
-		userId: string,
-		participants: ParticipantData[],
-		channelId: string,
-		matchId: string,
-	) {
-		await this.sendEvent(
-			{
-				event: 'user_signed_up',
-				guildId,
-				eventId,
-				timestamp: Date.now(),
-				data: { userId, participants },
-			},
-			{ channelId, matchId },
-		);
+	async trackUserSignUp(data: TelemetryEventData) {
+		await this.sendEvent('user_signed_up', data);
 	}
 
-	async trackUserSignOut(
-		guildId: string,
-		eventId: string,
-		userId: string,
-		participants: ParticipantData[],
-		channelId: string,
-		matchId: string,
-	) {
-		await this.sendEvent(
-			{
-				event: 'user_signed_out',
-				guildId,
-				eventId,
-				timestamp: Date.now(),
-				data: { userId, participants },
-			},
-			{ channelId, matchId },
-		);
+	async trackUserSignOut(data: TelemetryEventData) {
+		await this.sendEvent('user_signed_out', data);
 	}
 
-	async trackEventCancelled(
-		guildId: string,
-		eventId: string,
-		participants: ParticipantData[],
-		channelId: string,
-		matchId: string,
-	) {
-		await this.sendEvent(
-			{
-				event: 'event_cancelled',
-				guildId,
-				eventId,
-				timestamp: Date.now(),
-				data: { participants },
-			},
-			{ channelId, matchId },
-		);
+	async trackEventCancelled(data: TelemetryEventData) {
+		await this.sendEvent('event_cancelled', data);
 	}
 
-	async trackEventStarted(
-		guildId: string,
-		eventId: string,
-		participants: ParticipantData[],
-		channelId: string,
-		matchId: string,
-	) {
-		await this.sendEvent(
-			{
-				event: 'event_started',
-				guildId,
-				eventId,
-				timestamp: Date.now(),
-				data: { participants },
-			},
-			{ channelId, matchId },
-		);
+	async trackEventStarted(data: TelemetryEventData) {
+		await this.sendEvent('event_started', data);
 	}
 
-	async trackEventFinished(
-		guildId: string,
-		eventId: string,
-		participants: ParticipantData[],
-		channelId: string,
-		matchId: string,
-	) {
-		await this.sendEvent(
-			{
-				event: 'event_finished',
-				guildId,
-				eventId,
-				timestamp: Date.now(),
-				data: { participants },
-			},
-			{ channelId, matchId },
-		);
+	async trackEventFinished(data: TelemetryEventData) {
+		await this.sendEvent('event_finished', data);
 	}
 
-	async trackEventExpired(
-		guildId: string,
-		eventId: string,
-		participants: ParticipantData[],
-		channelId: string,
-		matchId: string,
-	) {
-		await this.sendEvent(
-			{
-				event: 'event_expired',
-				guildId,
-				eventId,
-				timestamp: Date.now(),
-				data: { participants },
-			},
-			{ channelId, matchId },
-		);
+	async trackEventExpired(data: TelemetryEventData) {
+		await this.sendEvent('event_expired', data);
 	}
 }

@@ -151,7 +151,12 @@ appClient.on('interactionCreate', async (interaction) => {
 					);
 					break;
 				case 'cancel':
-					await handleCancelButton(interaction, userId, creatorId);
+					await handleCancelButton(
+						interaction,
+						userId,
+						participantMap,
+						creatorId,
+					);
 					break;
 				case 'startnow':
 					await handleStartNowButton(
@@ -162,7 +167,12 @@ appClient.on('interactionCreate', async (interaction) => {
 					);
 					break;
 				case 'finish':
-					await handleFinishButton(interaction, userId, creatorId);
+					await handleFinishButton(
+						interaction,
+						userId,
+						participantMap,
+						creatorId,
+					);
 					break;
 			}
 		}
@@ -196,7 +206,8 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	}
 
 	const casual = !!interaction.options.getBoolean('casual', false);
-	const timeInMinutes = interaction.options.getInteger('time', false);
+	const timeInMinutes =
+		interaction.options.getInteger('time', false) ?? undefined;
 	const startTime = Date.now();
 	const userMention = createUserMention(interaction.user.id);
 
@@ -300,14 +311,17 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	});
 	eventMatchIds.set(message.id, matchId);
 
-	telemetry?.trackEventCreated(
-		interaction.guild?.id || 'unknown',
-		message.id,
-		interaction.user.id,
-		interaction.channelId,
+	telemetry?.trackEventCreated({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: message.id,
+		userId: interaction.user.id,
+		participants: userMentionsToUserIds(
+			eventParticipants.get(message.id) || new Map(),
+		),
+		channelId: interaction.channelId,
 		matchId,
-		timeInMinutes || undefined,
-	);
+		timeToStart: timeInMinutes,
+	});
 
 	if (timeInMinutes) {
 		const timeout = setTimeout(
@@ -366,14 +380,14 @@ async function handleSignUpButton(
 	participantMap.set(userMention, { userId: userMention, role: null });
 
 	const matchId = eventMatchIds.get(interaction.message.id);
-	telemetry?.trackUserSignUp(
-		interaction.guild?.id || 'unknown',
-		interaction.message.id,
-		interaction.user.id,
-		userMentionsToUserIds(participantMap),
-		interaction.channelId,
-		matchId || 'unknown',
-	);
+	telemetry?.trackUserSignUp({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: interaction.message.id,
+		userId: userId,
+		participants: userMentionsToUserIds(participantMap),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
@@ -401,14 +415,14 @@ async function handleSignOutButton(
 	participantMap.delete(userMention);
 
 	const matchId = eventMatchIds.get(interaction.message.id);
-	telemetry?.trackUserSignOut(
-		interaction.guild?.id || 'unknown',
-		interaction.message.id,
-		interaction.user.id,
-		userMentionsToUserIds(participantMap),
-		interaction.channelId,
-		matchId || 'unknown',
-	);
+	telemetry?.trackUserSignOut({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: interaction.message.id,
+		userId: userId,
+		participants: userMentionsToUserIds(participantMap),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
@@ -419,6 +433,7 @@ async function handleSignOutButton(
 async function handleCancelButton(
 	interaction: ButtonInteraction,
 	userId: string,
+	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
 	if (userId !== creatorId) {
@@ -440,16 +455,14 @@ async function handleCancelButton(
 	await interaction.message.edit({ embeds: [embed], components: [] });
 
 	const matchId = eventMatchIds.get(messageId);
-	telemetry?.trackEventCancelled(
-		interaction.guild?.id || 'unknown',
-		messageId,
-		userMentionsToUserIds(
-			eventParticipants.get(messageId) ||
-				new Map<string, { userId: string; role: string | null }>(),
-		),
-		interaction.channelId,
-		matchId || 'unknown',
-	);
+	telemetry?.trackEventCancelled({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: messageId,
+		userId: userId,
+		participants: userMentionsToUserIds(participantMap),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
 
 	cleanupEvent(messageId);
 }
@@ -487,6 +500,7 @@ async function handleStartNowButton(
 async function handleFinishButton(
 	interaction: ButtonInteraction,
 	userId: string,
+	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
 	if (userId !== creatorId) {
@@ -519,16 +533,14 @@ async function handleFinishButton(
 	await interaction.message.edit({ embeds: [embed], components: [] });
 
 	const matchId = eventMatchIds.get(messageId);
-	telemetry?.trackEventFinished(
-		interaction.guild?.id || 'unknown',
-		messageId,
-		userMentionsToUserIds(
-			eventParticipants.get(messageId) ||
-				new Map<string, { userId: string; role: string | null }>(),
-		),
-		interaction.channelId,
-		matchId || 'unknown',
-	);
+	telemetry?.trackEventFinished({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: messageId,
+		userId: userId,
+		participants: userMentionsToUserIds(participantMap),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
 
 	cleanupEvent(messageId);
 }
@@ -621,13 +633,14 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 		await thread.members.add(participant.userId);
 	}
 
-	telemetry?.trackEventStarted(
-		message.guild?.id || 'unknown',
-		message.id,
-		newParticipantsMap,
-		message.channelId,
-		matchId || 'unknown',
-	);
+	telemetry?.trackEventStarted({
+		guildId: message.guild?.id || 'unknown',
+		eventId: message.id,
+		userId: eventCreators.get(message.id) || 'unknown',
+		participants: newParticipantsMap,
+		channelId: message.channelId,
+		matchId: matchId || 'unknown',
+	});
 }
 
 /**
@@ -813,16 +826,16 @@ async function cleanupStaleEvents() {
 				}
 
 				const matchId = eventMatchIds.get(messageId);
-				telemetry?.trackEventExpired(
-					message.guild?.id || 'unknown',
-					messageId,
-					userMentionsToUserIds(
-						eventParticipants.get(messageId) ||
-							new Map<string, { userId: string; role: string | null }>(),
+				telemetry?.trackEventExpired({
+					guildId: message.guild?.id || 'unknown',
+					eventId: messageId,
+					userId: '1434173887888887908',
+					participants: userMentionsToUserIds(
+						eventParticipants.get(messageId) || new Map(),
 					),
-					message.channelId,
-					matchId || 'unknown',
-				);
+					channelId: message.channelId,
+					matchId: matchId || 'unknown',
+				});
 
 				break;
 			}

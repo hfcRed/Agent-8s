@@ -1,21 +1,16 @@
 import { Pool } from 'pg';
 import { DEFAULT_SCHEMA, DEFAULT_TABLE } from './constants.js';
-import type {
-	EventRecorderOptions,
-	ParticipantRecord,
-	TelemetryContext,
-	TelemetryEvent,
-} from './types.js';
+import type { EventRecorderOptions, TelemetryEventData } from './types.js';
 
 /**
  * Class for persisting telemetry events to a PostgreSQL database.
  */
 export class EventRecorder {
-	private pool: Pool;
-	private initialized = false;
 	private readonly schemaName: string;
 	private readonly tableName: string;
 	private readonly tableReference: string;
+	private pool: Pool;
+	private initialized = false;
 
 	constructor(connectionString: string, options: EventRecorderOptions = {}) {
 		this.schemaName = this.resolveIdentifier(options.schema, DEFAULT_SCHEMA);
@@ -32,12 +27,13 @@ export class EventRecorder {
 		}
 	}
 
-	async record(event: TelemetryEvent, context: TelemetryContext) {
+	async record(event: string, data: TelemetryEventData) {
 		try {
 			await this.ensureSchema();
 
-			const actorUserId = this.extractActorUserId(event);
-			const participantIds = this.extractParticipantIds(event);
+			const timestamp = Date.now();
+			const actorUserId = data.userId;
+			const participantIds = data.participants.map((p) => p.userId);
 
 			await this.pool.query(
 				`INSERT INTO ${this.tableReference} (
@@ -52,15 +48,15 @@ export class EventRecorder {
 					occurred_at
 				) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, to_timestamp($9 / 1000.0))`,
 				[
-					context.matchId,
-					event.event,
-					event.guildId,
-					context.channelId,
-					event.eventId,
+					data.matchId,
+					event,
+					data.guildId,
+					data.channelId,
+					data.eventId,
 					actorUserId,
 					participantIds ? JSON.stringify(participantIds) : null,
-					JSON.stringify(event.data),
-					event.timestamp,
+					JSON.stringify(data),
+					timestamp,
 				],
 			);
 		} catch (error) {
@@ -96,35 +92,6 @@ export class EventRecorder {
 		`);
 
 		this.initialized = true;
-	}
-
-	private extractActorUserId(event: TelemetryEvent) {
-		const { data } = event;
-		if (!data) return null;
-
-		const potentialUserId = (data as Record<string, unknown>).userId;
-		return typeof potentialUserId === 'string' ? potentialUserId : null;
-	}
-
-	private extractParticipantIds(event: TelemetryEvent) {
-		const { data } = event;
-		if (!data) return null;
-
-		const participants = (data as Record<string, unknown>).participants as
-			| ParticipantRecord[]
-			| undefined;
-
-		if (!Array.isArray(participants)) return null;
-
-		const ids = participants
-			.map((participant) =>
-				participant && typeof participant.userId === 'string'
-					? participant.userId
-					: null,
-			)
-			.filter((id): id is string => id !== null);
-
-		return ids.length > 0 ? ids : null;
 	}
 
 	private resolveIdentifier(

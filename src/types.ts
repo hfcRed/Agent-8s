@@ -11,21 +11,14 @@ export interface EventTimer {
 	hasStarted: boolean;
 }
 
-export interface TelemetryEvent {
-	event: string;
+export interface TelemetryEventData {
 	guildId: string;
 	eventId: string;
-	timestamp: number;
-	data: Record<string, unknown>;
-}
-
-export interface TelemetryContext {
+	userId: string;
+	participants: ParticipantData[];
 	channelId: string;
 	matchId: string;
-}
-
-export interface ParticipantRecord {
-	userId: string;
+	timeToStart?: number;
 }
 
 export interface EventRecorderOptions {
