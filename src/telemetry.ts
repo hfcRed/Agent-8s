@@ -34,7 +34,10 @@ export class TelemetryService {
 			await fetch(`${this.backendUrl}/telemetry`, {
 				method: 'POST',
 				headers,
-				body: JSON.stringify(event),
+				body: JSON.stringify({
+					event,
+					...data,
+				}),
 			});
 
 			recordTelemetryDispatch(event, data.guildId, data.channelId);
