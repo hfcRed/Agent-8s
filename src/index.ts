@@ -304,9 +304,9 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		interaction.guild?.id || 'unknown',
 		message.id,
 		interaction.user.id,
-		timeInMinutes || undefined,
 		interaction.channelId,
 		matchId,
+		timeInMinutes || undefined,
 	);
 
 	if (timeInMinutes) {
@@ -372,7 +372,7 @@ async function handleSignUpButton(
 		interaction.user.id,
 		userMentionsToUserIds(participantMap),
 		interaction.channelId,
-		matchId,
+		matchId || 'unknown',
 	);
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
@@ -407,7 +407,7 @@ async function handleSignOutButton(
 		interaction.user.id,
 		userMentionsToUserIds(participantMap),
 		interaction.channelId,
-		matchId,
+		matchId || 'unknown',
 	);
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
@@ -448,7 +448,7 @@ async function handleCancelButton(
 				new Map<string, { userId: string; role: string | null }>(),
 		),
 		interaction.channelId,
-		matchId,
+		matchId || 'unknown',
 	);
 
 	cleanupEvent(messageId);
@@ -527,7 +527,7 @@ async function handleFinishButton(
 				new Map<string, { userId: string; role: string | null }>(),
 		),
 		interaction.channelId,
-		matchId,
+		matchId || 'unknown',
 	);
 
 	cleanupEvent(messageId);
@@ -626,7 +626,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 		message.id,
 		newParticipantsMap,
 		message.channelId,
-		matchId,
+		matchId || 'unknown',
 	);
 }
 
@@ -821,7 +821,7 @@ async function cleanupStaleEvents() {
 							new Map<string, { userId: string; role: string | null }>(),
 					),
 					message.channelId,
-					matchId,
+					matchId || 'unknown',
 				);
 
 				break;

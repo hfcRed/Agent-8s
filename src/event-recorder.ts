@@ -32,7 +32,7 @@ export class EventRecorder {
 		}
 	}
 
-	async record(event: TelemetryEvent, context?: TelemetryContext) {
+	async record(event: TelemetryEvent, context: TelemetryContext) {
 		try {
 			await this.ensureSchema();
 
@@ -52,10 +52,10 @@ export class EventRecorder {
 					occurred_at
 				) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, to_timestamp($9 / 1000.0))`,
 				[
-					context?.matchId || null,
+					context.matchId,
 					event.event,
 					event.guildId,
-					context?.channelId || null,
+					context.channelId,
 					event.eventId,
 					actorUserId,
 					participantIds ? JSON.stringify(participantIds) : null,

@@ -26,10 +26,8 @@ export class TelemetryService {
 			);
 	}
 
-	private async sendEvent(event: TelemetryEvent, context?: TelemetryContext) {
+	private async sendEvent(event: TelemetryEvent, context: TelemetryContext) {
 		await this.recorder?.record(event, context);
-
-		if (!this.backendUrl || !this.apiKey) return;
 
 		try {
 			const headers = {
@@ -43,10 +41,10 @@ export class TelemetryService {
 				body: JSON.stringify(event),
 			});
 
-			recordTelemetryDispatch(event.event, event.guildId, context?.channelId);
+			recordTelemetryDispatch(event.event, event.guildId, context.channelId);
 		} catch (error) {
 			console.error(error);
-			recordTelemetryFailure(event.event, event.guildId, context?.channelId);
+			recordTelemetryFailure(event.event, event.guildId, context.channelId);
 		}
 	}
 
@@ -54,9 +52,9 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		userId: string,
+		channelId: string,
+		matchId: string,
 		timeToStart?: number,
-		channelId?: string,
-		matchId?: string,
 	) {
 		await this.sendEvent(
 			{
@@ -75,8 +73,8 @@ export class TelemetryService {
 		eventId: string,
 		userId: string,
 		participants: ParticipantData[],
-		channelId?: string,
-		matchId?: string,
+		channelId: string,
+		matchId: string,
 	) {
 		await this.sendEvent(
 			{
@@ -95,8 +93,8 @@ export class TelemetryService {
 		eventId: string,
 		userId: string,
 		participants: ParticipantData[],
-		channelId?: string,
-		matchId?: string,
+		channelId: string,
+		matchId: string,
 	) {
 		await this.sendEvent(
 			{
@@ -114,8 +112,8 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		participants: ParticipantData[],
-		channelId?: string,
-		matchId?: string,
+		channelId: string,
+		matchId: string,
 	) {
 		await this.sendEvent(
 			{
@@ -133,8 +131,8 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		participants: ParticipantData[],
-		channelId?: string,
-		matchId?: string,
+		channelId: string,
+		matchId: string,
 	) {
 		await this.sendEvent(
 			{
@@ -152,8 +150,8 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		participants: ParticipantData[],
-		channelId?: string,
-		matchId?: string,
+		channelId: string,
+		matchId: string,
 	) {
 		await this.sendEvent(
 			{
@@ -171,8 +169,8 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		participants: ParticipantData[],
-		channelId?: string,
-		matchId?: string,
+		channelId: string,
+		matchId: string,
 	) {
 		await this.sendEvent(
 			{

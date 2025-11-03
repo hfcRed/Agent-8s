@@ -20,15 +20,15 @@ export interface TelemetryEvent {
 }
 
 export interface TelemetryContext {
-	channelId?: string;
-	matchId?: string;
+	channelId: string;
+	matchId: string;
 }
 
 export interface ParticipantRecord {
-	userId?: string;
+	userId: string;
 }
 
 export interface EventRecorderOptions {
-	schema?: string | null;
-	table?: string | null;
+	schema?: string;
+	table?: string;
 }
