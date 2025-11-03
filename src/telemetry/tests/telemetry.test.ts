@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, mock, test } from 'node:test';
+import type { TelemetryContext, TelemetryEvent } from '../../types.js';
 import type { EventRecorder } from '../event-recorder.js';
-import type { TelemetryContext, TelemetryEvent } from '../types.js';
 
 process.env.METRICS_PORT = '0';
 

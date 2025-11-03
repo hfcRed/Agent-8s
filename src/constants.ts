@@ -28,6 +28,3 @@ export const ERROR_MESSAGES = {
 		'The event creator cannot sign out. Please cancel the event instead.',
 	NOT_SIGNED_UP: 'You need to be signed up to perform this action.',
 } as const;
-
-export const DEFAULT_SCHEMA = 'public';
-export const DEFAULT_TABLE = 'telemetry_events';

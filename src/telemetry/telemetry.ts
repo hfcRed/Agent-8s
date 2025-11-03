@@ -1,6 +1,6 @@
 import type { EventRecorder } from './event-recorder.js';
 import { recordTelemetryDispatch, recordTelemetryFailure } from './metrics.js';
-import type { TelemetryEventData } from './types';
+import type { TelemetryEventData } from './types.js';
 
 /**
  * Class for forwarding events to a telemetry backend.

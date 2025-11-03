@@ -26,8 +26,8 @@ import {
 	PING_ROLE_NAMES,
 	STATUS_MESSAGES,
 } from './constants.js';
-import { EventRecorder } from './event-recorder.js';
-import { TelemetryService } from './telemetry.js';
+import { EventRecorder } from './telemetry/event-recorder.js';
+import { TelemetryService } from './telemetry/telemetry.js';
 import type { EventTimer, ParticipantMap } from './types.js';
 
 const parsed = dotenv.config();
