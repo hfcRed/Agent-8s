@@ -35,12 +35,15 @@ import type { EventTimer, ParticipantMap } from './types.js';
  * and routes user interactions to the appropriate handlers.
  */
 const parsed = dotenv.config();
-const botToken = parsed.parsed?.BOT_TOKEN;
-const telemetryUrl = parsed.parsed?.TELEMETRY_URL;
-const telemetryToken = parsed.parsed?.TELEMETRY_TOKEN;
-const databaseUrl = parsed.parsed?.DATABASE_URL;
-const databaseSchema = parsed.parsed?.DATABASE_SCHEMA;
-const telemetryEventsTable = parsed.parsed?.TELEMETRY_EVENTS_TABLE;
+const botToken = parsed.parsed?.BOT_TOKEN ?? process.env.BOT_TOKEN;
+const telemetryUrl = parsed.parsed?.TELEMETRY_URL ?? process.env.TELEMETRY_URL;
+const telemetryToken =
+	parsed.parsed?.TELEMETRY_TOKEN ?? process.env.TELEMETRY_TOKEN;
+const databaseUrl = parsed.parsed?.DATABASE_URL ?? process.env.DATABASE_URL;
+const databaseSchema =
+	parsed.parsed?.DATABASE_SCHEMA ?? process.env.DATABASE_SCHEMA;
+const telemetryEventsTable =
+	parsed.parsed?.TELEMETRY_EVENTS_TABLE ?? process.env.TELEMETRY_EVENTS_TABLE;
 
 if (!botToken) {
 	console.error('BOT_TOKEN not found in .env file');

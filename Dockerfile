@@ -9,9 +9,12 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-FROM deps AS build
-COPY tsconfig.json ./
+FROM deps AS test
+COPY tsconfig.json tsconfig.test.json ./
 COPY src ./src
+RUN pnpm test
+
+FROM test AS build
 RUN pnpm build
 
 FROM deps AS prune

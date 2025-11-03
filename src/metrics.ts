@@ -23,11 +23,12 @@ const telemetryFailureCounter = new client.Counter({
 const port = Number.parseInt(process.env.METRICS_PORT || '9464', 10);
 
 let serverStarted = false;
+let server: http.Server | null = null;
 
 function startMetricsServer() {
 	if (serverStarted) return;
 
-	const server = http.createServer(async (req, res) => {
+	server = http.createServer(async (req, res) => {
 		if (!req.url) {
 			res.statusCode = 404;
 			res.end();
@@ -66,6 +67,35 @@ function startMetricsServer() {
 }
 
 startMetricsServer();
+
+export async function stopMetricsServer() {
+	const activeServer = server;
+	server = null;
+	serverStarted = false;
+
+	if (!activeServer) return;
+
+	await new Promise<void>((resolve, reject) => {
+		const done = (error?: NodeJS.ErrnoException | null) => {
+			if (error && error.code !== 'ERR_SERVER_NOT_RUNNING') {
+				reject(error);
+				return;
+			}
+			resolve();
+		};
+
+		try {
+			activeServer.close(done);
+		} catch (error) {
+			const err = error as NodeJS.ErrnoException;
+			if (err.code === 'ERR_SERVER_NOT_RUNNING') {
+				resolve();
+			} else {
+				reject(error as Error);
+			}
+		}
+	});
+}
 
 export function recordTelemetryDispatch(
 	eventName: string,

@@ -67,6 +67,7 @@ To start testing locally you can use the following commands:
 
 - `pnpm dev` to run the bot locally
 - `pnpm run build` to create a build of the bot
+- `task test` to compile and execute the automated suite inside Docker
 
 ## Environment configuration
 
@@ -78,7 +79,7 @@ To start testing locally you can use the following commands:
 
 ## Running with Docker
 
-Build the production image:
+Build the production image (tests run during the multi-stage build):
 
 ```bash
 docker build -t agent-8s .
@@ -114,7 +115,8 @@ docker run --rm --env-file .env agent-8s
 
 Install [Task](https://taskfile.dev) and use the provided helpers:
 
-- `task docker:build` builds the image using the repository Dockerfile.
+- `task test` runs the Docker test stage to compile sources and execute the Node test suite.
+- `task docker:build` runs the test stage and then builds the runtime image using the repository Dockerfile.
 - `task docker:run BOT_TOKEN=your_token_here` runs the container with the required token (add `TELEMETRY_URL`/`TELEMETRY_TOKEN` as needed). Append `DETACH=true` to run in the background.
 - `task docker:run-env-file` runs the container with environment values from `.env` or a custom file via `ENV_FILE=path/to/file`.
 - `task docker:down` stops the running container (defaults to `agent-8s`; override with `CONTAINER_NAME=name`).
