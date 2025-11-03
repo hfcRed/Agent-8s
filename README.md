@@ -83,6 +83,7 @@ docker run --rm \
   -e BOT_TOKEN=your_token_here \
   -e TELEMETRY_URL=optional_url \
   -e TELEMETRY_TOKEN=optional_token \
+  -e METRICS_PORT=9464 \
   agent-8s
 ```
 
@@ -91,6 +92,13 @@ You can also supply environment values from a file:
 ```bash
 docker run --rm --env-file .env agent-8s
 ```
+
+## Telemetry & Metrics
+
+- The bot exposes a Prometheus endpoint on `/metrics` bound to `0.0.0.0`. Override the port with `METRICS_PORT` (defaults to `9464`).
+- Every telemetry dispatch increments `telemetry_events_forwarded_total{event="...",guild="...",channel="..."}`; failures increment the matching `telemetry_events_failed_total` series.
+- Guild and channel labels fall back to `unknown` whenever the IDs cannot be resolved (for example, when telemetry is triggered outside a guild context).
+- The metrics endpoint is available even when remote telemetry is disabled, allowing local scraping without forwarding events.
 
 ## Task shortcuts
 

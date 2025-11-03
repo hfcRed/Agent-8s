@@ -18,3 +18,7 @@ export interface TelemetryEvent {
 	timestamp: number;
 	data: Record<string, unknown>;
 }
+
+export interface TelemetryContext {
+	channelId?: string;
+}

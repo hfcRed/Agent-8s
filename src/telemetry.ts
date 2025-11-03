@@ -1,4 +1,8 @@
-import type { ParticipantData, TelemetryEvent } from './types';
+import type { ParticipantData, TelemetryContext, TelemetryEvent } from './types';
+import {
+	recordTelemetryDispatch,
+	recordTelemetryFailure,
+} from './metrics.js';
 
 /**
  * Lightweight client for forwarding structured telemetry events to the backend.
@@ -15,10 +19,10 @@ export class TelemetryService {
 		this.apiKey = apiKey;
 	}
 
-	/**
-	 * Performs the underlying POST request to send a telemetry payload.
-	 */
-	async sendEvent(event: TelemetryEvent) {
+	private async sendEvent(
+		event: TelemetryEvent,
+		context?: TelemetryContext,
+	) {
 		try {
 			const headers = {
 				'Content-Type': 'application/json',
@@ -30,8 +34,11 @@ export class TelemetryService {
 				headers,
 				body: JSON.stringify(event),
 			});
+
+			recordTelemetryDispatch(event.event, event.guildId, context?.channelId);
 		} catch (error) {
 			console.error(error);
+			recordTelemetryFailure(event.event, event.guildId, context?.channelId);
 		}
 	}
 
@@ -43,14 +50,18 @@ export class TelemetryService {
 		eventId: string,
 		userId: string,
 		timeToStart?: number,
+		channelId?: string,
 	) {
-		await this.sendEvent({
-			event: 'event_created',
-			guildId,
-			eventId,
-			timestamp: Date.now(),
-			data: { userId, timeToStart },
-		});
+		await this.sendEvent(
+			{
+				event: 'event_created',
+				guildId,
+				eventId,
+				timestamp: Date.now(),
+				data: { userId, timeToStart },
+			},
+			{ channelId },
+		);
 	}
 
 	/**
@@ -61,14 +72,18 @@ export class TelemetryService {
 		eventId: string,
 		userId: string,
 		participants: ParticipantData[],
+		channelId?: string,
 	) {
-		await this.sendEvent({
-			event: 'user_signed_up',
-			guildId,
-			eventId,
-			timestamp: Date.now(),
-			data: { userId, participants },
-		});
+		await this.sendEvent(
+			{
+				event: 'user_signed_up',
+				guildId,
+				eventId,
+				timestamp: Date.now(),
+				data: { userId, participants },
+			},
+			{ channelId },
+		);
 	}
 
 	/**
@@ -79,14 +94,18 @@ export class TelemetryService {
 		eventId: string,
 		userId: string,
 		participants: ParticipantData[],
+		channelId?: string,
 	) {
-		await this.sendEvent({
-			event: 'user_signed_out',
-			guildId,
-			eventId,
-			timestamp: Date.now(),
-			data: { userId, participants },
-		});
+		await this.sendEvent(
+			{
+				event: 'user_signed_out',
+				guildId,
+				eventId,
+				timestamp: Date.now(),
+				data: { userId, participants },
+			},
+			{ channelId },
+		);
 	}
 
 	/**
@@ -96,14 +115,18 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		participants: ParticipantData[],
+		channelId?: string,
 	) {
-		await this.sendEvent({
-			event: 'event_cancelled',
-			guildId,
-			eventId,
-			timestamp: Date.now(),
-			data: { participants },
-		});
+		await this.sendEvent(
+			{
+				event: 'event_cancelled',
+				guildId,
+				eventId,
+				timestamp: Date.now(),
+				data: { participants },
+			},
+			{ channelId },
+		);
 	}
 
 	/**
@@ -113,14 +136,18 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		participants: ParticipantData[],
+		channelId?: string,
 	) {
-		await this.sendEvent({
-			event: 'event_started',
-			guildId,
-			eventId,
-			timestamp: Date.now(),
-			data: { participants },
-		});
+		await this.sendEvent(
+			{
+				event: 'event_started',
+				guildId,
+				eventId,
+				timestamp: Date.now(),
+				data: { participants },
+			},
+			{ channelId },
+		);
 	}
 
 	/**
@@ -130,14 +157,18 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		participants: ParticipantData[],
+		channelId?: string,
 	) {
-		await this.sendEvent({
-			event: 'event_finished',
-			guildId,
-			eventId,
-			timestamp: Date.now(),
-			data: { participants },
-		});
+		await this.sendEvent(
+			{
+				event: 'event_finished',
+				guildId,
+				eventId,
+				timestamp: Date.now(),
+				data: { participants },
+			},
+			{ channelId },
+		);
 	}
 
 	/**
@@ -147,13 +178,17 @@ export class TelemetryService {
 		guildId: string,
 		eventId: string,
 		participants: ParticipantData[],
+		channelId?: string,
 	) {
-		await this.sendEvent({
-			event: 'event_expired',
-			guildId,
-			eventId,
-			timestamp: Date.now(),
-			data: { participants },
-		});
+		await this.sendEvent(
+			{
+				event: 'event_expired',
+				guildId,
+				eventId,
+				timestamp: Date.now(),
+				data: { participants },
+			},
+			{ channelId },
+		);
 	}
 }

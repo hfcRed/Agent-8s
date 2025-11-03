@@ -300,6 +300,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		message.id,
 		interaction.user.id,
 		timeInMinutes || undefined,
+		interaction.channelId,
 	);
 
 	if (timeInMinutes) {
@@ -364,6 +365,7 @@ async function handleSignUpButton(
 		interaction.message.id,
 		interaction.user.id,
 		userMentionsToUserIds(participantMap),
+		interaction.channelId,
 	);
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
@@ -396,6 +398,7 @@ async function handleSignOutButton(
 		interaction.message.id,
 		interaction.user.id,
 		userMentionsToUserIds(participantMap),
+		interaction.channelId,
 	);
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
@@ -435,6 +438,7 @@ async function handleCancelButton(
 			eventParticipants.get(messageId) ||
 				new Map<string, { userId: string; role: string | null }>(),
 		),
+		interaction.channelId,
 	);
 
 	cleanupEvent(messageId);
@@ -510,6 +514,7 @@ async function handleFinishButton(
 			eventParticipants.get(messageId) ||
 				new Map<string, { userId: string; role: string | null }>(),
 		),
+		interaction.channelId,
 	);
 
 	cleanupEvent(messageId);
@@ -606,6 +611,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 		message.guild?.id || 'unknown',
 		message.id,
 		newParticipantsMap,
+		message.channelId,
 	);
 }
 
@@ -789,14 +795,15 @@ async function cleanupStaleEvents() {
 					}
 				}
 
-				telemetry?.trackEventExpired(
-					message.guild?.id || 'unknown',
-					messageId,
-					userMentionsToUserIds(
-						eventParticipants.get(messageId) ||
-							new Map<string, { userId: string; role: string | null }>(),
-					),
-				);
+	telemetry?.trackEventExpired(
+		message.guild?.id || 'unknown',
+		messageId,
+		userMentionsToUserIds(
+			eventParticipants.get(messageId) ||
+				new Map<string, { userId: string; role: string | null }>(),
+		),
+		message.channelId,
+	);
 
 				break;
 			}
