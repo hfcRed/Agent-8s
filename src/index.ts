@@ -209,7 +209,6 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	const timeInMinutes =
 		interaction.options.getInteger('time', false) ?? undefined;
 	const startTime = Date.now();
-	const userMention = createUserMention(interaction.user.id);
 
 	const buttons = [
 		new ButtonBuilder()
@@ -265,7 +264,11 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
 
 	const embedFields = [
-		{ name: 'Participants (1)', value: `- ${userMention}`, inline: true },
+		{
+			name: 'Participants (1)',
+			value: `- <@${interaction.user.id}>`,
+			inline: true,
+		},
 		{
 			name: 'Role',
 			value: '- None',
@@ -301,7 +304,9 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 
 	eventParticipants.set(
 		message.id,
-		new Map([[userMention, { userId: userMention, role: null }]]),
+		new Map([
+			[interaction.user.id, { userId: interaction.user.id, role: null }],
+		]),
 	);
 	eventCreators.set(message.id, interaction.user.id);
 	eventTimers.set(message.id, {
@@ -315,8 +320,8 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		guildId: interaction.guild?.id || 'unknown',
 		eventId: message.id,
 		userId: interaction.user.id,
-		participants: userMentionsToUserIds(
-			eventParticipants.get(message.id) || new Map(),
+		participants: Array.from(
+			(eventParticipants.get(message.id) || new Map()).values(),
 		),
 		channelId: interaction.channelId,
 		matchId,
@@ -359,12 +364,7 @@ async function handleSignUpButton(
 	participantMap: ParticipantMap,
 	timerData: EventTimer,
 ) {
-	const userMention = createUserMention(userId);
-
-	if (
-		participantMap.size >= MAX_PARTICIPANTS &&
-		!participantMap.has(userMention)
-	) {
+	if (participantMap.size >= MAX_PARTICIPANTS && !participantMap.has(userId)) {
 		await interaction.deferUpdate();
 		return;
 	}
@@ -377,14 +377,14 @@ async function handleSignUpButton(
 		return;
 	}
 
-	participantMap.set(userMention, { userId: userMention, role: null });
+	participantMap.set(userId, { userId: userId, role: null });
 
 	const matchId = eventMatchIds.get(interaction.message.id);
 	telemetry?.trackUserSignUp({
 		guildId: interaction.guild?.id || 'unknown',
 		eventId: interaction.message.id,
 		userId: userId,
-		participants: userMentionsToUserIds(participantMap),
+		participants: Array.from(participantMap.values()),
 		channelId: interaction.channelId,
 		matchId: matchId || 'unknown',
 	});
@@ -411,15 +411,14 @@ async function handleSignOutButton(
 		return;
 	}
 
-	const userMention = createUserMention(userId);
-	participantMap.delete(userMention);
+	participantMap.delete(userId);
 
 	const matchId = eventMatchIds.get(interaction.message.id);
 	telemetry?.trackUserSignOut({
 		guildId: interaction.guild?.id || 'unknown',
 		eventId: interaction.message.id,
 		userId: userId,
-		participants: userMentionsToUserIds(participantMap),
+		participants: Array.from(participantMap.values()),
 		channelId: interaction.channelId,
 		matchId: matchId || 'unknown',
 	});
@@ -459,7 +458,7 @@ async function handleCancelButton(
 		guildId: interaction.guild?.id || 'unknown',
 		eventId: messageId,
 		userId: userId,
-		participants: userMentionsToUserIds(participantMap),
+		participants: Array.from(participantMap.values()),
 		channelId: interaction.channelId,
 		matchId: matchId || 'unknown',
 	});
@@ -537,7 +536,7 @@ async function handleFinishButton(
 		guildId: interaction.guild?.id || 'unknown',
 		eventId: messageId,
 		userId: userId,
-		participants: userMentionsToUserIds(participantMap),
+		participants: Array.from(participantMap.values()),
 		channelId: interaction.channelId,
 		matchId: matchId || 'unknown',
 	});
@@ -554,8 +553,7 @@ async function handleRoleSelection(
 	userId: string,
 	participantMap: ParticipantMap,
 ) {
-	const userMention = createUserMention(userId);
-	if (!participantMap.has(userMention)) {
+	if (!participantMap.has(userId)) {
 		await interaction.reply({
 			content: ERROR_MESSAGES.NOT_SIGNED_UP,
 			flags: ['Ephemeral'],
@@ -570,8 +568,8 @@ async function handleRoleSelection(
 	);
 	const selectedRole = selectedOption?.label || selectedValue;
 
-	participantMap.set(userMention, {
-		userId: userMention,
+	participantMap.set(userId, {
+		userId: userId,
 		role: selectedRole,
 	});
 
@@ -627,9 +625,9 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 
 	eventThreads.set(message.id, thread.id);
 
-	const newParticipantsMap = userMentionsToUserIds(participantMap);
+	const participants = Array.from(participantMap.values());
 
-	for (const participant of newParticipantsMap) {
+	for (const participant of participants) {
 		await thread.members.add(participant.userId);
 	}
 
@@ -637,7 +635,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 		guildId: message.guild?.id || 'unknown',
 		eventId: message.id,
 		userId: eventCreators.get(message.id) || 'unknown',
-		participants: newParticipantsMap,
+		participants: participants,
 		channelId: message.channelId,
 		matchId: matchId || 'unknown',
 	});
@@ -698,8 +696,8 @@ async function updateParticipantEmbed(
 		embed,
 		'Participants',
 		`Participants (${participantMap.size})`,
-		Array.from(participantMap)
-			.map((p) => `- ${p[1].userId}`)
+		Array.from(participantMap.values())
+			.map((p) => `- <@${p.userId}>`)
 			.join('\n'),
 	);
 
@@ -727,32 +725,12 @@ async function updateParticipantEmbed(
  * Returns true if the supplied user is already registered in any event.
  */
 function isUserInAnyEvent(userId: string): boolean {
-	const mention = createUserMention(userId);
 	for (const [_, participantSet] of eventParticipants.entries()) {
-		if (participantSet.has(mention)) {
+		if (participantSet.has(userId)) {
 			return true;
 		}
 	}
 	return false;
-}
-
-/**
- * Creates a Discord mention string for the provided user ID.
- */
-function createUserMention(userId: string) {
-	return `<@${userId}>`;
-}
-
-/**
- * Converts a map keyed by user mentions into an array of clean user IDs and roles.
- */
-function userMentionsToUserIds(mentions: ParticipantMap) {
-	return Array.from(mentions.values()).map((mention) => {
-		return {
-			userId: mention.userId.replace(/[<@>]/g, ''),
-			role: mention.role,
-		};
-	});
 }
 
 /**
@@ -830,8 +808,8 @@ async function cleanupStaleEvents() {
 					guildId: message.guild?.id || 'unknown',
 					eventId: messageId,
 					userId: '1434173887888887908',
-					participants: userMentionsToUserIds(
-						eventParticipants.get(messageId) || new Map(),
+					participants: Array.from(
+						(eventParticipants.get(messageId) || new Map()).values(),
 					),
 					channelId: message.channelId,
 					matchId: matchId || 'unknown',
