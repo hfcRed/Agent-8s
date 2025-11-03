@@ -1,0 +1,76 @@
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  IMAGE_NAME: '{{ default "agent-8s" .IMAGE_NAME }}'
+  CONTAINER_NAME: '{{ default "agent-8s" .CONTAINER_NAME }}'
+
+tasks:
+  docker:build:
+    desc: Build the Docker image for the bot
+    cmds:
+      - docker build -t {{.IMAGE_NAME}} .
+
+  docker:run:
+    desc: Run the bot container with required environment variables
+    vars:
+      BOT_TOKEN_VALUE: '{{ coalesce .BOT_TOKEN (env "BOT_TOKEN") }}'
+      TELEMETRY_URL_VALUE: '{{ coalesce .TELEMETRY_URL (env "TELEMETRY_URL") }}'
+      TELEMETRY_TOKEN_VALUE: '{{ coalesce .TELEMETRY_TOKEN (env "TELEMETRY_TOKEN") }}'
+      DETACH_FLAG: '{{if eq (default "false" .DETACH) "true"}}-d{{end}}'
+      RUN_ENV_ARGS: '-e BOT_TOKEN={{.BOT_TOKEN_VALUE}}{{if .TELEMETRY_URL_VALUE}} -e TELEMETRY_URL={{.TELEMETRY_URL_VALUE}}{{end}}{{if .TELEMETRY_TOKEN_VALUE}} -e TELEMETRY_TOKEN={{.TELEMETRY_TOKEN_VALUE}}{{end}}'
+    preconditions:
+      - sh: test -n "{{.BOT_TOKEN_VALUE}}"
+        msg: Provide BOT_TOKEN via environment or BOT_TOKEN=... when running task
+    cmds:
+      - docker run --rm{{if .DETACH_FLAG}} {{.DETACH_FLAG}}{{end}} --name {{.CONTAINER_NAME}} {{.RUN_ENV_ARGS}} {{.IMAGE_NAME}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}
+
+  docker:run-env-file:
+    desc: Run the bot container using an env file (defaults to .env)
+    vars:
+      ENV_FILE: '{{ default ".env" .ENV_FILE }}'
+      DETACH_FLAG: '{{if eq (default "false" .DETACH) "true"}}-d{{end}}'
+    cmds:
+      - docker run --rm{{if .DETACH_FLAG}} {{.DETACH_FLAG}}{{end}} --name {{.CONTAINER_NAME}} --env-file {{.ENV_FILE}} {{.IMAGE_NAME}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}
+
+  docker:down:
+    desc: Stop the running bot container and remove it if present
+    cmds:
+      - |
+        CONTAINER="{{.CONTAINER_NAME}}"
+        if [ -n "$(docker ps -q --filter name=^/${CONTAINER}$)" ]; then
+          docker stop "${CONTAINER}"
+        fi
+        if [ -n "$(docker ps -aq --filter name=^/${CONTAINER}$)" ]; then
+          docker rm "${CONTAINER}"
+        fi
+
+  docker:destroy-image:
+    desc: Remove the bot Docker image and prune dangling layers
+    cmds:
+      - |
+        if docker image inspect {{.IMAGE_NAME}} >/dev/null 2>&1; then
+          docker image rm {{.IMAGE_NAME}}
+        fi
+      - docker image prune -f
+
+  docker:update-run:
+    desc: Stop container, rebuild image, and run the latest bot using .env by default
+    cmds:
+      - task: docker:down
+        vars:
+          CONTAINER_NAME: '{{.CONTAINER_NAME}}'
+      - task: docker:destroy-image
+        vars:
+          IMAGE_NAME: '{{.IMAGE_NAME}}'
+      - task: docker:build
+        vars:
+          IMAGE_NAME: '{{.IMAGE_NAME}}'
+      - task: docker:run-env-file
+        vars:
+          IMAGE_NAME: '{{.IMAGE_NAME}}'
+          CONTAINER_NAME: '{{.CONTAINER_NAME}}'
+          ENV_FILE: '{{ default ".env" .ENV_FILE }}'
+          DETACH: '{{ default "false" .DETACH }}'
+          CLI_ARGS: '{{.CLI_ARGS}}'
