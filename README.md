@@ -67,3 +67,27 @@ To start testing locally you can use the following commands:
 
 - `pnpm dev` to run the bot locally
 - `pnpm run build` to create a build of the bot
+
+## Running with Docker
+
+Build the production image:
+
+```bash
+docker build -t agent-8s .
+```
+
+Run the container with your bot token (and optional telemetry settings):
+
+```bash
+docker run --rm \
+  -e BOT_TOKEN=your_token_here \
+  -e TELEMETRY_URL=optional_url \
+  -e TELEMETRY_TOKEN=optional_token \
+  agent-8s
+```
+
+You can also supply environment values from a file:
+
+```bash
+docker run --rm --env-file .env agent-8s
+```
