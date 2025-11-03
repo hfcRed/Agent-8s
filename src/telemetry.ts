@@ -1,9 +1,10 @@
 import type { EventRecorder } from './event-recorder.js';
-import type { ParticipantData, TelemetryContext, TelemetryEvent } from './types';
-import {
-	recordTelemetryDispatch,
-	recordTelemetryFailure,
-} from './metrics.js';
+import { recordTelemetryDispatch, recordTelemetryFailure } from './metrics.js';
+import type {
+	ParticipantData,
+	TelemetryContext,
+	TelemetryEvent,
+} from './types';
 
 /**
  * Lightweight client for forwarding structured telemetry events to the backend.
@@ -26,10 +27,7 @@ export class TelemetryService {
 		this.recorder = recorder;
 	}
 
-	private async sendEvent(
-		event: TelemetryEvent,
-		context?: TelemetryContext,
-	) {
+	private async sendEvent(event: TelemetryEvent, context?: TelemetryContext) {
 		await this.recorder?.record(event, context);
 
 		if (!this.backendUrl || !this.apiKey) return;

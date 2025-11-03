@@ -113,8 +113,9 @@ export class EventRecorder {
 		const { data } = event;
 		if (!data) return null;
 
-		const participants = (data as Record<string, unknown>)
-			.participants as ParticipantRecord[] | undefined;
+		const participants = (data as Record<string, unknown>).participants as
+			| ParticipantRecord[]
+			| undefined;
 
 		if (!Array.isArray(participants)) return null;
 

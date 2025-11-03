@@ -1,10 +1,5 @@
 import assert from 'node:assert/strict';
-import {
-	afterEach,
-	beforeEach,
-	mock,
-	test,
-} from 'node:test';
+import { afterEach, beforeEach, mock, test } from 'node:test';
 import type { EventRecorder } from '../event-recorder.js';
 import type { TelemetryContext, TelemetryEvent } from '../types.js';
 
@@ -19,7 +14,11 @@ let originalFetch: typeof globalThis.fetch | undefined;
 
 beforeEach(async () => {
 	metricsModule = await import('../metrics.js');
-	dispatchMock = mock.method(metricsModule, 'recordTelemetryDispatch', () => {});
+	dispatchMock = mock.method(
+		metricsModule,
+		'recordTelemetryDispatch',
+		() => {},
+	);
 	failureMock = mock.method(metricsModule, 'recordTelemetryFailure', () => {});
 	originalFetch = globalThis.fetch;
 });
@@ -157,7 +156,13 @@ test('omits network forwarding when backend credentials are missing', async () =
 
 	const service = new TelemetryService(undefined, undefined, recorder);
 
-	await service.trackEventCancelled('guild-3', 'event-3', [], 'channel-3', 'match-3');
+	await service.trackEventCancelled(
+		'guild-3',
+		'event-3',
+		[],
+		'channel-3',
+		'match-3',
+	);
 
 	assert.equal(recordSpy.mock.callCount(), 1);
 	assert.equal(fetchSpy.mock.callCount(), 0);

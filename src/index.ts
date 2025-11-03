@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
 	ActionRowBuilder,
 	ButtonBuilder,
@@ -17,7 +18,6 @@ import {
 	StringSelectMenuOptionBuilder,
 	type TextChannel,
 } from 'discord.js';
-import { randomUUID } from 'node:crypto';
 import dotenv from 'dotenv';
 import {
 	COLORS,
