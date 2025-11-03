@@ -74,6 +74,7 @@ To start testing locally you can use the following commands:
 - `TELEMETRY_URL` and `TELEMETRY_TOKEN` (optional): enable forwarding lifecycle telemetry to an external HTTP endpoint.
 - `METRICS_PORT` (optional, defaults to `9464`): port exposing the Prometheus `/metrics` endpoint.
 - `DATABASE_URL` (optional): PostgreSQL connection string used to persist match lifecycle data to the `telemetry_events` table.
+- `DATABASE_SCHEMA` and `TELEMETRY_EVENTS_TABLE` (optional, default to `public.telemetry_events`): override where lifecycle rows are stored; both values must be valid PostgreSQL identifiers.
 
 ## Running with Docker
 
@@ -107,7 +108,7 @@ docker run --rm --env-file .env agent-8s
 - Every telemetry dispatch increments `telemetry_events_forwarded_total{event="...",guild="...",channel="..."}`; failures increment the matching `telemetry_events_failed_total` series.
 - Guild and channel labels fall back to `unknown` whenever the IDs cannot be resolved (for example, when telemetry is triggered outside a guild context).
 - The metrics endpoint is available even when remote telemetry is disabled, allowing local scraping without forwarding events.
-- Provide `DATABASE_URL` to persist lifecycle events in PostgreSQL. The bot will create a `telemetry_events` table (if missing) and record match UUIDs, guild/channel IDs, user/participant identifiers, payload JSON, and timestamps for each lifecycle hook.
+- Provide `DATABASE_URL` (and optional `DATABASE_SCHEMA`/`TELEMETRY_EVENTS_TABLE`) to persist lifecycle events in PostgreSQL. The bot prepares the target schema/table on startup and records match UUIDs, guild/channel IDs, user/participant identifiers, payload JSON, and timestamps for each lifecycle hook.
 
 ## Task shortcuts
 

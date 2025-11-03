@@ -5,12 +5,34 @@ type ParticipantRecord = {
 	userId?: string;
 };
 
+type EventRecorderOptions = {
+	schema?: string | null;
+	table?: string | null;
+};
+
+const DEFAULT_SCHEMA = 'public';
+const DEFAULT_TABLE = 'telemetry_events';
+
 export class EventRecorder {
 	private pool: Pool;
 	private initialized = false;
+	private readonly schemaName: string;
+	private readonly tableName: string;
+	private readonly tableReference: string;
 
-	constructor(connectionString: string) {
+	constructor(connectionString: string, options: EventRecorderOptions = {}) {
+		this.schemaName = this.resolveIdentifier(options.schema, DEFAULT_SCHEMA);
+		this.tableName = this.resolveIdentifier(options.table, DEFAULT_TABLE);
+		this.tableReference = `${this.quoteIdentifier(this.schemaName)}.${this.quoteIdentifier(this.tableName)}`;
 		this.pool = new Pool({ connectionString });
+	}
+
+	async initialize() {
+		try {
+			await this.ensureSchema();
+		} catch (error) {
+			console.error('Failed to initialize event recorder', error);
+		}
 	}
 
 	async record(event: TelemetryEvent, context?: TelemetryContext) {
@@ -21,7 +43,7 @@ export class EventRecorder {
 			const participantIds = this.extractParticipantIds(event);
 
 			await this.pool.query(
-				`INSERT INTO telemetry_events (
+				`INSERT INTO ${this.tableReference} (
 					match_uuid,
 					event_type,
 					guild_id,
@@ -56,8 +78,12 @@ export class EventRecorder {
 	private async ensureSchema() {
 		if (this.initialized) return;
 
+		await this.pool.query(
+			`CREATE SCHEMA IF NOT EXISTS ${this.quoteIdentifier(this.schemaName)}`,
+		);
+
 		await this.pool.query(`
-			CREATE TABLE IF NOT EXISTS telemetry_events (
+			CREATE TABLE IF NOT EXISTS ${this.tableReference} (
 				id BIGSERIAL PRIMARY KEY,
 				match_uuid UUID,
 				event_type TEXT NOT NULL,
@@ -101,5 +127,26 @@ export class EventRecorder {
 			.filter((id): id is string => id !== null);
 
 		return ids.length > 0 ? ids : null;
+	}
+
+	private resolveIdentifier(
+		value: string | null | undefined,
+		fallback: string,
+	): string {
+		if (!value) return fallback;
+
+		const trimmed = value.trim();
+		if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) {
+			console.warn(
+				`Invalid identifier "${value}" supplied to EventRecorder. Falling back to "${fallback}".`,
+			);
+			return fallback;
+		}
+
+		return trimmed;
+	}
+
+	private quoteIdentifier(identifier: string) {
+		return `"${identifier.replace(/"/g, '""')}"`;
 	}
 }

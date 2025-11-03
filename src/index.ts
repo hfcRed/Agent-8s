@@ -39,6 +39,8 @@ const botToken = parsed.parsed?.BOT_TOKEN;
 const telemetryUrl = parsed.parsed?.TELEMETRY_URL;
 const telemetryToken = parsed.parsed?.TELEMETRY_TOKEN;
 const databaseUrl = parsed.parsed?.DATABASE_URL;
+const databaseSchema = parsed.parsed?.DATABASE_SCHEMA;
+const telemetryEventsTable = parsed.parsed?.TELEMETRY_EVENTS_TABLE;
 
 if (!botToken) {
 	console.error('BOT_TOKEN not found in .env file');
@@ -48,7 +50,12 @@ if (!botToken) {
 /**
  * Optional telemetry client used to forward interaction lifecycle metrics.
  */
-const eventRecorder = databaseUrl ? new EventRecorder(databaseUrl) : null;
+const eventRecorder = databaseUrl
+	? new EventRecorder(databaseUrl, {
+			schema: databaseSchema,
+			table: telemetryEventsTable,
+		})
+	: null;
 const telemetry =
 	telemetryUrl && telemetryToken
 		? new TelemetryService(
@@ -59,6 +66,12 @@ const telemetry =
 		: eventRecorder
 			? new TelemetryService(null, null, eventRecorder)
 			: null;
+
+eventRecorder
+	?.initialize()
+	.catch((error) =>
+		console.error('Failed to prepare telemetry persistence', error),
+	);
 
 /**
  * Slash command definitions registered with the Discord API at startup.
