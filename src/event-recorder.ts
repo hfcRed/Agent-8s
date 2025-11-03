@@ -31,10 +31,6 @@ export class EventRecorder {
 		try {
 			await this.ensureSchema();
 
-			const timestamp = Date.now();
-			const actorUserId = data.userId;
-			const participantIds = data.participants.map((p) => p.userId);
-
 			await this.pool.query(
 				`INSERT INTO ${this.tableReference} (
 					match_uuid,
@@ -53,10 +49,10 @@ export class EventRecorder {
 					data.guildId,
 					data.channelId,
 					data.eventId,
-					actorUserId,
-					participantIds ? JSON.stringify(participantIds) : null,
+					data.userId,
+					JSON.stringify(data.participants),
 					JSON.stringify(data),
-					timestamp,
+					Date.now(),
 				],
 			);
 		} catch (error) {
