@@ -17,6 +17,7 @@ import {
 	StringSelectMenuOptionBuilder,
 	type TextChannel,
 } from 'discord.js';
+import { randomUUID } from 'node:crypto';
 import dotenv from 'dotenv';
 import {
 	COLORS,
@@ -25,6 +26,7 @@ import {
 	PING_ROLE_NAMES,
 	STATUS_MESSAGES,
 } from './constants.js';
+import { EventRecorder } from './event-recorder.js';
 import { TelemetryService } from './telemetry.js';
 import type { EventTimer, ParticipantMap } from './types.js';
 
@@ -36,6 +38,7 @@ const parsed = dotenv.config();
 const botToken = parsed.parsed?.BOT_TOKEN;
 const telemetryUrl = parsed.parsed?.TELEMETRY_URL;
 const telemetryToken = parsed.parsed?.TELEMETRY_TOKEN;
+const databaseUrl = parsed.parsed?.DATABASE_URL;
 
 if (!botToken) {
 	console.error('BOT_TOKEN not found in .env file');
@@ -45,10 +48,17 @@ if (!botToken) {
 /**
  * Optional telemetry client used to forward interaction lifecycle metrics.
  */
+const eventRecorder = databaseUrl ? new EventRecorder(databaseUrl) : null;
 const telemetry =
 	telemetryUrl && telemetryToken
-		? new TelemetryService(telemetryUrl, telemetryToken)
-		: null;
+		? new TelemetryService(
+				telemetryUrl,
+				telemetryToken,
+				eventRecorder ?? undefined,
+			)
+		: eventRecorder
+			? new TelemetryService(null, null, eventRecorder)
+			: null;
 
 /**
  * Slash command definitions registered with the Discord API at startup.
@@ -102,6 +112,7 @@ const eventCreators = new Map<string, string>();
 const eventTimers = new Map<string, EventTimer>();
 const eventThreads = new Map<string, string>();
 const eventTimeouts = new Map<string, NodeJS.Timeout>();
+const eventMatchIds = new Map<string, string>();
 
 /**
  * Routes Discord interactions to the relevant handler based on component type.
@@ -283,6 +294,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		components: [buttonRow, selectRow],
 	});
 	const message = await reply.fetch();
+	const matchId = randomUUID();
 
 	eventParticipants.set(
 		message.id,
@@ -294,6 +306,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		duration: timeInMinutes ? timeInMinutes * 60 * 1000 : 0,
 		hasStarted: false,
 	});
+	eventMatchIds.set(message.id, matchId);
 
 	telemetry?.trackEventCreated(
 		interaction.guild?.id || 'unknown',
@@ -301,6 +314,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		interaction.user.id,
 		timeInMinutes || undefined,
 		interaction.channelId,
+		matchId,
 	);
 
 	if (timeInMinutes) {
@@ -360,12 +374,14 @@ async function handleSignUpButton(
 
 	participantMap.set(userMention, { userId: userMention, role: null });
 
+	const matchId = eventMatchIds.get(interaction.message.id);
 	telemetry?.trackUserSignUp(
 		interaction.guild?.id || 'unknown',
 		interaction.message.id,
 		interaction.user.id,
 		userMentionsToUserIds(participantMap),
 		interaction.channelId,
+		matchId,
 	);
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
@@ -393,12 +409,14 @@ async function handleSignOutButton(
 	const userMention = createUserMention(userId);
 	participantMap.delete(userMention);
 
+	const matchId = eventMatchIds.get(interaction.message.id);
 	telemetry?.trackUserSignOut(
 		interaction.guild?.id || 'unknown',
 		interaction.message.id,
 		interaction.user.id,
 		userMentionsToUserIds(participantMap),
 		interaction.channelId,
+		matchId,
 	);
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
@@ -431,6 +449,7 @@ async function handleCancelButton(
 	await interaction.deferUpdate();
 	await interaction.message.edit({ embeds: [embed], components: [] });
 
+	const matchId = eventMatchIds.get(messageId);
 	telemetry?.trackEventCancelled(
 		interaction.guild?.id || 'unknown',
 		messageId,
@@ -439,6 +458,7 @@ async function handleCancelButton(
 				new Map<string, { userId: string; role: string | null }>(),
 		),
 		interaction.channelId,
+		matchId,
 	);
 
 	cleanupEvent(messageId);
@@ -507,6 +527,7 @@ async function handleFinishButton(
 	await interaction.deferUpdate();
 	await interaction.message.edit({ embeds: [embed], components: [] });
 
+	const matchId = eventMatchIds.get(messageId);
 	telemetry?.trackEventFinished(
 		interaction.guild?.id || 'unknown',
 		messageId,
@@ -515,6 +536,7 @@ async function handleFinishButton(
 				new Map<string, { userId: string; role: string | null }>(),
 		),
 		interaction.channelId,
+		matchId,
 	);
 
 	cleanupEvent(messageId);
@@ -566,6 +588,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 	if (!timerData || timerData.hasStarted) return;
 
 	timerData.hasStarted = true;
+	const matchId = eventMatchIds.get(message.id);
 
 	const timeout = eventTimeouts.get(message.id);
 	if (timeout) {
@@ -612,6 +635,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 		message.id,
 		newParticipantsMap,
 		message.channelId,
+		matchId,
 	);
 }
 
@@ -761,6 +785,7 @@ function cleanupEvent(messageId: string) {
 	eventCreators.delete(messageId);
 	eventTimers.delete(messageId);
 	eventThreads.delete(messageId);
+	eventMatchIds.delete(messageId);
 }
 
 /**
@@ -795,15 +820,17 @@ async function cleanupStaleEvents() {
 					}
 				}
 
-	telemetry?.trackEventExpired(
-		message.guild?.id || 'unknown',
-		messageId,
-		userMentionsToUserIds(
-			eventParticipants.get(messageId) ||
-				new Map<string, { userId: string; role: string | null }>(),
-		),
-		message.channelId,
-	);
+				const matchId = eventMatchIds.get(messageId);
+				telemetry?.trackEventExpired(
+					message.guild?.id || 'unknown',
+					messageId,
+					userMentionsToUserIds(
+						eventParticipants.get(messageId) ||
+							new Map<string, { userId: string; role: string | null }>(),
+					),
+					message.channelId,
+					matchId,
+				);
 
 				break;
 			}

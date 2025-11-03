@@ -1,3 +1,4 @@
+import type { EventRecorder } from './event-recorder.js';
 import type { ParticipantData, TelemetryContext, TelemetryEvent } from './types';
 import {
 	recordTelemetryDispatch,
@@ -8,21 +9,31 @@ import {
  * Lightweight client for forwarding structured telemetry events to the backend.
  */
 export class TelemetryService {
-	private backendUrl: string;
-	private apiKey: string;
+	private backendUrl: string | null;
+	private apiKey: string | null;
+	private recorder?: EventRecorder;
 
 	/**
 	 * Creates a telemetry client using the provided backend base URL and API key.
 	 */
-	constructor(backendUrl: string, apiKey: string) {
-		this.backendUrl = backendUrl;
-		this.apiKey = apiKey;
+	constructor(
+		backendUrl?: string | null,
+		apiKey?: string | null,
+		recorder?: EventRecorder,
+	) {
+		this.backendUrl = backendUrl ?? null;
+		this.apiKey = apiKey ?? null;
+		this.recorder = recorder;
 	}
 
 	private async sendEvent(
 		event: TelemetryEvent,
 		context?: TelemetryContext,
 	) {
+		await this.recorder?.record(event, context);
+
+		if (!this.backendUrl || !this.apiKey) return;
+
 		try {
 			const headers = {
 				'Content-Type': 'application/json',
@@ -51,6 +62,7 @@ export class TelemetryService {
 		userId: string,
 		timeToStart?: number,
 		channelId?: string,
+		matchId?: string,
 	) {
 		await this.sendEvent(
 			{
@@ -60,7 +72,7 @@ export class TelemetryService {
 				timestamp: Date.now(),
 				data: { userId, timeToStart },
 			},
-			{ channelId },
+			{ channelId, matchId },
 		);
 	}
 
@@ -73,6 +85,7 @@ export class TelemetryService {
 		userId: string,
 		participants: ParticipantData[],
 		channelId?: string,
+		matchId?: string,
 	) {
 		await this.sendEvent(
 			{
@@ -82,7 +95,7 @@ export class TelemetryService {
 				timestamp: Date.now(),
 				data: { userId, participants },
 			},
-			{ channelId },
+			{ channelId, matchId },
 		);
 	}
 
@@ -95,6 +108,7 @@ export class TelemetryService {
 		userId: string,
 		participants: ParticipantData[],
 		channelId?: string,
+		matchId?: string,
 	) {
 		await this.sendEvent(
 			{
@@ -104,7 +118,7 @@ export class TelemetryService {
 				timestamp: Date.now(),
 				data: { userId, participants },
 			},
-			{ channelId },
+			{ channelId, matchId },
 		);
 	}
 
@@ -116,6 +130,7 @@ export class TelemetryService {
 		eventId: string,
 		participants: ParticipantData[],
 		channelId?: string,
+		matchId?: string,
 	) {
 		await this.sendEvent(
 			{
@@ -125,7 +140,7 @@ export class TelemetryService {
 				timestamp: Date.now(),
 				data: { participants },
 			},
-			{ channelId },
+			{ channelId, matchId },
 		);
 	}
 
@@ -137,6 +152,7 @@ export class TelemetryService {
 		eventId: string,
 		participants: ParticipantData[],
 		channelId?: string,
+		matchId?: string,
 	) {
 		await this.sendEvent(
 			{
@@ -146,7 +162,7 @@ export class TelemetryService {
 				timestamp: Date.now(),
 				data: { participants },
 			},
-			{ channelId },
+			{ channelId, matchId },
 		);
 	}
 
@@ -158,6 +174,7 @@ export class TelemetryService {
 		eventId: string,
 		participants: ParticipantData[],
 		channelId?: string,
+		matchId?: string,
 	) {
 		await this.sendEvent(
 			{
@@ -167,7 +184,7 @@ export class TelemetryService {
 				timestamp: Date.now(),
 				data: { participants },
 			},
-			{ channelId },
+			{ channelId, matchId },
 		);
 	}
 
@@ -179,6 +196,7 @@ export class TelemetryService {
 		eventId: string,
 		participants: ParticipantData[],
 		channelId?: string,
+		matchId?: string,
 	) {
 		await this.sendEvent(
 			{
@@ -188,7 +206,7 @@ export class TelemetryService {
 				timestamp: Date.now(),
 				data: { participants },
 			},
-			{ channelId },
+			{ channelId, matchId },
 		);
 	}
 }

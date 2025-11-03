@@ -68,6 +68,13 @@ To start testing locally you can use the following commands:
 - `pnpm dev` to run the bot locally
 - `pnpm run build` to create a build of the bot
 
+## Environment configuration
+
+- `BOT_TOKEN` (required): Discord bot token used to authenticate the bot.
+- `TELEMETRY_URL` and `TELEMETRY_TOKEN` (optional): enable forwarding lifecycle telemetry to an external HTTP endpoint.
+- `METRICS_PORT` (optional, defaults to `9464`): port exposing the Prometheus `/metrics` endpoint.
+- `DATABASE_URL` (optional): PostgreSQL connection string used to persist match lifecycle data to the `telemetry_events` table.
+
 ## Running with Docker
 
 Build the production image:
@@ -84,6 +91,7 @@ docker run --rm \
   -e TELEMETRY_URL=optional_url \
   -e TELEMETRY_TOKEN=optional_token \
   -e METRICS_PORT=9464 \
+  -e DATABASE_URL=optional_postgres_connection_string \
   agent-8s
 ```
 
@@ -99,6 +107,7 @@ docker run --rm --env-file .env agent-8s
 - Every telemetry dispatch increments `telemetry_events_forwarded_total{event="...",guild="...",channel="..."}`; failures increment the matching `telemetry_events_failed_total` series.
 - Guild and channel labels fall back to `unknown` whenever the IDs cannot be resolved (for example, when telemetry is triggered outside a guild context).
 - The metrics endpoint is available even when remote telemetry is disabled, allowing local scraping without forwarding events.
+- Provide `DATABASE_URL` to persist lifecycle events in PostgreSQL. The bot will create a `telemetry_events` table (if missing) and record match UUIDs, guild/channel IDs, user/participant identifiers, payload JSON, and timestamps for each lifecycle hook.
 
 ## Task shortcuts
 

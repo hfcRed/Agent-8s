@@ -21,4 +21,5 @@ export interface TelemetryEvent {
 
 export interface TelemetryContext {
 	channelId?: string;
+	matchId?: string;
 }
