@@ -91,3 +91,16 @@ You can also supply environment values from a file:
 ```bash
 docker run --rm --env-file .env agent-8s
 ```
+
+## Task shortcuts
+
+Install [Task](https://taskfile.dev) and use the provided helpers:
+
+- `task docker:build` builds the image using the repository Dockerfile.
+- `task docker:run BOT_TOKEN=your_token_here` runs the container with the required token (add `TELEMETRY_URL`/`TELEMETRY_TOKEN` as needed). Append `DETACH=true` to run in the background.
+- `task docker:run-env-file` runs the container with environment values from `.env` or a custom file via `ENV_FILE=path/to/file`.
+- `task docker:down` stops the running container (defaults to `agent-8s`; override with `CONTAINER_NAME=name`).
+- `task docker:destroy-image` removes the current image (if present) and prunes dangling layers.
+- `task docker:update-run` stops the container, rebuilds the image, and runs it again using `.env` by default; accepts the same overrides as the other Docker tasks.
+
+All Docker tasks respect `IMAGE_NAME` and `CONTAINER_NAME` overrides if you need to run multiple variants side by side.
