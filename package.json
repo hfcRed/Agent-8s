@@ -1,8 +1,6 @@
 {
 	"name": "agent-8s",
 	"version": "1.0.0",
-	"description": "",
-	"main": "index.js",
 	"scripts": {
 		"dev": "tsx watch src/index.ts",
 		"build": "tsc",
@@ -12,9 +10,6 @@
 		"lint": "biome lint .",
 		"check": "biome check --write ."
 	},
-	"keywords": [],
-	"author": "",
-	"license": "ISC",
 	"packageManager": "pnpm@10.12.4",
 	"dependencies": {
 		"discord.js": "^14.24.2",
