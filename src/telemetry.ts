@@ -1,14 +1,23 @@
 import type { ParticipantData, TelemetryEvent } from './types';
 
+/**
+ * Lightweight client for forwarding structured telemetry events to the backend.
+ */
 export class TelemetryService {
 	private backendUrl: string;
 	private apiKey: string;
 
+	/**
+	 * Creates a telemetry client using the provided backend base URL and API key.
+	 */
 	constructor(backendUrl: string, apiKey: string) {
 		this.backendUrl = backendUrl;
 		this.apiKey = apiKey;
 	}
 
+	/**
+	 * Performs the underlying POST request to send a telemetry payload.
+	 */
 	async sendEvent(event: TelemetryEvent) {
 		try {
 			const headers = {
@@ -26,6 +35,9 @@ export class TelemetryService {
 		}
 	}
 
+	/**
+	 * Emits telemetry capturing when an event lobby is created.
+	 */
 	async trackEventCreated(
 		guildId: string,
 		eventId: string,
@@ -41,6 +53,9 @@ export class TelemetryService {
 		});
 	}
 
+	/**
+	 * Records when a user signs up for an event and the resulting roster.
+	 */
 	async trackUserSignUp(
 		guildId: string,
 		eventId: string,
@@ -56,6 +71,9 @@ export class TelemetryService {
 		});
 	}
 
+	/**
+	 * Records when a user withdraws from an event lobby and shares the new roster.
+	 */
 	async trackUserSignOut(
 		guildId: string,
 		eventId: string,
@@ -71,6 +89,9 @@ export class TelemetryService {
 		});
 	}
 
+	/**
+	 * Records when an event is cancelled before it starts.
+	 */
 	async trackEventCancelled(
 		guildId: string,
 		eventId: string,
@@ -85,6 +106,9 @@ export class TelemetryService {
 		});
 	}
 
+	/**
+	 * Records when an event transitions into an active state.
+	 */
 	async trackEventStarted(
 		guildId: string,
 		eventId: string,
@@ -99,6 +123,9 @@ export class TelemetryService {
 		});
 	}
 
+	/**
+	 * Records when an event is marked as complete.
+	 */
 	async trackEventFinished(
 		guildId: string,
 		eventId: string,
@@ -113,6 +140,9 @@ export class TelemetryService {
 		});
 	}
 
+	/**
+	 * Records when an event expires without reaching completion.
+	 */
 	async trackEventExpired(
 		guildId: string,
 		eventId: string,

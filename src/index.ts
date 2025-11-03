@@ -28,6 +28,10 @@ import {
 import { TelemetryService } from './telemetry.js';
 import type { EventTimer, ParticipantMap } from './types.js';
 
+/**
+ * Discord bot entry point that registers slash commands, tracks event state,
+ * and routes user interactions to the appropriate handlers.
+ */
 const parsed = dotenv.config();
 const botToken = parsed.parsed?.BOT_TOKEN;
 const telemetryUrl = parsed.parsed?.TELEMETRY_URL;
@@ -38,11 +42,17 @@ if (!botToken) {
 	process.exit(1);
 }
 
+/**
+ * Optional telemetry client used to forward interaction lifecycle metrics.
+ */
 const telemetry =
 	telemetryUrl && telemetryToken
 		? new TelemetryService(telemetryUrl, telemetryToken)
 		: null;
 
+/**
+ * Slash command definitions registered with the Discord API at startup.
+ */
 const commands = [
 	new SlashCommandBuilder()
 		.setName('create')
@@ -72,6 +82,9 @@ const client = new Client({
 	allowedMentions: { parse: ['roles'] },
 });
 
+/**
+ * Registers slash commands with Discord as soon as the bot client is ready.
+ */
 client.once('clientReady', async () => {
 	if (!client.user) return;
 
@@ -80,13 +93,19 @@ client.once('clientReady', async () => {
 	});
 });
 
-// The key is the message ID of the bot message created for the event
+/**
+ * In-memory event state keyed by the bot message ID created for each event.
+ * These maps are cleared when an event completes, is cancelled, or expires.
+ */
 const eventParticipants = new Map<string, ParticipantMap>();
 const eventCreators = new Map<string, string>();
 const eventTimers = new Map<string, EventTimer>();
 const eventThreads = new Map<string, string>();
 const eventTimeouts = new Map<string, NodeJS.Timeout>();
 
+/**
+ * Routes Discord interactions to the relevant handler based on component type.
+ */
 client.on('interactionCreate', async (interaction) => {
 	try {
 		if (
@@ -160,6 +179,10 @@ client.on('interactionCreate', async (interaction) => {
 	}
 });
 
+/**
+ * Handles the /create slash command by creating the event embed, registering
+ * local state tracking, and setting up any scheduled start timers.
+ */
 async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	if (isUserInAnyEvent(interaction.user.id)) {
 		await interaction.reply({
@@ -306,6 +329,10 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	}
 }
 
+/**
+ * Adds the interacting user to the event, updates telemetry, and refreshes the
+ * participant embed when the Sign Up button is pressed.
+ */
 async function handleSignUpButton(
 	interaction: ButtonInteraction,
 	userId: string,
@@ -342,6 +369,10 @@ async function handleSignUpButton(
 	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
 
+/**
+ * Removes the interacting user from the participant list while preventing the
+ * event creator from opting out of their own lobby.
+ */
 async function handleSignOutButton(
 	interaction: ButtonInteraction,
 	userId: string,
@@ -370,6 +401,10 @@ async function handleSignOutButton(
 	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
 
+/**
+ * Cancels an event when invoked by its creator, updates visual state, and
+ * clears all cached data for the associated message.
+ */
 async function handleCancelButton(
 	interaction: ButtonInteraction,
 	userId: string,
@@ -405,6 +440,10 @@ async function handleCancelButton(
 	cleanupEvent(messageId);
 }
 
+/**
+ * Starts the event immediately when the lobby is full and the creator invokes
+ * the Start Now button.
+ */
 async function handleStartNowButton(
 	interaction: ButtonInteraction,
 	userId: string,
@@ -427,6 +466,9 @@ async function handleStartNowButton(
 	await startEvent(interaction.message, participantMap);
 }
 
+/**
+ * Completes an active event, locks the associated thread, and records telemetry.
+ */
 async function handleFinishButton(
 	interaction: ButtonInteraction,
 	userId: string,
@@ -473,6 +515,10 @@ async function handleFinishButton(
 	cleanupEvent(messageId);
 }
 
+/**
+ * Persists the weapon role selected by the user and updates shared state plus
+ * the visible embed with the new assignment.
+ */
 async function handleRoleSelection(
 	interaction: StringSelectMenuInteraction,
 	userId: string,
@@ -506,6 +552,10 @@ async function handleRoleSelection(
 	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
 
+/**
+ * Transitions a lobby into an active event, creates a private thread, and
+ * invites all registered participants.
+ */
 async function startEvent(message: Message, participantMap: ParticipantMap) {
 	const timerData = eventTimers.get(message.id);
 	if (!timerData || timerData.hasStarted) return;
@@ -559,6 +609,9 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 	);
 }
 
+/**
+ * Updates a field on the event embed by exact name match.
+ */
 function updateEmbedField(
 	embed: EmbedBuilder,
 	fieldName: string,
@@ -572,6 +625,9 @@ function updateEmbedField(
 	embed.setFields(fields);
 }
 
+/**
+ * Updates a field on the event embed using a partial match to find dynamic slots.
+ */
 function updateEmbedFieldByMatch(
 	embed: EmbedBuilder,
 	partialName: string,
@@ -587,6 +643,10 @@ function updateEmbedFieldByMatch(
 	embed.setFields(fields);
 }
 
+/**
+ * Syncs the event embed with the current participant roster and triggers an
+ * automatic start when the lobby fills and any timers have elapsed.
+ */
 async function updateParticipantEmbed(
 	interaction: ButtonInteraction | StringSelectMenuInteraction,
 	participantMap: ParticipantMap,
@@ -629,6 +689,9 @@ async function updateParticipantEmbed(
 	}
 }
 
+/**
+ * Returns true if the supplied user is already registered in any tracked event.
+ */
 function isUserInAnyEvent(userId: string): boolean {
 	const mention = createUserMention(userId);
 	for (const [_, participantSet] of eventParticipants.entries()) {
@@ -639,10 +702,16 @@ function isUserInAnyEvent(userId: string): boolean {
 	return false;
 }
 
+/**
+ * Creates a Discord mention string for the provided user ID.
+ */
 function createUserMention(userId: string) {
 	return `<@${userId}>`;
 }
 
+/**
+ * Converts a map keyed by user mentions into an array of clean user IDs and roles.
+ */
 function userMentionsToUserIds(mentions: ParticipantMap) {
 	return Array.from(mentions.values()).map((mention) => {
 		return {
@@ -652,6 +721,9 @@ function userMentionsToUserIds(mentions: ParticipantMap) {
 	});
 }
 
+/**
+ * Resolves which roles to ping for the current guild based on the lobby type.
+ */
 function getPingsForServer(
 	interaction: ChatInputCommandInteraction,
 	casual: boolean,
@@ -669,6 +741,9 @@ function getPingsForServer(
 	return roles.map((role) => `||<@&${role.id}>||`).join(' ');
 }
 
+/**
+ * Clears all cached state associated with a specific event.
+ */
 function cleanupEvent(messageId: string) {
 	const timeout = eventTimeouts.get(messageId);
 	if (timeout) {
@@ -682,6 +757,9 @@ function cleanupEvent(messageId: string) {
 	eventThreads.delete(messageId);
 }
 
+/**
+ * Periodically scans active events and expires any that have exceeded their lifetime.
+ */
 async function cleanupStaleEvents() {
 	const MAX_EVENT_LIFETIME = 24 * 60 * 60 * 1000;
 	const now = Date.now();
