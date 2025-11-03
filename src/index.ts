@@ -30,10 +30,6 @@ import { EventRecorder } from './event-recorder.js';
 import { TelemetryService } from './telemetry.js';
 import type { EventTimer, ParticipantMap } from './types.js';
 
-/**
- * Discord bot entry point that registers slash commands, tracks event state,
- * and routes user interactions to the appropriate handlers.
- */
 const parsed = dotenv.config();
 const botToken = parsed.parsed?.BOT_TOKEN ?? process.env.BOT_TOKEN;
 const telemetryUrl = parsed.parsed?.TELEMETRY_URL ?? process.env.TELEMETRY_URL;
@@ -58,27 +54,20 @@ const eventRecorder = databaseUrl
 			schema: databaseSchema,
 			table: telemetryEventsTable,
 		})
-	: null;
+	: undefined;
+
 const telemetry =
 	telemetryUrl && telemetryToken
-		? new TelemetryService(
-				telemetryUrl,
-				telemetryToken,
-				eventRecorder ?? undefined,
-			)
-		: eventRecorder
-			? new TelemetryService(null, null, eventRecorder)
-			: null;
+		? new TelemetryService(telemetryUrl, telemetryToken, eventRecorder)
+		: undefined;
 
-eventRecorder
-	?.initialize()
-	.catch((error) =>
-		console.error('Failed to prepare telemetry persistence', error),
-	);
+const rest = new REST({ version: '10' }).setToken(botToken);
 
-/**
- * Slash command definitions registered with the Discord API at startup.
- */
+const appClient = new Client({
+	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+	allowedMentions: { parse: ['roles'] },
+});
+
 const commands = [
 	new SlashCommandBuilder()
 		.setName('create')
@@ -101,20 +90,10 @@ const commands = [
 		.toJSON(),
 ];
 
-const rest = new REST({ version: '10' }).setToken(botToken);
+appClient.once('clientReady', async () => {
+	if (!appClient.user) return;
 
-const client = new Client({
-	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
-	allowedMentions: { parse: ['roles'] },
-});
-
-/**
- * Registers slash commands with Discord as soon as the bot client is ready.
- */
-client.once('clientReady', async () => {
-	if (!client.user) return;
-
-	await rest.put(Routes.applicationCommands(client.user.id), {
+	await rest.put(Routes.applicationCommands(appClient.user.id), {
 		body: commands,
 	});
 });
@@ -130,10 +109,7 @@ const eventThreads = new Map<string, string>();
 const eventTimeouts = new Map<string, NodeJS.Timeout>();
 const eventMatchIds = new Map<string, string>();
 
-/**
- * Routes Discord interactions to the relevant handler based on component type.
- */
-client.on('interactionCreate', async (interaction) => {
+appClient.on('interactionCreate', async (interaction) => {
 	try {
 		if (
 			interaction.isChatInputCommand() &&
@@ -207,8 +183,8 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 /**
- * Handles the /create slash command by creating the event embed, registering
- * local state tracking, and setting up any scheduled start timers.
+ * Handles the /create slash command by creating the event embed
+ * and setting up any scheduled start timers.
  */
 async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	if (isUserInAnyEvent(interaction.user.id)) {
@@ -361,8 +337,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 }
 
 /**
- * Adds the interacting user to the event, updates telemetry, and refreshes the
- * participant embed when the Sign Up button is pressed.
+ * Adds the interacting user to the event participant list if there is room.
  */
 async function handleSignUpButton(
 	interaction: ButtonInteraction,
@@ -404,8 +379,8 @@ async function handleSignUpButton(
 }
 
 /**
- * Removes the interacting user from the participant list while preventing the
- * event creator from opting out of their own lobby.
+ * Removes the interacting user from the participant list.
+ * Event creators cannot sign out.
  */
 async function handleSignOutButton(
 	interaction: ButtonInteraction,
@@ -439,8 +414,7 @@ async function handleSignOutButton(
 }
 
 /**
- * Cancels an event when invoked by its creator, updates visual state, and
- * clears all cached data for the associated message.
+ * Cancels the event. Can only be invoked by the event creator.
  */
 async function handleCancelButton(
 	interaction: ButtonInteraction,
@@ -481,8 +455,8 @@ async function handleCancelButton(
 }
 
 /**
- * Starts the event immediately when the lobby is full and the creator invokes
- * the Start Now button.
+ * Starts the event immediately when the lobby is full.
+ * Can only be invoked by the event creator.
  */
 async function handleStartNowButton(
 	interaction: ButtonInteraction,
@@ -507,7 +481,8 @@ async function handleStartNowButton(
 }
 
 /**
- * Completes an active event, locks the associated thread, and records telemetry.
+ * Completes an active event and locks and archives the associated thread.
+ * Can only be invoked by the event creator.
  */
 async function handleFinishButton(
 	interaction: ButtonInteraction,
@@ -559,8 +534,8 @@ async function handleFinishButton(
 }
 
 /**
- * Persists the weapon role selected by the user and updates shared state plus
- * the visible embed with the new assignment.
+ * Updates the weapon role for the interacting user.
+ * Can only be invoked by users who are signed up for the event.
  */
 async function handleRoleSelection(
 	interaction: StringSelectMenuInteraction,
@@ -596,7 +571,7 @@ async function handleRoleSelection(
 }
 
 /**
- * Transitions a lobby into an active event, creates a private thread, and
+ * Starts the event, creates a private thread, and
  * invites all registered participants.
  */
 async function startEvent(message: Message, participantMap: ParticipantMap) {
@@ -656,7 +631,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 }
 
 /**
- * Updates a field on the event embed by exact name match.
+ * Updates a fields value on the event embed by exact name match.
  */
 function updateEmbedField(
 	embed: EmbedBuilder,
@@ -672,7 +647,7 @@ function updateEmbedField(
 }
 
 /**
- * Updates a field on the event embed using a partial match to find dynamic slots.
+ * Updates a fields value on the event embed using a partial match to find dynamic field names.
  */
 function updateEmbedFieldByMatch(
 	embed: EmbedBuilder,
@@ -690,7 +665,7 @@ function updateEmbedFieldByMatch(
 }
 
 /**
- * Syncs the event embed with the current participant roster and triggers an
+ * Updates the embed with the current participant list and triggers an
  * automatic start when the lobby fills and any timers have elapsed.
  */
 async function updateParticipantEmbed(
@@ -736,7 +711,7 @@ async function updateParticipantEmbed(
 }
 
 /**
- * Returns true if the supplied user is already registered in any tracked event.
+ * Returns true if the supplied user is already registered in any event.
  */
 function isUserInAnyEvent(userId: string): boolean {
 	const mention = createUserMention(userId);
@@ -788,7 +763,7 @@ function getPingsForServer(
 }
 
 /**
- * Clears all cached state associated with a specific event.
+ * Clears all data associated with a specific event.
  */
 function cleanupEvent(messageId: string) {
 	const timeout = eventTimeouts.get(messageId);
@@ -805,17 +780,18 @@ function cleanupEvent(messageId: string) {
 }
 
 /**
- * Periodically scans active events and expires any that have exceeded their lifetime.
+ * Looks through all active events and cleans up any
+ * that have exceeded their maximum lifetime.
  */
 async function cleanupStaleEvents() {
 	const MAX_EVENT_LIFETIME = 24 * 60 * 60 * 1000;
 	const now = Date.now();
 
 	for (const [messageId, timerData] of eventTimers.entries()) {
-		if (now - timerData.startTime < MAX_EVENT_LIFETIME) return;
+		if (now - timerData.startTime < MAX_EVENT_LIFETIME) continue;
 
 		try {
-			for (const [_, channel] of client.channels.cache) {
+			for (const [_, channel] of appClient.channels.cache) {
 				if (!channel.isTextBased() || channel.isDMBased()) continue;
 
 				const message = await channel.messages.fetch(messageId);
@@ -859,4 +835,4 @@ async function cleanupStaleEvents() {
 }
 
 setInterval(cleanupStaleEvents, 60 * 60 * 1000);
-client.login(botToken);
+appClient.login(botToken);

@@ -7,24 +7,23 @@ import type {
 } from './types';
 
 /**
- * Lightweight client for forwarding structured telemetry events to the backend.
+ * Class for forwarding events to a telemetry backend.
  */
 export class TelemetryService {
-	private backendUrl: string | null;
-	private apiKey: string | null;
+	private backendUrl: string;
+	private apiKey: string;
 	private recorder?: EventRecorder;
 
-	/**
-	 * Creates a telemetry client using the provided backend base URL and API key.
-	 */
-	constructor(
-		backendUrl?: string | null,
-		apiKey?: string | null,
-		recorder?: EventRecorder,
-	) {
-		this.backendUrl = backendUrl ?? null;
-		this.apiKey = apiKey ?? null;
+	constructor(backendUrl: string, apiKey: string, recorder?: EventRecorder) {
+		this.backendUrl = backendUrl;
+		this.apiKey = apiKey;
 		this.recorder = recorder;
+
+		this.recorder
+			?.initialize()
+			.catch((error) =>
+				console.error('Failed to prepare telemetry persistence', error),
+			);
 	}
 
 	private async sendEvent(event: TelemetryEvent, context?: TelemetryContext) {
@@ -51,9 +50,6 @@ export class TelemetryService {
 		}
 	}
 
-	/**
-	 * Emits telemetry capturing when an event lobby is created.
-	 */
 	async trackEventCreated(
 		guildId: string,
 		eventId: string,
@@ -74,9 +70,6 @@ export class TelemetryService {
 		);
 	}
 
-	/**
-	 * Records when a user signs up for an event and the resulting roster.
-	 */
 	async trackUserSignUp(
 		guildId: string,
 		eventId: string,
@@ -97,9 +90,6 @@ export class TelemetryService {
 		);
 	}
 
-	/**
-	 * Records when a user withdraws from an event lobby and shares the new roster.
-	 */
 	async trackUserSignOut(
 		guildId: string,
 		eventId: string,
@@ -120,9 +110,6 @@ export class TelemetryService {
 		);
 	}
 
-	/**
-	 * Records when an event is cancelled before it starts.
-	 */
 	async trackEventCancelled(
 		guildId: string,
 		eventId: string,
@@ -142,9 +129,6 @@ export class TelemetryService {
 		);
 	}
 
-	/**
-	 * Records when an event transitions into an active state.
-	 */
 	async trackEventStarted(
 		guildId: string,
 		eventId: string,
@@ -164,9 +148,6 @@ export class TelemetryService {
 		);
 	}
 
-	/**
-	 * Records when an event is marked as complete.
-	 */
 	async trackEventFinished(
 		guildId: string,
 		eventId: string,
@@ -186,9 +167,6 @@ export class TelemetryService {
 		);
 	}
 
-	/**
-	 * Records when an event expires without reaching completion.
-	 */
 	async trackEventExpired(
 		guildId: string,
 		eventId: string,

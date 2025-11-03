@@ -13,6 +13,9 @@ type EventRecorderOptions = {
 const DEFAULT_SCHEMA = 'public';
 const DEFAULT_TABLE = 'telemetry_events';
 
+/**
+ * Class for persisting telemetry events to a PostgreSQL database.
+ */
 export class EventRecorder {
 	private pool: Pool;
 	private initialized = false;
