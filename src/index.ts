@@ -10,6 +10,7 @@ import {
 	EmbedBuilder,
 	GatewayIntentBits,
 	type Guild,
+	GuildMember,
 	type Message,
 	OverwriteType,
 	PermissionFlagsBits,
@@ -125,6 +126,13 @@ const eventMatchIds = new Map<string, string>();
 const eventVoiceChannels = new Map<string, string[]>();
 
 appClient.on('interactionCreate', async (interaction) => {
+	if (
+		!interaction.guild ||
+		!interaction.member ||
+		!(interaction.member instanceof GuildMember)
+	)
+		return;
+
 	try {
 		if (
 			interaction.isChatInputCommand() &&
@@ -483,7 +491,7 @@ async function handleSignOutButton(
 }
 
 /**
- * Cancels the event. Can only be invoked by the event creator.
+ * Cancels the event. Can be invoked by the event creator or administrators.
  */
 async function handleCancelButton(
 	interaction: ButtonInteraction,
@@ -493,7 +501,10 @@ async function handleCancelButton(
 ) {
 	await interaction.deferUpdate();
 
-	if (userId !== creatorId) {
+	const isCreator = userId === creatorId;
+	const isAdmin = isUserAdmin(interaction.member as GuildMember);
+
+	if (!isCreator && !isAdmin) {
 		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_ONLY_CANCEL,
 			flags: ['Ephemeral'],
@@ -556,7 +567,7 @@ async function handleStartNowButton(
 
 /**
  * Completes an active event and locks and archives the associated thread.
- * Can only be invoked by the event creator.
+ * Can be invoked by the event creator or administrators.
  */
 async function handleFinishButton(
 	interaction: ButtonInteraction,
@@ -566,7 +577,10 @@ async function handleFinishButton(
 ) {
 	await interaction.deferUpdate();
 
-	if (userId !== creatorId) {
+	const isCreator = userId === creatorId;
+	const isAdmin = isUserAdmin(interaction.member as GuildMember);
+
+	if (!isCreator && !isAdmin) {
 		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_ONLY_FINISH,
 			flags: ['Ephemeral'],
@@ -879,7 +893,7 @@ async function updateParticipantEmbed(
 /**
  * Returns true if the supplied user is already registered in any event.
  */
-function isUserInAnyEvent(userId: string): boolean {
+function isUserInAnyEvent(userId: string) {
 	for (const [_, participantSet] of eventParticipants.entries()) {
 		if (participantSet.has(userId)) {
 			return true;
@@ -889,12 +903,21 @@ function isUserInAnyEvent(userId: string): boolean {
 }
 
 /**
+ * Checks if a user has administrator permissions.
+ */
+function isUserAdmin(member: GuildMember) {
+	return ADMIN_PERMISSIONS.some((permission) =>
+		member.permissions.has(PermissionFlagsBits[permission]),
+	);
+}
+
+/**
  * Resolves which roles to ping for the current guild based on the lobby type.
  */
 function getPingsForServer(
 	interaction: ChatInputCommandInteraction,
 	casual: boolean,
-): string | null {
+) {
 	if (!interaction.guild) return null;
 
 	const roles = interaction.guild.roles.cache.filter((role) =>
@@ -1054,11 +1077,7 @@ appClient.on('messageCreate', async (message) => {
 		const member = message.member;
 		if (!member) return;
 
-		const isAdmin = ADMIN_PERMISSIONS.some((permission) =>
-			member.permissions.has(PermissionFlagsBits[permission]),
-		);
-
-		if (!isAdmin && message.interactionMetadata?.type !== 2) {
+		if (!isUserAdmin(member) && message.interactionMetadata?.type !== 2) {
 			await message.delete();
 		}
 	} catch (error) {

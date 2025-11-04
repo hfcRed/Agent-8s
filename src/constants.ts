@@ -53,8 +53,10 @@ export const ERROR_MESSAGES = {
 	ALREADY_SIGNED_UP:
 		'You are already signed up for an event. Please sign out, cancel, or wait for the event to finish before joining a new one.',
 	CREATOR_ONLY_START: 'Only the event creator can start the event.',
-	CREATOR_ONLY_CANCEL: 'Only the event creator can cancel this event.',
-	CREATOR_ONLY_FINISH: 'Only the event creator can finish this event.',
+	CREATOR_ONLY_CANCEL:
+		'Only the event creator or administrators can cancel this event.',
+	CREATOR_ONLY_FINISH:
+		'Only the event creator or administrators can finish this event.',
 	CREATOR_CANNOT_SIGNOUT:
 		'The event creator cannot sign out. Please cancel the event instead.',
 	NOT_SIGNED_UP: 'You need to be signed up to perform this action.',
