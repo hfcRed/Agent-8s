@@ -7,9 +7,22 @@ vars:
   CONTAINER_NAME: '{{ default "agent-8s" .CONTAINER_NAME }}'
 
 tasks:
+  test:
+    desc: Run unit tests inside the Docker build stage
+    cmds:
+      - task: docker:test
+
+  docker:test:
+    desc: Execute the Docker test stage to compile and run checks
+    cmds:
+      - docker build --target test --progress plain -t {{.IMAGE_NAME}}:test .
+
   docker:build:
     desc: Build the Docker image for the bot
     cmds:
+      - task: docker:test
+        vars:
+          IMAGE_NAME: '{{.IMAGE_NAME}}'
       - docker build -t {{.IMAGE_NAME}} .
 
   docker:run:
@@ -32,7 +45,7 @@ tasks:
       ENV_FILE: '{{ default ".env" .ENV_FILE }}'
       DETACH_FLAG: '{{if eq (default "false" .DETACH) "true"}}-d{{end}}'
     cmds:
-      - docker run --rm{{if .DETACH_FLAG}} {{.DETACH_FLAG}}{{end}} --name {{.CONTAINER_NAME}} --env-file {{.ENV_FILE}} {{.IMAGE_NAME}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}
+      - docker run --rm{{if .DETACH_FLAG}} {{.DETACH_FLAG}}{{end}} --name {{.CONTAINER_NAME}} --env-file {{.ENV_FILE}} -v {{.PWD}}/{{.ENV_FILE}}:/usr/src/app/.env:ro {{.IMAGE_NAME}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}
 
   docker:down:
     desc: Stop the running bot container and remove it if present

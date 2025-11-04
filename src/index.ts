@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
 	ActionRowBuilder,
 	ButtonBuilder,
@@ -25,23 +26,50 @@ import {
 	PING_ROLE_NAMES,
 	STATUS_MESSAGES,
 } from './constants.js';
-import { TelemetryService } from './telemetry.js';
+import { EventRecorder } from './telemetry/event-recorder.js';
+import { TelemetryService } from './telemetry/telemetry.js';
 import type { EventTimer, ParticipantMap } from './types.js';
 
 const parsed = dotenv.config();
-const botToken = parsed.parsed?.BOT_TOKEN;
-const telemetryUrl = parsed.parsed?.TELEMETRY_URL;
-const telemetryToken = parsed.parsed?.TELEMETRY_TOKEN;
+const botToken = parsed.parsed?.BOT_TOKEN ?? process.env.BOT_TOKEN;
+const telemetryUrl = parsed.parsed?.TELEMETRY_URL ?? process.env.TELEMETRY_URL;
+const telemetryToken =
+	parsed.parsed?.TELEMETRY_TOKEN ?? process.env.TELEMETRY_TOKEN;
+const databaseUrl = parsed.parsed?.DATABASE_URL ?? process.env.DATABASE_URL;
+const databaseSchema =
+	parsed.parsed?.DATABASE_SCHEMA ?? process.env.DATABASE_SCHEMA;
+const telemetryEventsTable =
+	parsed.parsed?.TELEMETRY_EVENTS_TABLE ?? process.env.TELEMETRY_EVENTS_TABLE;
 
 if (!botToken) {
 	console.error('BOT_TOKEN not found in .env file');
 	process.exit(1);
 }
 
+/**
+ * Optional telemetry client used to forward interaction lifecycle metrics.
+ */
+// this should just be moved into the TelemetryService constructor
+// likewise so should all the environment variable reading
+// we want to keep this file for just the bot logic
+const eventRecorder = databaseUrl
+	? new EventRecorder(databaseUrl, {
+			schema: databaseSchema,
+			table: telemetryEventsTable,
+		})
+	: undefined;
+
 const telemetry =
 	telemetryUrl && telemetryToken
-		? new TelemetryService(telemetryUrl, telemetryToken)
-		: null;
+		? new TelemetryService(telemetryUrl, telemetryToken, eventRecorder)
+		: undefined;
+
+const rest = new REST({ version: '10' }).setToken(botToken);
+
+const appClient = new Client({
+	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+	allowedMentions: { parse: ['roles'] },
+});
 
 const commands = [
 	new SlashCommandBuilder()
@@ -65,29 +93,26 @@ const commands = [
 		.toJSON(),
 ];
 
-const rest = new REST({ version: '10' }).setToken(botToken);
+appClient.once('clientReady', async () => {
+	if (!appClient.user) return;
 
-const client = new Client({
-	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
-	allowedMentions: { parse: ['roles'] },
-});
-
-client.once('clientReady', async () => {
-	if (!client.user) return;
-
-	await rest.put(Routes.applicationCommands(client.user.id), {
+	await rest.put(Routes.applicationCommands(appClient.user.id), {
 		body: commands,
 	});
 });
 
-// The key is the message ID of the bot message created for the event
+/**
+ * In-memory event state keyed by the bot message ID created for each event.
+ * These maps are cleared when an event completes, is cancelled, or expires.
+ */
 const eventParticipants = new Map<string, ParticipantMap>();
 const eventCreators = new Map<string, string>();
 const eventTimers = new Map<string, EventTimer>();
 const eventThreads = new Map<string, string>();
 const eventTimeouts = new Map<string, NodeJS.Timeout>();
+const eventMatchIds = new Map<string, string>();
 
-client.on('interactionCreate', async (interaction) => {
+appClient.on('interactionCreate', async (interaction) => {
 	try {
 		if (
 			interaction.isChatInputCommand() &&
@@ -129,7 +154,12 @@ client.on('interactionCreate', async (interaction) => {
 					);
 					break;
 				case 'cancel':
-					await handleCancelButton(interaction, userId, creatorId);
+					await handleCancelButton(
+						interaction,
+						userId,
+						participantMap,
+						creatorId,
+					);
 					break;
 				case 'startnow':
 					await handleStartNowButton(
@@ -140,7 +170,12 @@ client.on('interactionCreate', async (interaction) => {
 					);
 					break;
 				case 'finish':
-					await handleFinishButton(interaction, userId, creatorId);
+					await handleFinishButton(
+						interaction,
+						userId,
+						participantMap,
+						creatorId,
+					);
 					break;
 			}
 		}
@@ -160,6 +195,10 @@ client.on('interactionCreate', async (interaction) => {
 	}
 });
 
+/**
+ * Handles the /create slash command by creating the event embed
+ * and setting up any scheduled start timers.
+ */
 async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	if (isUserInAnyEvent(interaction.user.id)) {
 		await interaction.reply({
@@ -170,9 +209,9 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	}
 
 	const casual = !!interaction.options.getBoolean('casual', false);
-	const timeInMinutes = interaction.options.getInteger('time', false);
+	const timeInMinutes =
+		interaction.options.getInteger('time', false) ?? undefined;
 	const startTime = Date.now();
-	const userMention = createUserMention(interaction.user.id);
 
 	const buttons = [
 		new ButtonBuilder()
@@ -228,7 +267,11 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
 
 	const embedFields = [
-		{ name: 'Participants (1)', value: `- ${userMention}`, inline: true },
+		{
+			name: 'Participants (1)',
+			value: `- <@${interaction.user.id}>`,
+			inline: true,
+		},
 		{
 			name: 'Role',
 			value: '- None',
@@ -260,10 +303,13 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		components: [buttonRow, selectRow],
 	});
 	const message = await reply.fetch();
+	const matchId = randomUUID();
 
 	eventParticipants.set(
 		message.id,
-		new Map([[userMention, { userId: userMention, role: null }]]),
+		new Map([
+			[interaction.user.id, { userId: interaction.user.id, role: null }],
+		]),
 	);
 	eventCreators.set(message.id, interaction.user.id);
 	eventTimers.set(message.id, {
@@ -271,13 +317,19 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		duration: timeInMinutes ? timeInMinutes * 60 * 1000 : 0,
 		hasStarted: false,
 	});
+	eventMatchIds.set(message.id, matchId);
 
-	telemetry?.trackEventCreated(
-		interaction.guild?.id || 'unknown',
-		message.id,
-		interaction.user.id,
-		timeInMinutes || undefined,
-	);
+	telemetry?.trackEventCreated({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: message.id,
+		userId: interaction.user.id,
+		participants: Array.from(
+			(eventParticipants.get(message.id) || new Map()).values(),
+		),
+		channelId: interaction.channelId,
+		matchId,
+		timeToStart: timeInMinutes,
+	});
 
 	if (timeInMinutes) {
 		const timeout = setTimeout(
@@ -306,18 +358,16 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	}
 }
 
+/**
+ * Adds the interacting user to the event participant list if there is room.
+ */
 async function handleSignUpButton(
 	interaction: ButtonInteraction,
 	userId: string,
 	participantMap: ParticipantMap,
 	timerData: EventTimer,
 ) {
-	const userMention = createUserMention(userId);
-
-	if (
-		participantMap.size >= MAX_PARTICIPANTS &&
-		!participantMap.has(userMention)
-	) {
+	if (participantMap.size >= MAX_PARTICIPANTS && !participantMap.has(userId)) {
 		await interaction.deferUpdate();
 		return;
 	}
@@ -330,18 +380,25 @@ async function handleSignUpButton(
 		return;
 	}
 
-	participantMap.set(userMention, { userId: userMention, role: null });
+	participantMap.set(userId, { userId: userId, role: null });
 
-	telemetry?.trackUserSignUp(
-		interaction.guild?.id || 'unknown',
-		interaction.message.id,
-		interaction.user.id,
-		userMentionsToUserIds(participantMap),
-	);
+	const matchId = eventMatchIds.get(interaction.message.id);
+	telemetry?.trackUserSignUp({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: interaction.message.id,
+		userId: userId,
+		participants: Array.from(participantMap.values()),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
 
+/**
+ * Removes the interacting user from the participant list.
+ * Event creators cannot sign out.
+ */
 async function handleSignOutButton(
 	interaction: ButtonInteraction,
 	userId: string,
@@ -357,22 +414,28 @@ async function handleSignOutButton(
 		return;
 	}
 
-	const userMention = createUserMention(userId);
-	participantMap.delete(userMention);
+	participantMap.delete(userId);
 
-	telemetry?.trackUserSignOut(
-		interaction.guild?.id || 'unknown',
-		interaction.message.id,
-		interaction.user.id,
-		userMentionsToUserIds(participantMap),
-	);
+	const matchId = eventMatchIds.get(interaction.message.id);
+	telemetry?.trackUserSignOut({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: interaction.message.id,
+		userId: userId,
+		participants: Array.from(participantMap.values()),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
 
 	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
 
+/**
+ * Cancels the event. Can only be invoked by the event creator.
+ */
 async function handleCancelButton(
 	interaction: ButtonInteraction,
 	userId: string,
+	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
 	if (userId !== creatorId) {
@@ -393,18 +456,23 @@ async function handleCancelButton(
 	await interaction.deferUpdate();
 	await interaction.message.edit({ embeds: [embed], components: [] });
 
-	telemetry?.trackEventCancelled(
-		interaction.guild?.id || 'unknown',
-		messageId,
-		userMentionsToUserIds(
-			eventParticipants.get(messageId) ||
-				new Map<string, { userId: string; role: string | null }>(),
-		),
-	);
+	const matchId = eventMatchIds.get(messageId);
+	telemetry?.trackEventCancelled({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: messageId,
+		userId: userId,
+		participants: Array.from(participantMap.values()),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
 
 	cleanupEvent(messageId);
 }
 
+/**
+ * Starts the event immediately when the lobby is full.
+ * Can only be invoked by the event creator.
+ */
 async function handleStartNowButton(
 	interaction: ButtonInteraction,
 	userId: string,
@@ -427,9 +495,14 @@ async function handleStartNowButton(
 	await startEvent(interaction.message, participantMap);
 }
 
+/**
+ * Completes an active event and locks and archives the associated thread.
+ * Can only be invoked by the event creator.
+ */
 async function handleFinishButton(
 	interaction: ButtonInteraction,
 	userId: string,
+	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
 	if (userId !== creatorId) {
@@ -461,25 +534,29 @@ async function handleFinishButton(
 	await interaction.deferUpdate();
 	await interaction.message.edit({ embeds: [embed], components: [] });
 
-	telemetry?.trackEventFinished(
-		interaction.guild?.id || 'unknown',
-		messageId,
-		userMentionsToUserIds(
-			eventParticipants.get(messageId) ||
-				new Map<string, { userId: string; role: string | null }>(),
-		),
-	);
+	const matchId = eventMatchIds.get(messageId);
+	telemetry?.trackEventFinished({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: messageId,
+		userId: userId,
+		participants: Array.from(participantMap.values()),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
 
 	cleanupEvent(messageId);
 }
 
+/**
+ * Updates the weapon role for the interacting user.
+ * Can only be invoked by users who are signed up for the event.
+ */
 async function handleRoleSelection(
 	interaction: StringSelectMenuInteraction,
 	userId: string,
 	participantMap: ParticipantMap,
 ) {
-	const userMention = createUserMention(userId);
-	if (!participantMap.has(userMention)) {
+	if (!participantMap.has(userId)) {
 		await interaction.reply({
 			content: ERROR_MESSAGES.NOT_SIGNED_UP,
 			flags: ['Ephemeral'],
@@ -494,8 +571,8 @@ async function handleRoleSelection(
 	);
 	const selectedRole = selectedOption?.label || selectedValue;
 
-	participantMap.set(userMention, {
-		userId: userMention,
+	participantMap.set(userId, {
+		userId: userId,
 		role: selectedRole,
 	});
 
@@ -506,11 +583,16 @@ async function handleRoleSelection(
 	await updateParticipantEmbed(interaction, participantMap, timerData);
 }
 
+/**
+ * Starts the event, creates a private thread, and
+ * invites all registered participants.
+ */
 async function startEvent(message: Message, participantMap: ParticipantMap) {
 	const timerData = eventTimers.get(message.id);
 	if (!timerData || timerData.hasStarted) return;
 
 	timerData.hasStarted = true;
+	const matchId = eventMatchIds.get(message.id);
 
 	const timeout = eventTimeouts.get(message.id);
 	if (timeout) {
@@ -546,19 +628,25 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 
 	eventThreads.set(message.id, thread.id);
 
-	const newParticipantsMap = userMentionsToUserIds(participantMap);
+	const participants = Array.from(participantMap.values());
 
-	for (const participant of newParticipantsMap) {
+	for (const participant of participants) {
 		await thread.members.add(participant.userId);
 	}
 
-	telemetry?.trackEventStarted(
-		message.guild?.id || 'unknown',
-		message.id,
-		newParticipantsMap,
-	);
+	telemetry?.trackEventStarted({
+		guildId: message.guild?.id || 'unknown',
+		eventId: message.id,
+		userId: eventCreators.get(message.id) || 'unknown',
+		participants: participants,
+		channelId: message.channelId,
+		matchId: matchId || 'unknown',
+	});
 }
 
+/**
+ * Updates a fields value on the event embed by exact name match.
+ */
 function updateEmbedField(
 	embed: EmbedBuilder,
 	fieldName: string,
@@ -572,6 +660,9 @@ function updateEmbedField(
 	embed.setFields(fields);
 }
 
+/**
+ * Updates a fields value on the event embed using a partial match to find dynamic field names.
+ */
 function updateEmbedFieldByMatch(
 	embed: EmbedBuilder,
 	partialName: string,
@@ -587,6 +678,10 @@ function updateEmbedFieldByMatch(
 	embed.setFields(fields);
 }
 
+/**
+ * Updates the embed with the current participant list and triggers an
+ * automatic start when the lobby fills and any timers have elapsed.
+ */
 async function updateParticipantEmbed(
 	interaction: ButtonInteraction | StringSelectMenuInteraction,
 	participantMap: ParticipantMap,
@@ -604,8 +699,8 @@ async function updateParticipantEmbed(
 		embed,
 		'Participants',
 		`Participants (${participantMap.size})`,
-		Array.from(participantMap)
-			.map((p) => `- ${p[1].userId}`)
+		Array.from(participantMap.values())
+			.map((p) => `- <@${p.userId}>`)
 			.join('\n'),
 	);
 
@@ -629,29 +724,21 @@ async function updateParticipantEmbed(
 	}
 }
 
+/**
+ * Returns true if the supplied user is already registered in any event.
+ */
 function isUserInAnyEvent(userId: string): boolean {
-	const mention = createUserMention(userId);
 	for (const [_, participantSet] of eventParticipants.entries()) {
-		if (participantSet.has(mention)) {
+		if (participantSet.has(userId)) {
 			return true;
 		}
 	}
 	return false;
 }
 
-function createUserMention(userId: string) {
-	return `<@${userId}>`;
-}
-
-function userMentionsToUserIds(mentions: ParticipantMap) {
-	return Array.from(mentions.values()).map((mention) => {
-		return {
-			userId: mention.userId.replace(/[<@>]/g, ''),
-			role: mention.role,
-		};
-	});
-}
-
+/**
+ * Resolves which roles to ping for the current guild based on the lobby type.
+ */
 function getPingsForServer(
 	interaction: ChatInputCommandInteraction,
 	casual: boolean,
@@ -669,6 +756,9 @@ function getPingsForServer(
 	return roles.map((role) => `||<@&${role.id}>||`).join(' ');
 }
 
+/**
+ * Clears all data associated with a specific event.
+ */
 function cleanupEvent(messageId: string) {
 	const timeout = eventTimeouts.get(messageId);
 	if (timeout) {
@@ -680,17 +770,22 @@ function cleanupEvent(messageId: string) {
 	eventCreators.delete(messageId);
 	eventTimers.delete(messageId);
 	eventThreads.delete(messageId);
+	eventMatchIds.delete(messageId);
 }
 
+/**
+ * Looks through all active events and cleans up any
+ * that have exceeded their maximum lifetime.
+ */
 async function cleanupStaleEvents() {
 	const MAX_EVENT_LIFETIME = 24 * 60 * 60 * 1000;
 	const now = Date.now();
 
 	for (const [messageId, timerData] of eventTimers.entries()) {
-		if (now - timerData.startTime < MAX_EVENT_LIFETIME) return;
+		if (now - timerData.startTime < MAX_EVENT_LIFETIME) continue;
 
 		try {
-			for (const [_, channel] of client.channels.cache) {
+			for (const [_, channel] of appClient.channels.cache) {
 				if (!channel.isTextBased() || channel.isDMBased()) continue;
 
 				const message = await channel.messages.fetch(messageId);
@@ -711,14 +806,17 @@ async function cleanupStaleEvents() {
 					}
 				}
 
-				telemetry?.trackEventExpired(
-					message.guild?.id || 'unknown',
-					messageId,
-					userMentionsToUserIds(
-						eventParticipants.get(messageId) ||
-							new Map<string, { userId: string; role: string | null }>(),
+				const matchId = eventMatchIds.get(messageId);
+				telemetry?.trackEventExpired({
+					guildId: message.guild?.id || 'unknown',
+					eventId: messageId,
+					userId: '1434173887888887908',
+					participants: Array.from(
+						(eventParticipants.get(messageId) || new Map()).values(),
 					),
-				);
+					channelId: message.channelId,
+					matchId: matchId || 'unknown',
+				});
 
 				break;
 			}
@@ -731,4 +829,4 @@ async function cleanupStaleEvents() {
 }
 
 setInterval(cleanupStaleEvents, 60 * 60 * 1000);
-client.login(botToken);
+appClient.login(botToken);

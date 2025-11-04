@@ -67,10 +67,19 @@ To start testing locally you can use the following commands:
 
 - `pnpm dev` to run the bot locally
 - `pnpm run build` to create a build of the bot
+- `task test` to compile and execute the automated suite inside Docker
+
+## Environment configuration
+
+- `BOT_TOKEN` (required): Discord bot token used to authenticate the bot.
+- `TELEMETRY_URL` and `TELEMETRY_TOKEN` (optional): enable forwarding lifecycle telemetry to an external HTTP endpoint.
+- `METRICS_PORT` (optional, defaults to `9464`): port exposing the Prometheus `/metrics` endpoint.
+- `DATABASE_URL` (optional): PostgreSQL connection string used to persist match lifecycle data to the `telemetry_events` table.
+- `DATABASE_SCHEMA` and `TELEMETRY_EVENTS_TABLE` (optional, default to `public.telemetry_events`): override where lifecycle rows are stored; both values must be valid PostgreSQL identifiers.
 
 ## Running with Docker
 
-Build the production image:
+Build the production image (tests run during the multi-stage build):
 
 ```bash
 docker build -t agent-8s .
@@ -83,6 +92,8 @@ docker run --rm \
   -e BOT_TOKEN=your_token_here \
   -e TELEMETRY_URL=optional_url \
   -e TELEMETRY_TOKEN=optional_token \
+  -e METRICS_PORT=9464 \
+  -e DATABASE_URL=optional_postgres_connection_string \
   agent-8s
 ```
 
@@ -92,11 +103,20 @@ You can also supply environment values from a file:
 docker run --rm --env-file .env agent-8s
 ```
 
+## Telemetry & Metrics
+
+- The bot exposes a Prometheus endpoint on `/metrics` bound to `0.0.0.0`. Override the port with `METRICS_PORT` (defaults to `9464`).
+- Every telemetry dispatch increments `telemetry_events_forwarded_total{event="...",guild="...",channel="..."}`; failures increment the matching `telemetry_events_failed_total` series.
+- Guild and channel labels fall back to `unknown` whenever the IDs cannot be resolved (for example, when telemetry is triggered outside a guild context).
+- The metrics endpoint is available even when remote telemetry is disabled, allowing local scraping without forwarding events.
+- Provide `DATABASE_URL` (and optional `DATABASE_SCHEMA`/`TELEMETRY_EVENTS_TABLE`) to persist lifecycle events in PostgreSQL. The bot prepares the target schema/table on startup and records match UUIDs, guild/channel IDs, user/participant identifiers, payload JSON, and timestamps for each lifecycle hook.
+
 ## Task shortcuts
 
 Install [Task](https://taskfile.dev) and use the provided helpers:
 
-- `task docker:build` builds the image using the repository Dockerfile.
+- `task test` runs the Docker test stage to compile sources and execute the Node test suite.
+- `task docker:build` runs the test stage and then builds the runtime image using the repository Dockerfile.
 - `task docker:run BOT_TOKEN=your_token_here` runs the container with the required token (add `TELEMETRY_URL`/`TELEMETRY_TOKEN` as needed). Append `DETACH=true` to run in the background.
 - `task docker:run-env-file` runs the container with environment values from `.env` or a custom file via `ENV_FILE=path/to/file`.
 - `task docker:down` stops the running container (defaults to `agent-8s`; override with `CONTAINER_NAME=name`).
