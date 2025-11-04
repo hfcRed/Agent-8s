@@ -64,12 +64,15 @@ const appClient = new Client({
 	allowedMentions: { parse: ['roles'] },
 });
 
-if (!appClient || !appClient.user) {
-	console.error('Failed to initialize Discord client');
-	process.exit(1);
-}
-
-const botUserId = appClient.user.id;
+appClient
+	.login(botToken)
+	.then(() => {
+		console.log('Discord client logged in');
+	})
+	.catch((error) => {
+		console.error('Failed to log in Discord client:', error);
+		process.exit(1);
+	});
 
 const commands = [
 	new SlashCommandBuilder()
@@ -665,7 +668,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 					type: OverwriteType.Role,
 				},
 				{
-					id: botUserId,
+					id: appClient.user?.id || '',
 					allow: [
 						PermissionFlagsBits.Connect,
 						PermissionFlagsBits.ViewChannel,
@@ -916,7 +919,7 @@ async function cleanupStaleEvents() {
 				telemetry?.trackEventExpired({
 					guildId: message.guild?.id || 'unknown',
 					eventId: messageId,
-					userId: botUserId,
+					userId: appClient.user?.id || 'unknown',
 					participants: Array.from(
 						(eventParticipants.get(messageId) || new Map()).values(),
 					),
@@ -935,4 +938,3 @@ async function cleanupStaleEvents() {
 }
 
 setInterval(cleanupStaleEvents, 60 * 60 * 1000);
-appClient.login(botToken);
