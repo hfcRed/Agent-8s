@@ -99,9 +99,15 @@ const commands = [
 appClient.once('clientReady', async () => {
 	if (!appClient.user) return;
 
-	await rest.put(Routes.applicationCommands(appClient.user.id), {
-		body: commands,
-	});
+	try {
+		await rest.put(Routes.applicationCommands(appClient.user.id), {
+			body: commands,
+		});
+		console.log('Successfully registered application commands');
+	} catch (error) {
+		console.error('Failed to register application commands:', error);
+		process.exit(1);
+	}
 });
 
 /**
@@ -190,11 +196,27 @@ appClient.on('interactionCreate', async (interaction) => {
 	} catch (error) {
 		console.error(error);
 
-		if (interaction.isRepliable() && !interaction.replied) {
-			await interaction.reply({
-				content: 'An error occurred while processing your request.',
-				flags: ['Ephemeral'],
-			});
+		try {
+			if (
+				interaction.isRepliable() &&
+				!interaction.replied &&
+				!interaction.deferred
+			) {
+				await interaction.reply({
+					content: 'An error occurred while processing your request.',
+					flags: ['Ephemeral'],
+				});
+			} else if (
+				interaction.isRepliable() &&
+				(interaction.replied || interaction.deferred)
+			) {
+				await interaction.followUp({
+					content: 'An error occurred while processing your request.',
+					flags: ['Ephemeral'],
+				});
+			}
+		} catch (replyError) {
+			console.error('Failed to send error message to user:', replyError);
 		}
 	}
 });
@@ -345,22 +367,29 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	if (timeInMinutes) {
 		const timeout = setTimeout(
 			async () => {
-				const participantSet = eventParticipants.get(message.id);
-				const timerData = eventTimers.get(message.id);
-				if (!participantSet || !timerData || timerData.hasStarted) {
+				try {
+					const participantSet = eventParticipants.get(message.id);
+					const timerData = eventTimers.get(message.id);
+					if (!participantSet || !timerData || timerData.hasStarted) {
+						eventTimeouts.delete(message.id);
+						return;
+					}
+
+					if (participantSet.size === MAX_PARTICIPANTS) {
+						await startEvent(message, participantSet);
+					} else {
+						const embed = EmbedBuilder.from(message.embeds[0]);
+						updateEmbedField(embed, 'Start', 'When 8 players have signed up');
+						await message.edit({ embeds: [embed] });
+					}
+				} catch (error) {
+					console.error(
+						`Error in timeout callback for event ${message.id}:`,
+						error,
+					);
+				} finally {
 					eventTimeouts.delete(message.id);
-					return;
 				}
-
-				if (participantSet.size === MAX_PARTICIPANTS) {
-					await startEvent(message, participantSet);
-				} else {
-					const embed = EmbedBuilder.from(message.embeds[0]);
-					updateEmbedField(embed, 'Start', 'When 8 players have signed up');
-					await message.edit({ embeds: [embed] });
-				}
-
-				eventTimeouts.delete(message.id);
 			},
 			timeInMinutes * 60 * 1000,
 		);
@@ -548,10 +577,14 @@ async function handleFinishButton(
 	const threadId = eventThreads.get(messageId);
 	const channel = interaction.channel as TextChannel | null;
 	if (threadId && channel) {
-		const thread = await channel.threads.fetch(threadId);
-		if (thread) {
-			await thread.setLocked(true);
-			await thread.setArchived(true);
+		try {
+			const thread = await channel.threads.fetch(threadId);
+			if (thread) {
+				await thread.setLocked(true);
+				await thread.setArchived(true);
+			}
+		} catch (error) {
+			console.error(`Failed to manage thread ${threadId}:`, error);
 		}
 	}
 
@@ -649,22 +682,37 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 	await message.edit({ embeds: [embed], components: [row] });
 
 	const channel = message.channel as TextChannel;
-	const thread = await channel.threads.create({
-		name: `8s Event - ${shortId}`,
-		autoArchiveDuration: 60,
-		type: ChannelType.PrivateThread,
-	});
+	let thread = null;
+	try {
+		const createdThread = await channel.threads.create({
+			name: `8s Event - ${shortId}`,
+			autoArchiveDuration: 60,
+			type: ChannelType.PrivateThread,
+		});
 
-	await thread.send({
-		embeds: [EmbedBuilder.from(message.embeds[0])],
-	});
+		await createdThread.send({
+			embeds: [EmbedBuilder.from(message.embeds[0])],
+		});
 
-	eventThreads.set(message.id, thread.id);
+		eventThreads.set(message.id, createdThread.id);
+		thread = createdThread;
+	} catch (error) {
+		console.error('Failed to create or send message to thread:', error);
+	}
 
 	const participants = Array.from(participantMap.values());
 
-	for (const participant of participants) {
-		await thread.members.add(participant.userId);
+	if (thread) {
+		for (const participant of participants) {
+			try {
+				await thread.members.add(participant.userId);
+			} catch (error) {
+				console.error(
+					`Failed to add participant ${participant.userId} to thread:`,
+					error,
+				);
+			}
+		}
 	}
 
 	const guild = message.guild as Guild;
@@ -672,45 +720,61 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 	const voiceChannels: string[] = [];
 
 	for (let i = 1; i <= 3; i++) {
-		const voiceChannel = await guild.channels.create({
-			name: `${voiceNames[i - 1]} - ${shortId}`,
-			type: ChannelType.GuildVoice,
-			parent: channel.parent,
-			permissionOverwrites: [
-				{
-					id: guild.roles.everyone.id,
-					deny: [PermissionFlagsBits.Connect, PermissionFlagsBits.ViewChannel],
-					type: OverwriteType.Role,
-				},
-				{
-					id: appClient.user?.id || '',
-					allow: [
-						PermissionFlagsBits.Connect,
-						PermissionFlagsBits.ViewChannel,
-						PermissionFlagsBits.ManageChannels,
-					],
-					type: OverwriteType.Member,
-				},
-				...participants.map((participant) => ({
-					id: participant.userId,
-					allow: [
-						PermissionFlagsBits.Connect,
-						PermissionFlagsBits.ViewChannel,
-						PermissionFlagsBits.Speak,
-					],
-					type: OverwriteType.Member,
-				})),
-			],
-		});
+		try {
+			const voiceChannel = await guild.channels.create({
+				name: `${voiceNames[i - 1]} - ${shortId}`,
+				type: ChannelType.GuildVoice,
+				parent: channel.parent,
+				permissionOverwrites: [
+					{
+						id: guild.roles.everyone.id,
+						deny: [
+							PermissionFlagsBits.Connect,
+							PermissionFlagsBits.ViewChannel,
+						],
+						type: OverwriteType.Role,
+					},
+					{
+						id: appClient.user?.id || '',
+						allow: [
+							PermissionFlagsBits.Connect,
+							PermissionFlagsBits.ViewChannel,
+							PermissionFlagsBits.ManageChannels,
+						],
+						type: OverwriteType.Member,
+					},
+					...participants.map((participant) => ({
+						id: participant.userId,
+						allow: [
+							PermissionFlagsBits.Connect,
+							PermissionFlagsBits.ViewChannel,
+							PermissionFlagsBits.Speak,
+						],
+						type: OverwriteType.Member,
+					})),
+				],
+			});
 
-		voiceChannels.push(voiceChannel.id);
+			voiceChannels.push(voiceChannel.id);
+		} catch (error) {
+			console.error(
+				`Failed to create voice channel ${voiceNames[i - 1]}:`,
+				error,
+			);
+		}
 	}
 
 	eventVoiceChannels.set(message.id, voiceChannels);
 
-	await thread.send({
-		content: `**Voice Channels Created**\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
-	});
+	if (thread) {
+		try {
+			await thread.send({
+				content: `**Voice Channels Created**\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+			});
+		} catch (error) {
+			console.error('Failed to send voice channel info to thread:', error);
+		}
+	}
 
 	telemetry?.trackEventStarted({
 		guildId: message.guild?.id || 'unknown',
@@ -790,14 +854,23 @@ async function updateParticipantEmbed(
 			.join('\n'),
 	);
 
-	await interaction.editReply({ embeds: [embed] });
+	try {
+		await interaction.editReply({ embeds: [embed] });
+	} catch (error) {
+		console.error('Failed to update participant embed:', error);
+		return;
+	}
 
 	const timeElapsed = Date.now() - timerData.startTime;
 	const timeIsUpOrNotSet =
 		timerData.duration === 0 || timeElapsed >= timerData.duration;
 
 	if (participantMap.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
-		await startEvent(interaction.message, participantMap);
+		try {
+			await startEvent(interaction.message, participantMap);
+		} catch (error) {
+			console.error('Failed to start event automatically:', error);
+		}
 	}
 }
 
@@ -911,37 +984,53 @@ async function cleanupStaleEvents() {
 			for (const [_, channel] of appClient.channels.cache) {
 				if (!channel.isTextBased() || channel.isDMBased()) continue;
 
-				const message = await channel.messages.fetch(messageId);
+				try {
+					const message = await channel.messages.fetch(messageId);
 
-				const embed = EmbedBuilder.from(message.embeds[0]).setColor(
-					COLORS.CANCELLED,
-				);
-				updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
+					const embed = EmbedBuilder.from(message.embeds[0]).setColor(
+						COLORS.CANCELLED,
+					);
+					updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
 
-				await message.edit({ embeds: [embed], components: [] });
+					await message.edit({ embeds: [embed], components: [] });
 
-				const threadId = eventThreads.get(messageId);
-				if (threadId && channel.isThread() === false) {
-					const thread = await (channel as TextChannel).threads.fetch(threadId);
-					if (thread) {
-						await thread.setLocked(true);
-						await thread.setArchived(true);
+					const threadId = eventThreads.get(messageId);
+					if (threadId && channel.isThread() === false) {
+						try {
+							const thread = await (channel as TextChannel).threads.fetch(
+								threadId,
+							);
+							if (thread) {
+								await thread.setLocked(true);
+								await thread.setArchived(true);
+							}
+						} catch (threadError) {
+							console.error(
+								`Failed to manage thread ${threadId}:`,
+								threadError,
+							);
+						}
 					}
+
+					const matchId = eventMatchIds.get(messageId);
+					telemetry?.trackEventExpired({
+						guildId: message.guild?.id || 'unknown',
+						eventId: messageId,
+						userId: appClient.user?.id || 'unknown',
+						participants: Array.from(
+							(eventParticipants.get(messageId) || new Map()).values(),
+						),
+						channelId: message.channelId,
+						matchId: matchId || 'unknown',
+					});
+
+					break;
+				} catch (error) {
+					console.error(
+						`Failed to fetch message ${messageId} in channel ${channel.id}:`,
+						error,
+					);
 				}
-
-				const matchId = eventMatchIds.get(messageId);
-				telemetry?.trackEventExpired({
-					guildId: message.guild?.id || 'unknown',
-					eventId: messageId,
-					userId: appClient.user?.id || 'unknown',
-					participants: Array.from(
-						(eventParticipants.get(messageId) || new Map()).values(),
-					),
-					channelId: message.channelId,
-					matchId: matchId || 'unknown',
-				});
-
-				break;
 			}
 		} catch (error) {
 			console.error(`Failed to clean up stale event ${messageId}:`, error);
@@ -952,3 +1041,21 @@ async function cleanupStaleEvents() {
 }
 
 setInterval(cleanupStaleEvents, 60 * 60 * 1000);
+
+appClient.on('error', (error) => {
+	console.error('Discord client error:', error);
+});
+
+appClient.on('warn', (warning) => {
+	console.warn('Discord client warning:', warning);
+});
+
+process.on('uncaughtException', (error) => {
+	console.error('Uncaught Exception:', error);
+	process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+	console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+	process.exit(1);
+});
