@@ -1,4 +1,4 @@
-export const MAX_PARTICIPANTS = 8;
+export const MAX_PARTICIPANTS = 1;
 
 export const PING_ROLE_NAMES = {
 	casual: 'Casual 8s',

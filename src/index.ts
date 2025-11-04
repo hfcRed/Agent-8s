@@ -9,7 +9,10 @@ import {
 	Client,
 	EmbedBuilder,
 	GatewayIntentBits,
+	type Guild,
 	type Message,
+	OverwriteType,
+	PermissionFlagsBits,
 	REST,
 	Routes,
 	SlashCommandBuilder,
@@ -53,9 +56,20 @@ const telemetry =
 const rest = new REST({ version: '10' }).setToken(botToken);
 
 const appClient = new Client({
-	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.GuildVoiceStates,
+	],
 	allowedMentions: { parse: ['roles'] },
 });
+
+if (!appClient || !appClient.user) {
+	console.error('Failed to initialize Discord client');
+	process.exit(1);
+}
+
+const botUserId = appClient.user.id;
 
 const commands = [
 	new SlashCommandBuilder()
@@ -97,6 +111,7 @@ const eventTimers = new Map<string, EventTimer>();
 const eventThreads = new Map<string, string>();
 const eventTimeouts = new Map<string, NodeJS.Timeout>();
 const eventMatchIds = new Map<string, string>();
+const eventVoiceChannels = new Map<string, string[]>();
 
 appClient.on('interactionCreate', async (interaction) => {
 	try {
@@ -463,7 +478,7 @@ async function handleCancelButton(
 		matchId: matchId || 'unknown',
 	});
 
-	cleanupEvent(messageId);
+	await cleanupEvent(messageId);
 }
 
 /**
@@ -489,6 +504,7 @@ async function handleStartNowButton(
 		return;
 	}
 
+	await interaction.deferUpdate();
 	await startEvent(interaction.message, participantMap);
 }
 
@@ -541,7 +557,7 @@ async function handleFinishButton(
 		matchId: matchId || 'unknown',
 	});
 
-	cleanupEvent(messageId);
+	await cleanupEvent(messageId);
 }
 
 /**
@@ -591,6 +607,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 
 	timerData.hasStarted = true;
 	const matchId = eventMatchIds.get(message.id);
+	const shortId = matchId?.slice(0, 5);
 
 	const timeout = eventTimeouts.get(message.id);
 	if (timeout) {
@@ -615,7 +632,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 
 	const channel = message.channel as TextChannel;
 	const thread = await channel.threads.create({
-		name: '8s Game Ready!',
+		name: `8s Event - ${shortId}`,
 		autoArchiveDuration: 60,
 		type: ChannelType.PrivateThread,
 	});
@@ -631,6 +648,51 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 	for (const participant of participants) {
 		await thread.members.add(participant.userId);
 	}
+
+	const guild = message.guild as Guild;
+	const voiceNames = ['👥 Group', '🔵 Team A', '🔴 Team B'];
+	const voiceChannels: string[] = [];
+
+	for (let i = 1; i <= 3; i++) {
+		const voiceChannel = await guild.channels.create({
+			name: `${voiceNames[i - 1]} - ${shortId}`,
+			type: ChannelType.GuildVoice,
+			parent: channel.parent,
+			permissionOverwrites: [
+				{
+					id: guild.roles.everyone.id,
+					deny: [PermissionFlagsBits.Connect, PermissionFlagsBits.ViewChannel],
+					type: OverwriteType.Role,
+				},
+				{
+					id: botUserId,
+					allow: [
+						PermissionFlagsBits.Connect,
+						PermissionFlagsBits.ViewChannel,
+						PermissionFlagsBits.ManageChannels,
+					],
+					type: OverwriteType.Member,
+				},
+				...participants.map((participant) => ({
+					id: participant.userId,
+					allow: [
+						PermissionFlagsBits.Connect,
+						PermissionFlagsBits.ViewChannel,
+						PermissionFlagsBits.Speak,
+					],
+					type: OverwriteType.Member,
+				})),
+			],
+		});
+
+		voiceChannels.push(voiceChannel.id);
+	}
+
+	eventVoiceChannels.set(message.id, voiceChannels);
+
+	await thread.send({
+		content: `**Voice Channels Created**\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+	});
 
 	telemetry?.trackEventStarted({
 		guildId: message.guild?.id || 'unknown',
@@ -788,7 +850,7 @@ function getExcaliburRankOfUser(
 /**
  * Clears all data associated with a specific event.
  */
-function cleanupEvent(messageId: string) {
+async function cleanupEvent(messageId: string) {
 	const timeout = eventTimeouts.get(messageId);
 	if (timeout) {
 		clearTimeout(timeout);
@@ -800,6 +862,21 @@ function cleanupEvent(messageId: string) {
 	eventTimers.delete(messageId);
 	eventThreads.delete(messageId);
 	eventMatchIds.delete(messageId);
+
+	const voiceChannelIds = eventVoiceChannels.get(messageId);
+	if (!voiceChannelIds) return;
+
+	for (const channelId of voiceChannelIds) {
+		try {
+			const channel = await appClient.channels.fetch(channelId);
+			if (channel?.isVoiceBased()) {
+				await channel.delete();
+			}
+		} catch (error) {
+			console.error(`Failed to delete voice channel ${channelId}:`, error);
+		}
+	}
+	eventVoiceChannels.delete(messageId);
 }
 
 /**
@@ -839,7 +916,7 @@ async function cleanupStaleEvents() {
 				telemetry?.trackEventExpired({
 					guildId: message.guild?.id || 'unknown',
 					eventId: messageId,
-					userId: '1434173887888887908',
+					userId: botUserId,
 					participants: Array.from(
 						(eventParticipants.get(messageId) || new Map()).values(),
 					),
@@ -850,9 +927,9 @@ async function cleanupStaleEvents() {
 				break;
 			}
 		} catch (error) {
-			console.error(error);
+			console.error(`Failed to clean up stale event ${messageId}:`, error);
 		} finally {
-			cleanupEvent(messageId);
+			await cleanupEvent(messageId);
 		}
 	}
 }
