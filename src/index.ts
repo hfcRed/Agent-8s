@@ -26,42 +26,26 @@ import {
 	PING_ROLE_NAMES,
 	STATUS_MESSAGES,
 } from './constants.js';
-import { EventRecorder } from './telemetry/event-recorder.js';
 import { TelemetryService } from './telemetry/telemetry.js';
 import type { EventTimer, ParticipantMap } from './types.js';
 
-const parsed = dotenv.config();
-const botToken = parsed.parsed?.BOT_TOKEN ?? process.env.BOT_TOKEN;
-const telemetryUrl = parsed.parsed?.TELEMETRY_URL ?? process.env.TELEMETRY_URL;
-const telemetryToken =
-	parsed.parsed?.TELEMETRY_TOKEN ?? process.env.TELEMETRY_TOKEN;
-const databaseUrl = parsed.parsed?.DATABASE_URL ?? process.env.DATABASE_URL;
-const databaseSchema =
-	parsed.parsed?.DATABASE_SCHEMA ?? process.env.DATABASE_SCHEMA;
-const telemetryEventsTable =
-	parsed.parsed?.TELEMETRY_EVENTS_TABLE ?? process.env.TELEMETRY_EVENTS_TABLE;
+dotenv.config();
+const botToken = process.env.BOT_TOKEN;
 
 if (!botToken) {
 	console.error('BOT_TOKEN not found in .env file');
 	process.exit(1);
 }
 
+const telemetryUrl = process.env.TELEMETRY_URL;
+const telemetryToken = process.env.TELEMETRY_TOKEN;
+
 /**
  * Optional telemetry client used to forward interaction lifecycle metrics.
  */
-// this should just be moved into the TelemetryService constructor
-// likewise so should all the environment variable reading
-// we want to keep this file for just the bot logic
-const eventRecorder = databaseUrl
-	? new EventRecorder(databaseUrl, {
-			schema: databaseSchema,
-			table: telemetryEventsTable,
-		})
-	: undefined;
-
 const telemetry =
 	telemetryUrl && telemetryToken
-		? new TelemetryService(telemetryUrl, telemetryToken, eventRecorder)
+		? new TelemetryService(telemetryUrl, telemetryToken)
 		: undefined;
 
 const rest = new REST({ version: '10' }).setToken(botToken);
