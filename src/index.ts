@@ -378,13 +378,18 @@ async function handleSignUpButton(
 	participantMap: ParticipantMap,
 	timerData: EventTimer,
 ) {
+	await interaction.deferUpdate();
+
 	if (participantMap.size >= MAX_PARTICIPANTS && !participantMap.has(userId)) {
-		await interaction.deferUpdate();
+		await interaction.followUp({
+			content: ERROR_MESSAGES.EVENT_FULL,
+			flags: ['Ephemeral'],
+		});
 		return;
 	}
 
 	if (isUserInAnyEvent(userId)) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
 			flags: ['Ephemeral'],
 		});
@@ -421,8 +426,10 @@ async function handleSignOutButton(
 	creatorId: string,
 	timerData: EventTimer,
 ) {
+	await interaction.deferUpdate();
+
 	if (userId === creatorId) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
 			flags: ['Ephemeral'],
 		});
@@ -453,8 +460,10 @@ async function handleCancelButton(
 	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
+	await interaction.deferUpdate();
+
 	if (userId !== creatorId) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_ONLY_CANCEL,
 			flags: ['Ephemeral'],
 		});
@@ -468,8 +477,7 @@ async function handleCancelButton(
 
 	updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
 
-	await interaction.deferUpdate();
-	await interaction.message.edit({ embeds: [embed], components: [] });
+	await interaction.editReply({ embeds: [embed], components: [] });
 
 	const matchId = eventMatchIds.get(messageId);
 	telemetry?.trackEventCancelled({
@@ -494,8 +502,10 @@ async function handleStartNowButton(
 	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
+	await interaction.deferUpdate();
+
 	if (userId !== creatorId) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_ONLY_START,
 			flags: ['Ephemeral'],
 		});
@@ -503,11 +513,13 @@ async function handleStartNowButton(
 	}
 
 	if (participantMap.size !== MAX_PARTICIPANTS) {
-		await interaction.deferUpdate();
+		await interaction.followUp({
+			content: ERROR_MESSAGES.NOT_ENOUGH_PARTICIPANTS,
+			flags: ['Ephemeral'],
+		});
 		return;
 	}
 
-	await interaction.deferUpdate();
 	await startEvent(interaction.message, participantMap);
 }
 
@@ -521,8 +533,10 @@ async function handleFinishButton(
 	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
+	await interaction.deferUpdate();
+
 	if (userId !== creatorId) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_ONLY_FINISH,
 			flags: ['Ephemeral'],
 		});
@@ -547,8 +561,7 @@ async function handleFinishButton(
 
 	updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
 
-	await interaction.deferUpdate();
-	await interaction.message.edit({ embeds: [embed], components: [] });
+	await interaction.editReply({ embeds: [embed], components: [] });
 
 	const matchId = eventMatchIds.get(messageId);
 	telemetry?.trackEventFinished({
@@ -572,8 +585,10 @@ async function handleRoleSelection(
 	userId: string,
 	participantMap: ParticipantMap,
 ) {
+	await interaction.deferUpdate();
+
 	if (!participantMap.has(userId)) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.NOT_SIGNED_UP,
 			flags: ['Ephemeral'],
 		});
@@ -775,8 +790,7 @@ async function updateParticipantEmbed(
 			.join('\n'),
 	);
 
-	await interaction.deferUpdate();
-	await interaction.message.edit({ embeds: [embed] });
+	await interaction.editReply({ embeds: [embed] });
 
 	const timeElapsed = Date.now() - timerData.startTime;
 	const timeIsUpOrNotSet =

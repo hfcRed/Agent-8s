@@ -1,4 +1,4 @@
-export const MAX_PARTICIPANTS = 1;
+export const MAX_PARTICIPANTS = 3;
 
 export const PING_ROLE_NAMES = {
 	casual: 'Casual 8s',
@@ -58,4 +58,7 @@ export const ERROR_MESSAGES = {
 	CREATOR_CANNOT_SIGNOUT:
 		'The event creator cannot sign out. Please cancel the event instead.',
 	NOT_SIGNED_UP: 'You need to be signed up to perform this action.',
+	EVENT_FULL: 'This event is already full! You cannot sign up.',
+	NOT_ENOUGH_PARTICIPANTS:
+		'Cannot start the event yet - not enough participants signed up.',
 } as const;
