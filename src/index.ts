@@ -22,6 +22,8 @@ import dotenv from 'dotenv';
 import {
 	COLORS,
 	ERROR_MESSAGES,
+	EXCALIBUR_GUILD_ID,
+	EXCALIBUR_RANKS,
 	MAX_PARTICIPANTS,
 	PING_ROLE_NAMES,
 	STATUS_MESSAGES,
@@ -292,7 +294,14 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	eventParticipants.set(
 		message.id,
 		new Map([
-			[interaction.user.id, { userId: interaction.user.id, role: null }],
+			[
+				interaction.user.id,
+				{
+					userId: interaction.user.id,
+					role: null,
+					rank: getExcaliburRankOfUser(interaction),
+				},
+			],
 		]),
 	);
 	eventCreators.set(message.id, interaction.user.id);
@@ -364,7 +373,11 @@ async function handleSignUpButton(
 		return;
 	}
 
-	participantMap.set(userId, { userId: userId, role: null });
+	participantMap.set(userId, {
+		userId: userId,
+		role: null,
+		rank: getExcaliburRankOfUser(interaction),
+	});
 
 	const matchId = eventMatchIds.get(interaction.message.id);
 	telemetry?.trackUserSignUp({
@@ -558,6 +571,7 @@ async function handleRoleSelection(
 	participantMap.set(userId, {
 		userId: userId,
 		role: selectedRole,
+		rank: getExcaliburRankOfUser(interaction),
 	});
 
 	const timerData = eventTimers.get(interaction.message.id);
@@ -738,6 +752,37 @@ function getPingsForServer(
 	if (roles.size === 0) return null;
 
 	return roles.map((role) => `||<@&${role.id}>||`).join(' ');
+}
+
+/**
+ * Returns the Excalibur rank of the interacting user if they are in the Excalibur server.
+ */
+function getExcaliburRankOfUser(
+	interaction:
+		| ChatInputCommandInteraction
+		| ButtonInteraction
+		| StringSelectMenuInteraction,
+) {
+	if (interaction.guild?.id !== EXCALIBUR_GUILD_ID) return null;
+
+	const roles = interaction.member?.roles;
+	if (!roles || Array.isArray(roles)) return null;
+
+	const resolved = Array.from(roles.valueOf()).map((r) => {
+		return { id: r[1].id, name: r[1].name };
+	});
+
+	for (const rankKey in EXCALIBUR_RANKS) {
+		const rank = EXCALIBUR_RANKS[rankKey as keyof typeof EXCALIBUR_RANKS];
+		if (resolved.find((r) => r.id === rank.id)) {
+			return rankKey as keyof typeof EXCALIBUR_RANKS;
+		}
+		if (resolved.find((r) => r.name === rank.name)) {
+			return rankKey as keyof typeof EXCALIBUR_RANKS;
+		}
+	}
+
+	return null;
 }
 
 /**

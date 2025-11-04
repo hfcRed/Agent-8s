@@ -1,6 +1,7 @@
 export type ParticipantData = {
 	userId: string;
 	role: string | null;
+	rank: string | null;
 };
 
 export type ParticipantMap = Map<string, ParticipantData>;

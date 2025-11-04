@@ -5,6 +5,34 @@ export const PING_ROLE_NAMES = {
 	competitive: 'Comp 8s',
 } as const;
 
+export const EXCALIBUR_GUILD_ID = '1428966578501849193';
+export const EXCALIBUR_RANKS = {
+	'1': {
+		name: 'TX Grandmaster',
+		id: '1429217994168598669',
+	},
+	'2': {
+		name: 'T1 Legend',
+		id: '1428997469303341166',
+	},
+	'3': {
+		name: 'T2 Ascendant',
+		id: '1428997715106332815',
+	},
+	'4': {
+		name: 'T3 Elite',
+		id: '1428998081126596618',
+	},
+	'5': {
+		name: 'T4 Knight',
+		id: '1428998361188532264',
+	},
+	'6': {
+		name: 'T5 Novice',
+		id: '1428998419250286704',
+	},
+} as const;
+
 export const COLORS = {
 	OPEN: '#626CE9',
 	STARTED: '#1cff5c',
