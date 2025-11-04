@@ -1,6 +1,9 @@
 export const MAX_PARTICIPANTS = 8;
 
-export const PING_ROLE_NAMES = ['Comp 8s', 'Casual 8s'];
+export const PING_ROLE_NAMES = {
+	casual: 'Casual 8s',
+	competitive: 'Comp 8s',
+} as const;
 
 export const COLORS = {
 	OPEN: '#626CE9',

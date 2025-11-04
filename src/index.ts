@@ -729,10 +729,10 @@ function getPingsForServer(
 ): string | null {
 	if (!interaction.guild) return null;
 
-	const roles = interaction.guild.roles.cache.filter(
-		(role) =>
-			PING_ROLE_NAMES.includes(role.name) &&
-			(casual || !role.name.toLowerCase().includes('casual')),
+	const roles = interaction.guild.roles.cache.filter((role) =>
+		casual
+			? role.name === PING_ROLE_NAMES.casual
+			: role.name === PING_ROLE_NAMES.competitive,
 	);
 
 	if (roles.size === 0) return null;
