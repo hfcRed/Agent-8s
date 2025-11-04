@@ -23,6 +23,7 @@ import {
 } from 'discord.js';
 import dotenv from 'dotenv';
 import {
+	ADMIN_PERMISSIONS,
 	COLORS,
 	ERROR_MESSAGES,
 	EXCALIBUR_GUILD_ID,
@@ -60,6 +61,7 @@ const appClient = new Client({
 		GatewayIntentBits.Guilds,
 		GatewayIntentBits.GuildMessages,
 		GatewayIntentBits.GuildVoiceStates,
+		GatewayIntentBits.MessageContent,
 	],
 	allowedMentions: { parse: ['roles'] },
 });
@@ -1041,6 +1043,28 @@ async function cleanupStaleEvents() {
 }
 
 setInterval(cleanupStaleEvents, 60 * 60 * 1000);
+
+/**
+ * Message deletion handler to remove non-command messages from non-admin users
+ */
+appClient.on('messageCreate', async (message) => {
+	if (message.author.bot || !message.guild) return;
+
+	try {
+		const member = message.member;
+		if (!member) return;
+
+		const isAdmin = ADMIN_PERMISSIONS.some((permission) =>
+			member.permissions.has(PermissionFlagsBits[permission]),
+		);
+
+		if (!isAdmin && message.interactionMetadata?.type !== 2) {
+			await message.delete();
+		}
+	} catch (error) {
+		console.error('Error handling message deletion:', error);
+	}
+});
 
 appClient.on('error', (error) => {
 	console.error('Discord client error:', error);

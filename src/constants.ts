@@ -1,4 +1,4 @@
-export const MAX_PARTICIPANTS = 3;
+export const MAX_PARTICIPANTS = 2;
 
 export const PING_ROLE_NAMES = {
 	casual: 'Casual 8s',
@@ -62,3 +62,10 @@ export const ERROR_MESSAGES = {
 	NOT_ENOUGH_PARTICIPANTS:
 		'Cannot start the event yet - not enough participants signed up.',
 } as const;
+
+export const ADMIN_PERMISSIONS = [
+	'Administrator',
+	'ManageMessages',
+	'ManageChannels',
+	'ModerateMembers',
+] as const;
