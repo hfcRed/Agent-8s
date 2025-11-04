@@ -49,6 +49,9 @@ if (!botToken) {
 /**
  * Optional telemetry client used to forward interaction lifecycle metrics.
  */
+// this should just be moved into the TelemetryService constructor
+// likewise so should all the environment variable reading
+// we want to keep this file for just the bot logic
 const eventRecorder = databaseUrl
 	? new EventRecorder(databaseUrl, {
 			schema: databaseSchema,
