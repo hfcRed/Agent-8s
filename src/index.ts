@@ -153,7 +153,7 @@ appClient.on('interactionCreate', async (interaction) => {
 
 		if (interaction.isButton()) {
 			if (isProcessing(messageId, 'starting')) {
-				await interaction.followUp({
+				await interaction.reply({
 					content: PROCESSING_MESSAGES.STILL_STARTING,
 					flags: ['Ephemeral'],
 				});
@@ -161,7 +161,7 @@ appClient.on('interactionCreate', async (interaction) => {
 			}
 
 			if (isProcessing(messageId, 'finishing')) {
-				await interaction.followUp({
+				await interaction.reply({
 					content: PROCESSING_MESSAGES.ALREADY_FINISHING,
 					flags: ['Ephemeral'],
 				});
@@ -169,8 +169,16 @@ appClient.on('interactionCreate', async (interaction) => {
 			}
 
 			if (isProcessing(messageId, 'cancelling')) {
-				await interaction.followUp({
+				await interaction.reply({
 					content: PROCESSING_MESSAGES.ALREADY_CANCELLING,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+
+			if (isEventFinalizing(interaction.message)) {
+				await interaction.reply({
+					content: ERROR_MESSAGES.EVENT_FINALIZING,
 					flags: ['Ephemeral'],
 				});
 				return;
@@ -924,12 +932,6 @@ async function updateParticipantEmbed(
 ) {
 	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
 
-	const status =
-		participantMap.size === MAX_PARTICIPANTS
-			? STATUS_MESSAGES.READY
-			: STATUS_MESSAGES.OPEN;
-	updateEmbedField(embed, 'Status', status);
-
 	updateEmbedFieldByMatch(
 		embed,
 		'Participants',
@@ -947,7 +949,16 @@ async function updateParticipantEmbed(
 			.join('\n'),
 	);
 
-	await interaction.editReply({ embeds: [embed] });
+	if (isEventFinalizing(interaction.message)) {
+		await interaction.editReply({ embeds: [embed] });
+		return;
+	}
+
+	const status =
+		participantMap.size === MAX_PARTICIPANTS
+			? STATUS_MESSAGES.READY
+			: STATUS_MESSAGES.OPEN;
+	updateEmbedField(embed, 'Status', status);
 
 	const timeElapsed = Date.now() - timerData.startTime;
 	const timeIsUpOrNotSet =
@@ -959,7 +970,10 @@ async function updateParticipantEmbed(
 		await interaction.editReply({ embeds: [embed] });
 
 		createEventStartTimeout(interaction.message, 0.2);
+		return;
 	}
+
+	await interaction.editReply({ embeds: [embed] });
 }
 
 /**
@@ -1032,6 +1046,17 @@ function getExcaliburRankOfUser(
 	}
 
 	return null;
+}
+
+/**
+ * Checks if an event is currently in finalizing state.
+ */
+function isEventFinalizing(message: Message) {
+	const embed = message.embeds[0];
+	if (!embed || !embed.fields) return false;
+
+	const statusField = embed.fields.find((field) => field.name === 'Status');
+	return statusField?.value === STATUS_MESSAGES.FINALIZING;
 }
 
 /**

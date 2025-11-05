@@ -65,6 +65,8 @@ export const ERROR_MESSAGES = {
 	EVENT_FULL: 'This event is already full! You cannot sign up.',
 	NOT_ENOUGH_PARTICIPANTS:
 		'Cannot start the event yet - not enough participants signed up.',
+	EVENT_FINALIZING:
+		'The event is finalizing and will start soon. Only role changes are allowed.',
 } as const;
 
 export const PROCESSING_MESSAGES = {
