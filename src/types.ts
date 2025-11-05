@@ -8,6 +8,12 @@ export type ParticipantMap = Map<string, ParticipantData>;
 
 export interface EventTimer {
 	startTime: number;
-	duration: number;
+	duration?: number;
 	hasStarted: boolean;
 }
+
+export type EventOperation =
+	| 'starting'
+	| 'finishing'
+	| 'cancelling'
+	| 'cleanup';

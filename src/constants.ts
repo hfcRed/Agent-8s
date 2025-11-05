@@ -35,6 +35,7 @@ export const EXCALIBUR_RANKS = {
 
 export const COLORS = {
 	OPEN: '#626CE9',
+	FINALIZING: '#E9D662',
 	STARTED: '#1cff5c',
 	CANCELLED: '#ff1c1c',
 	FINISHED: '#ff1c1c',
@@ -43,6 +44,7 @@ export const COLORS = {
 export const STATUS_MESSAGES = {
 	OPEN: '🟢 Open for Sign Ups',
 	READY: '✅ Ready to Start!',
+	FINALIZING: '⏳ Finalizing...',
 	STARTED: '✅ Event Started!',
 	CANCELLED: '❌ Event cancelled',
 	FINISHED: '🏁 Event Finished',
@@ -63,6 +65,13 @@ export const ERROR_MESSAGES = {
 	EVENT_FULL: 'This event is already full! You cannot sign up.',
 	NOT_ENOUGH_PARTICIPANTS:
 		'Cannot start the event yet - not enough participants signed up.',
+} as const;
+
+export const PROCESSING_MESSAGES = {
+	ALREADY_STARTING: 'Event is already starting, please wait...',
+	STILL_STARTING: 'Event is still starting, please wait...',
+	ALREADY_FINISHING: 'Event is already being finished...',
+	ALREADY_CANCELLING: 'Event is already being cancelled...',
 } as const;
 
 export const ADMIN_PERMISSIONS = [

@@ -31,10 +31,11 @@ import {
 	EXCALIBUR_RANKS,
 	MAX_PARTICIPANTS,
 	PING_ROLE_NAMES,
+	PROCESSING_MESSAGES,
 	STATUS_MESSAGES,
 } from './constants.js';
 import { TelemetryService } from './telemetry/telemetry.js';
-import type { EventTimer, ParticipantMap } from './types.js';
+import type { EventOperation, EventTimer, ParticipantMap } from './types.js';
 
 dotenv.config();
 const botToken = process.env.BOT_TOKEN;
@@ -124,6 +125,7 @@ const eventThreads = new Map<string, string>();
 const eventTimeouts = new Map<string, NodeJS.Timeout>();
 const eventMatchIds = new Map<string, string>();
 const eventVoiceChannels = new Map<string, string[]>();
+const eventProcessingStates = new Map<string, Set<EventOperation>>();
 
 appClient.on('interactionCreate', async (interaction) => {
 	if (
@@ -150,6 +152,30 @@ appClient.on('interactionCreate', async (interaction) => {
 		if (!participantMap) return;
 
 		if (interaction.isButton()) {
+			if (isProcessing(messageId, 'starting')) {
+				await interaction.followUp({
+					content: PROCESSING_MESSAGES.STILL_STARTING,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+
+			if (isProcessing(messageId, 'finishing')) {
+				await interaction.followUp({
+					content: PROCESSING_MESSAGES.ALREADY_FINISHING,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+
+			if (isProcessing(messageId, 'cancelling')) {
+				await interaction.followUp({
+					content: PROCESSING_MESSAGES.ALREADY_CANCELLING,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+
 			const timerData = eventTimers.get(messageId);
 			const creatorId = eventCreators.get(messageId);
 
@@ -357,7 +383,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	eventCreators.set(message.id, interaction.user.id);
 	eventTimers.set(message.id, {
 		startTime,
-		duration: timeInMinutes ? timeInMinutes * 60 * 1000 : 0,
+		duration: timeInMinutes ? timeInMinutes * 60 * 1000 : undefined,
 		hasStarted: false,
 	});
 	eventMatchIds.set(message.id, matchId);
@@ -374,38 +400,72 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		timeToStart: timeInMinutes,
 	});
 
-	if (timeInMinutes) {
-		const timeout = setTimeout(
-			async () => {
-				try {
-					const participantSet = eventParticipants.get(message.id);
-					const timerData = eventTimers.get(message.id);
-					if (!participantSet || !timerData || timerData.hasStarted) {
-						eventTimeouts.delete(message.id);
-						return;
-					}
+	if (timeInMinutes) createEventStartTimeout(message, timeInMinutes);
+}
 
-					if (participantSet.size === MAX_PARTICIPANTS) {
-						await startEvent(message, participantSet);
-					} else {
-						const embed = EmbedBuilder.from(message.embeds[0]);
-						updateEmbedField(embed, 'Start', 'When 8 players have signed up');
-						await message.edit({ embeds: [embed] });
-					}
-				} catch (error) {
-					console.error(
-						`Error in timeout callback for event ${message.id}:`,
-						error,
-					);
-				} finally {
-					eventTimeouts.delete(message.id);
-				}
-			},
-			timeInMinutes * 60 * 1000,
-		);
-
-		eventTimeouts.set(message.id, timeout);
+/**
+ * Sets a timeout to automatically start the event after the specified time.
+ */
+async function createEventStartTimeout(
+	message: Message,
+	timeInMinutes: number,
+) {
+	const existingTimeout = eventTimeouts.get(message.id);
+	if (existingTimeout) {
+		clearTimeout(existingTimeout);
+		eventTimeouts.delete(message.id);
 	}
+
+	const embed = EmbedBuilder.from(message.embeds[0]);
+	updateEmbedField(
+		embed,
+		'Start',
+		`<t:${Math.floor((Date.now() + timeInMinutes * 60 * 1000) / 1000)}:R>`,
+	);
+	await message.edit({ embeds: [embed] });
+
+	const timeout = setTimeout(
+		async () => {
+			try {
+				const participantMap = eventParticipants.get(message.id);
+				const timerData = eventTimers.get(message.id);
+
+				if (!participantMap || !timerData || timerData.hasStarted) {
+					eventTimeouts.delete(message.id);
+					return;
+				}
+
+				if (
+					participantMap.size === MAX_PARTICIPANTS &&
+					!isProcessing(message.id, 'starting') &&
+					!isProcessing(message.id, 'finishing') &&
+					!isProcessing(message.id, 'cleanup') &&
+					!isProcessing(message.id, 'cancelling')
+				) {
+					setProcessing(message.id, 'starting');
+					try {
+						await startEvent(message, participantMap);
+					} finally {
+						clearProcessing(message.id, 'starting');
+					}
+				} else {
+					const embed = EmbedBuilder.from(message.embeds[0]);
+					updateEmbedField(embed, 'Start', 'When 8 players have signed up');
+					await message.edit({ embeds: [embed] });
+				}
+			} catch (error) {
+				console.error(
+					`Error in timeout callback for event ${message.id}:`,
+					error,
+				);
+			} finally {
+				eventTimeouts.delete(message.id);
+			}
+		},
+		timeInMinutes * 60 * 1000,
+	);
+
+	eventTimeouts.set(message.id, timeout);
 }
 
 /**
@@ -513,25 +573,31 @@ async function handleCancelButton(
 	}
 
 	const messageId = interaction.message.id;
-	const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
-		COLORS.CANCELLED,
-	);
 
-	updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
+	setProcessing(messageId, 'cancelling');
+	try {
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+			COLORS.CANCELLED,
+		);
 
-	await interaction.editReply({ embeds: [embed], components: [] });
+		updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
 
-	const matchId = eventMatchIds.get(messageId);
-	telemetry?.trackEventCancelled({
-		guildId: interaction.guild?.id || 'unknown',
-		eventId: messageId,
-		userId: userId,
-		participants: Array.from(participantMap.values()),
-		channelId: interaction.channelId,
-		matchId: matchId || 'unknown',
-	});
+		await interaction.editReply({ embeds: [embed], components: [] });
 
-	await cleanupEvent(messageId);
+		const matchId = eventMatchIds.get(messageId);
+		telemetry?.trackEventCancelled({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+
+		await cleanupEvent(messageId);
+	} finally {
+		clearProcessing(messageId, 'cancelling');
+	}
 }
 
 /**
@@ -545,6 +611,8 @@ async function handleStartNowButton(
 	creatorId: string,
 ) {
 	await interaction.deferUpdate();
+
+	const messageId = interaction.message.id;
 
 	if (userId !== creatorId) {
 		await interaction.followUp({
@@ -562,7 +630,12 @@ async function handleStartNowButton(
 		return;
 	}
 
-	await startEvent(interaction.message, participantMap);
+	setProcessing(messageId, 'starting');
+	try {
+		await startEvent(interaction.message, participantMap);
+	} finally {
+		clearProcessing(messageId, 'starting');
+	}
 }
 
 /**
@@ -576,7 +649,6 @@ async function handleFinishButton(
 	creatorId: string,
 ) {
 	await interaction.deferUpdate();
-
 	const isCreator = userId === creatorId;
 	const isAdmin = isUserAdmin(interaction.member as GuildMember);
 
@@ -590,39 +662,44 @@ async function handleFinishButton(
 
 	const messageId = interaction.message.id;
 
-	const threadId = eventThreads.get(messageId);
-	const channel = interaction.channel as TextChannel | null;
-	if (threadId && channel) {
-		try {
-			const thread = await channel.threads.fetch(threadId);
-			if (thread) {
-				await thread.setLocked(true);
-				await thread.setArchived(true);
+	setProcessing(messageId, 'finishing');
+	try {
+		const threadId = eventThreads.get(messageId);
+		const channel = interaction.channel as TextChannel | null;
+		if (threadId && channel) {
+			try {
+				const thread = await channel.threads.fetch(threadId);
+				if (thread) {
+					await thread.setLocked(true);
+					await thread.setArchived(true);
+				}
+			} catch (error) {
+				console.error(`Failed to manage thread ${threadId}:`, error);
 			}
-		} catch (error) {
-			console.error(`Failed to manage thread ${threadId}:`, error);
 		}
+
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+			COLORS.FINISHED,
+		);
+
+		updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
+
+		await interaction.editReply({ embeds: [embed], components: [] });
+
+		const matchId = eventMatchIds.get(messageId);
+		telemetry?.trackEventFinished({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+
+		await cleanupEvent(messageId);
+	} finally {
+		clearProcessing(messageId, 'finishing');
 	}
-
-	const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
-		COLORS.FINISHED,
-	);
-
-	updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
-
-	await interaction.editReply({ embeds: [embed], components: [] });
-
-	const matchId = eventMatchIds.get(messageId);
-	telemetry?.trackEventFinished({
-		guildId: interaction.guild?.id || 'unknown',
-		eventId: messageId,
-		userId: userId,
-		participants: Array.from(participantMap.values()),
-		channelId: interaction.channelId,
-		matchId: matchId || 'unknown',
-	});
-
-	await cleanupEvent(messageId);
 }
 
 /**
@@ -870,23 +947,18 @@ async function updateParticipantEmbed(
 			.join('\n'),
 	);
 
-	try {
-		await interaction.editReply({ embeds: [embed] });
-	} catch (error) {
-		console.error('Failed to update participant embed:', error);
-		return;
-	}
+	await interaction.editReply({ embeds: [embed] });
 
 	const timeElapsed = Date.now() - timerData.startTime;
 	const timeIsUpOrNotSet =
-		timerData.duration === 0 || timeElapsed >= timerData.duration;
+		!timerData.duration || timeElapsed >= timerData.duration;
 
 	if (participantMap.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
-		try {
-			await startEvent(interaction.message, participantMap);
-		} catch (error) {
-			console.error('Failed to start event automatically:', error);
-		}
+		embed.setColor(COLORS.FINALIZING);
+		updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINALIZING);
+		await interaction.editReply({ embeds: [embed] });
+
+		createEventStartTimeout(interaction.message, 0.2);
 	}
 }
 
@@ -963,35 +1035,73 @@ function getExcaliburRankOfUser(
 }
 
 /**
+ * Helper functions to manage processing states for race condition protection
+ */
+function isProcessing(messageId: string, operation: EventOperation) {
+	const states = eventProcessingStates.get(messageId) || new Set();
+	return states.has(operation);
+}
+
+function setProcessing(messageId: string, operation: EventOperation) {
+	const states = eventProcessingStates.get(messageId) || new Set();
+	states.add(operation);
+	eventProcessingStates.set(messageId, states);
+
+	// Its possible for an operation to get stuck (like a bot crash),
+	// so we want to auto-clear the processing state after a timeout
+	setTimeout(() => {
+		clearProcessing(messageId, operation);
+	}, 10000);
+}
+
+function clearProcessing(messageId: string, operation: EventOperation) {
+	const states = eventProcessingStates.get(messageId);
+	if (!states) return;
+
+	states.delete(operation);
+	if (states.size === 0) {
+		eventProcessingStates.delete(messageId);
+	}
+}
+
+/**
  * Clears all data associated with a specific event.
  */
 async function cleanupEvent(messageId: string) {
-	const timeout = eventTimeouts.get(messageId);
-	if (timeout) {
-		clearTimeout(timeout);
-		eventTimeouts.delete(messageId);
-	}
+	if (isProcessing(messageId, 'cleanup')) return;
 
-	eventParticipants.delete(messageId);
-	eventCreators.delete(messageId);
-	eventTimers.delete(messageId);
-	eventThreads.delete(messageId);
-	eventMatchIds.delete(messageId);
-
-	const voiceChannelIds = eventVoiceChannels.get(messageId);
-	if (!voiceChannelIds) return;
-
-	for (const channelId of voiceChannelIds) {
-		try {
-			const channel = await appClient.channels.fetch(channelId);
-			if (channel?.isVoiceBased()) {
-				await channel.delete();
-			}
-		} catch (error) {
-			console.error(`Failed to delete voice channel ${channelId}:`, error);
+	setProcessing(messageId, 'cleanup');
+	try {
+		const timeout = eventTimeouts.get(messageId);
+		if (timeout) {
+			clearTimeout(timeout);
+			eventTimeouts.delete(messageId);
 		}
+
+		eventParticipants.delete(messageId);
+		eventCreators.delete(messageId);
+		eventTimers.delete(messageId);
+		eventThreads.delete(messageId);
+		eventMatchIds.delete(messageId);
+
+		const voiceChannelIds = eventVoiceChannels.get(messageId);
+		if (voiceChannelIds) {
+			for (const channelId of voiceChannelIds) {
+				try {
+					const channel = await appClient.channels.fetch(channelId);
+					if (channel?.isVoiceBased()) {
+						await channel.delete();
+					}
+				} catch (error) {
+					console.error(`Failed to delete voice channel ${channelId}:`, error);
+				}
+			}
+			eventVoiceChannels.delete(messageId);
+		}
+	} finally {
+		clearProcessing(messageId, 'cleanup');
+		eventProcessingStates.delete(messageId);
 	}
-	eventVoiceChannels.delete(messageId);
 }
 
 /**
