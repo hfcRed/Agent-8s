@@ -1,6 +1,6 @@
 export type ParticipantData = {
 	userId: string;
-	role: string | null;
+	role: string;
 	rank: string | null;
 };
 

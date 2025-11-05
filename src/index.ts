@@ -499,7 +499,7 @@ async function handleSignUpButton(
 
 	participantMap.set(userId, {
 		userId: userId,
-		role: null,
+		role: WEAPON_ROLES[0],
 		rank: getExcaliburRankOfUser(interaction),
 	});
 
