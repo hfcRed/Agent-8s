@@ -9,7 +9,11 @@ import {
 	Client,
 	EmbedBuilder,
 	GatewayIntentBits,
+	type Guild,
+	GuildMember,
 	type Message,
+	OverwriteType,
+	PermissionFlagsBits,
 	REST,
 	Routes,
 	SlashCommandBuilder,
@@ -20,56 +24,59 @@ import {
 } from 'discord.js';
 import dotenv from 'dotenv';
 import {
+	ADMIN_PERMISSIONS,
 	COLORS,
 	ERROR_MESSAGES,
+	EXCALIBUR_GUILD_ID,
+	EXCALIBUR_RANKS,
 	MAX_PARTICIPANTS,
 	PING_ROLE_NAMES,
+	PROCESSING_MESSAGES,
 	STATUS_MESSAGES,
 } from './constants.js';
-import { EventRecorder } from './telemetry/event-recorder.js';
 import { TelemetryService } from './telemetry/telemetry.js';
-import type { EventTimer, ParticipantMap } from './types.js';
+import type { EventOperation, EventTimer, ParticipantMap } from './types.js';
 
-const parsed = dotenv.config();
-const botToken = parsed.parsed?.BOT_TOKEN ?? process.env.BOT_TOKEN;
-const telemetryUrl = parsed.parsed?.TELEMETRY_URL ?? process.env.TELEMETRY_URL;
-const telemetryToken =
-	parsed.parsed?.TELEMETRY_TOKEN ?? process.env.TELEMETRY_TOKEN;
-const databaseUrl = parsed.parsed?.DATABASE_URL ?? process.env.DATABASE_URL;
-const databaseSchema =
-	parsed.parsed?.DATABASE_SCHEMA ?? process.env.DATABASE_SCHEMA;
-const telemetryEventsTable =
-	parsed.parsed?.TELEMETRY_EVENTS_TABLE ?? process.env.TELEMETRY_EVENTS_TABLE;
+dotenv.config();
+const botToken = process.env.BOT_TOKEN;
 
 if (!botToken) {
 	console.error('BOT_TOKEN not found in .env file');
 	process.exit(1);
 }
 
+const telemetryUrl = process.env.TELEMETRY_URL;
+const telemetryToken = process.env.TELEMETRY_TOKEN;
+
 /**
  * Optional telemetry client used to forward interaction lifecycle metrics.
  */
-// this should just be moved into the TelemetryService constructor
-// likewise so should all the environment variable reading
-// we want to keep this file for just the bot logic
-const eventRecorder = databaseUrl
-	? new EventRecorder(databaseUrl, {
-			schema: databaseSchema,
-			table: telemetryEventsTable,
-		})
-	: undefined;
-
 const telemetry =
 	telemetryUrl && telemetryToken
-		? new TelemetryService(telemetryUrl, telemetryToken, eventRecorder)
+		? new TelemetryService(telemetryUrl, telemetryToken)
 		: undefined;
 
 const rest = new REST({ version: '10' }).setToken(botToken);
 
 const appClient = new Client({
-	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.GuildVoiceStates,
+		GatewayIntentBits.MessageContent,
+	],
 	allowedMentions: { parse: ['roles'] },
 });
+
+appClient
+	.login(botToken)
+	.then(() => {
+		console.log('Discord client logged in');
+	})
+	.catch((error) => {
+		console.error('Failed to log in Discord client:', error);
+		process.exit(1);
+	});
 
 const commands = [
 	new SlashCommandBuilder()
@@ -96,9 +103,15 @@ const commands = [
 appClient.once('clientReady', async () => {
 	if (!appClient.user) return;
 
-	await rest.put(Routes.applicationCommands(appClient.user.id), {
-		body: commands,
-	});
+	try {
+		await rest.put(Routes.applicationCommands(appClient.user.id), {
+			body: commands,
+		});
+		console.log('Successfully registered application commands');
+	} catch (error) {
+		console.error('Failed to register application commands:', error);
+		process.exit(1);
+	}
 });
 
 /**
@@ -111,8 +124,17 @@ const eventTimers = new Map<string, EventTimer>();
 const eventThreads = new Map<string, string>();
 const eventTimeouts = new Map<string, NodeJS.Timeout>();
 const eventMatchIds = new Map<string, string>();
+const eventVoiceChannels = new Map<string, string[]>();
+const eventProcessingStates = new Map<string, Set<EventOperation>>();
 
 appClient.on('interactionCreate', async (interaction) => {
+	if (
+		!interaction.guild ||
+		!interaction.member ||
+		!(interaction.member instanceof GuildMember)
+	)
+		return;
+
 	try {
 		if (
 			interaction.isChatInputCommand() &&
@@ -130,6 +152,30 @@ appClient.on('interactionCreate', async (interaction) => {
 		if (!participantMap) return;
 
 		if (interaction.isButton()) {
+			if (isProcessing(messageId, 'starting')) {
+				await interaction.followUp({
+					content: PROCESSING_MESSAGES.STILL_STARTING,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+
+			if (isProcessing(messageId, 'finishing')) {
+				await interaction.followUp({
+					content: PROCESSING_MESSAGES.ALREADY_FINISHING,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+
+			if (isProcessing(messageId, 'cancelling')) {
+				await interaction.followUp({
+					content: PROCESSING_MESSAGES.ALREADY_CANCELLING,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+
 			const timerData = eventTimers.get(messageId);
 			const creatorId = eventCreators.get(messageId);
 
@@ -186,11 +232,27 @@ appClient.on('interactionCreate', async (interaction) => {
 	} catch (error) {
 		console.error(error);
 
-		if (interaction.isRepliable() && !interaction.replied) {
-			await interaction.reply({
-				content: 'An error occurred while processing your request.',
-				flags: ['Ephemeral'],
-			});
+		try {
+			if (
+				interaction.isRepliable() &&
+				!interaction.replied &&
+				!interaction.deferred
+			) {
+				await interaction.reply({
+					content: 'An error occurred while processing your request.',
+					flags: ['Ephemeral'],
+				});
+			} else if (
+				interaction.isRepliable() &&
+				(interaction.replied || interaction.deferred)
+			) {
+				await interaction.followUp({
+					content: 'An error occurred while processing your request.',
+					flags: ['Ephemeral'],
+				});
+			}
+		} catch (replyError) {
+			console.error('Failed to send error message to user:', replyError);
 		}
 	}
 });
@@ -308,13 +370,20 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 	eventParticipants.set(
 		message.id,
 		new Map([
-			[interaction.user.id, { userId: interaction.user.id, role: null }],
+			[
+				interaction.user.id,
+				{
+					userId: interaction.user.id,
+					role: null,
+					rank: getExcaliburRankOfUser(interaction),
+				},
+			],
 		]),
 	);
 	eventCreators.set(message.id, interaction.user.id);
 	eventTimers.set(message.id, {
 		startTime,
-		duration: timeInMinutes ? timeInMinutes * 60 * 1000 : 0,
+		duration: timeInMinutes ? timeInMinutes * 60 * 1000 : undefined,
 		hasStarted: false,
 	});
 	eventMatchIds.set(message.id, matchId);
@@ -331,31 +400,72 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		timeToStart: timeInMinutes,
 	});
 
-	if (timeInMinutes) {
-		const timeout = setTimeout(
-			async () => {
-				const participantSet = eventParticipants.get(message.id);
+	if (timeInMinutes) createEventStartTimeout(message, timeInMinutes);
+}
+
+/**
+ * Sets a timeout to automatically start the event after the specified time.
+ */
+async function createEventStartTimeout(
+	message: Message,
+	timeInMinutes: number,
+) {
+	const existingTimeout = eventTimeouts.get(message.id);
+	if (existingTimeout) {
+		clearTimeout(existingTimeout);
+		eventTimeouts.delete(message.id);
+	}
+
+	const embed = EmbedBuilder.from(message.embeds[0]);
+	updateEmbedField(
+		embed,
+		'Start',
+		`<t:${Math.floor((Date.now() + timeInMinutes * 60 * 1000) / 1000)}:R>`,
+	);
+	await message.edit({ embeds: [embed] });
+
+	const timeout = setTimeout(
+		async () => {
+			try {
+				const participantMap = eventParticipants.get(message.id);
 				const timerData = eventTimers.get(message.id);
-				if (!participantSet || !timerData || timerData.hasStarted) {
+
+				if (!participantMap || !timerData || timerData.hasStarted) {
 					eventTimeouts.delete(message.id);
 					return;
 				}
 
-				if (participantSet.size === MAX_PARTICIPANTS) {
-					await startEvent(message, participantSet);
+				if (
+					participantMap.size === MAX_PARTICIPANTS &&
+					!isProcessing(message.id, 'starting') &&
+					!isProcessing(message.id, 'finishing') &&
+					!isProcessing(message.id, 'cleanup') &&
+					!isProcessing(message.id, 'cancelling')
+				) {
+					setProcessing(message.id, 'starting');
+					try {
+						await startEvent(message, participantMap);
+					} finally {
+						clearProcessing(message.id, 'starting');
+					}
 				} else {
 					const embed = EmbedBuilder.from(message.embeds[0]);
 					updateEmbedField(embed, 'Start', 'When 8 players have signed up');
 					await message.edit({ embeds: [embed] });
 				}
-
+			} catch (error) {
+				console.error(
+					`Error in timeout callback for event ${message.id}:`,
+					error,
+				);
+			} finally {
 				eventTimeouts.delete(message.id);
-			},
-			timeInMinutes * 60 * 1000,
-		);
+			}
+		},
+		timeInMinutes * 60 * 1000,
+	);
 
-		eventTimeouts.set(message.id, timeout);
-	}
+	eventTimeouts.set(message.id, timeout);
 }
 
 /**
@@ -367,20 +477,29 @@ async function handleSignUpButton(
 	participantMap: ParticipantMap,
 	timerData: EventTimer,
 ) {
+	await interaction.deferUpdate();
+
 	if (participantMap.size >= MAX_PARTICIPANTS && !participantMap.has(userId)) {
-		await interaction.deferUpdate();
+		await interaction.followUp({
+			content: ERROR_MESSAGES.EVENT_FULL,
+			flags: ['Ephemeral'],
+		});
 		return;
 	}
 
 	if (isUserInAnyEvent(userId)) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
 			flags: ['Ephemeral'],
 		});
 		return;
 	}
 
-	participantMap.set(userId, { userId: userId, role: null });
+	participantMap.set(userId, {
+		userId: userId,
+		role: null,
+		rank: getExcaliburRankOfUser(interaction),
+	});
 
 	const matchId = eventMatchIds.get(interaction.message.id);
 	telemetry?.trackUserSignUp({
@@ -406,8 +525,10 @@ async function handleSignOutButton(
 	creatorId: string,
 	timerData: EventTimer,
 ) {
+	await interaction.deferUpdate();
+
 	if (userId === creatorId) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
 			flags: ['Ephemeral'],
 		});
@@ -430,7 +551,7 @@ async function handleSignOutButton(
 }
 
 /**
- * Cancels the event. Can only be invoked by the event creator.
+ * Cancels the event. Can be invoked by the event creator or administrators.
  */
 async function handleCancelButton(
 	interaction: ButtonInteraction,
@@ -438,8 +559,13 @@ async function handleCancelButton(
 	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
-	if (userId !== creatorId) {
-		await interaction.reply({
+	await interaction.deferUpdate();
+
+	const isCreator = userId === creatorId;
+	const isAdmin = isUserAdmin(interaction.member as GuildMember);
+
+	if (!isCreator && !isAdmin) {
+		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_ONLY_CANCEL,
 			flags: ['Ephemeral'],
 		});
@@ -447,26 +573,31 @@ async function handleCancelButton(
 	}
 
 	const messageId = interaction.message.id;
-	const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
-		COLORS.CANCELLED,
-	);
 
-	updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
+	setProcessing(messageId, 'cancelling');
+	try {
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+			COLORS.CANCELLED,
+		);
 
-	await interaction.deferUpdate();
-	await interaction.message.edit({ embeds: [embed], components: [] });
+		updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
 
-	const matchId = eventMatchIds.get(messageId);
-	telemetry?.trackEventCancelled({
-		guildId: interaction.guild?.id || 'unknown',
-		eventId: messageId,
-		userId: userId,
-		participants: Array.from(participantMap.values()),
-		channelId: interaction.channelId,
-		matchId: matchId || 'unknown',
-	});
+		await interaction.editReply({ embeds: [embed], components: [] });
 
-	cleanupEvent(messageId);
+		const matchId = eventMatchIds.get(messageId);
+		telemetry?.trackEventCancelled({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+
+		await cleanupEvent(messageId);
+	} finally {
+		clearProcessing(messageId, 'cancelling');
+	}
 }
 
 /**
@@ -479,8 +610,12 @@ async function handleStartNowButton(
 	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
+	await interaction.deferUpdate();
+
+	const messageId = interaction.message.id;
+
 	if (userId !== creatorId) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_ONLY_START,
 			flags: ['Ephemeral'],
 		});
@@ -488,16 +623,24 @@ async function handleStartNowButton(
 	}
 
 	if (participantMap.size !== MAX_PARTICIPANTS) {
-		await interaction.deferUpdate();
+		await interaction.followUp({
+			content: ERROR_MESSAGES.NOT_ENOUGH_PARTICIPANTS,
+			flags: ['Ephemeral'],
+		});
 		return;
 	}
 
-	await startEvent(interaction.message, participantMap);
+	setProcessing(messageId, 'starting');
+	try {
+		await startEvent(interaction.message, participantMap);
+	} finally {
+		clearProcessing(messageId, 'starting');
+	}
 }
 
 /**
  * Completes an active event and locks and archives the associated thread.
- * Can only be invoked by the event creator.
+ * Can be invoked by the event creator or administrators.
  */
 async function handleFinishButton(
 	interaction: ButtonInteraction,
@@ -505,8 +648,12 @@ async function handleFinishButton(
 	participantMap: ParticipantMap,
 	creatorId: string,
 ) {
-	if (userId !== creatorId) {
-		await interaction.reply({
+	await interaction.deferUpdate();
+	const isCreator = userId === creatorId;
+	const isAdmin = isUserAdmin(interaction.member as GuildMember);
+
+	if (!isCreator && !isAdmin) {
+		await interaction.followUp({
 			content: ERROR_MESSAGES.CREATOR_ONLY_FINISH,
 			flags: ['Ephemeral'],
 		});
@@ -515,36 +662,44 @@ async function handleFinishButton(
 
 	const messageId = interaction.message.id;
 
-	const threadId = eventThreads.get(messageId);
-	const channel = interaction.channel as TextChannel | null;
-	if (threadId && channel) {
-		const thread = await channel.threads.fetch(threadId);
-		if (thread) {
-			await thread.setLocked(true);
-			await thread.setArchived(true);
+	setProcessing(messageId, 'finishing');
+	try {
+		const threadId = eventThreads.get(messageId);
+		const channel = interaction.channel as TextChannel | null;
+		if (threadId && channel) {
+			try {
+				const thread = await channel.threads.fetch(threadId);
+				if (thread) {
+					await thread.setLocked(true);
+					await thread.setArchived(true);
+				}
+			} catch (error) {
+				console.error(`Failed to manage thread ${threadId}:`, error);
+			}
 		}
+
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+			COLORS.FINISHED,
+		);
+
+		updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
+
+		await interaction.editReply({ embeds: [embed], components: [] });
+
+		const matchId = eventMatchIds.get(messageId);
+		telemetry?.trackEventFinished({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+
+		await cleanupEvent(messageId);
+	} finally {
+		clearProcessing(messageId, 'finishing');
 	}
-
-	const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
-		COLORS.FINISHED,
-	);
-
-	updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
-
-	await interaction.deferUpdate();
-	await interaction.message.edit({ embeds: [embed], components: [] });
-
-	const matchId = eventMatchIds.get(messageId);
-	telemetry?.trackEventFinished({
-		guildId: interaction.guild?.id || 'unknown',
-		eventId: messageId,
-		userId: userId,
-		participants: Array.from(participantMap.values()),
-		channelId: interaction.channelId,
-		matchId: matchId || 'unknown',
-	});
-
-	cleanupEvent(messageId);
 }
 
 /**
@@ -556,8 +711,10 @@ async function handleRoleSelection(
 	userId: string,
 	participantMap: ParticipantMap,
 ) {
+	await interaction.deferUpdate();
+
 	if (!participantMap.has(userId)) {
-		await interaction.reply({
+		await interaction.followUp({
 			content: ERROR_MESSAGES.NOT_SIGNED_UP,
 			flags: ['Ephemeral'],
 		});
@@ -574,6 +731,7 @@ async function handleRoleSelection(
 	participantMap.set(userId, {
 		userId: userId,
 		role: selectedRole,
+		rank: getExcaliburRankOfUser(interaction),
 	});
 
 	const timerData = eventTimers.get(interaction.message.id);
@@ -593,6 +751,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 
 	timerData.hasStarted = true;
 	const matchId = eventMatchIds.get(message.id);
+	const shortId = matchId?.slice(0, 5);
 
 	const timeout = eventTimeouts.get(message.id);
 	if (timeout) {
@@ -616,22 +775,98 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 	await message.edit({ embeds: [embed], components: [row] });
 
 	const channel = message.channel as TextChannel;
-	const thread = await channel.threads.create({
-		name: '8s Game Ready!',
-		autoArchiveDuration: 60,
-		type: ChannelType.PrivateThread,
-	});
+	let thread = null;
+	try {
+		const createdThread = await channel.threads.create({
+			name: `8s Event - ${shortId}`,
+			autoArchiveDuration: 60,
+			type: ChannelType.PrivateThread,
+		});
 
-	await thread.send({
-		embeds: [EmbedBuilder.from(message.embeds[0])],
-	});
+		await createdThread.send({
+			embeds: [EmbedBuilder.from(message.embeds[0])],
+		});
 
-	eventThreads.set(message.id, thread.id);
+		eventThreads.set(message.id, createdThread.id);
+		thread = createdThread;
+	} catch (error) {
+		console.error('Failed to create or send message to thread:', error);
+	}
 
 	const participants = Array.from(participantMap.values());
 
-	for (const participant of participants) {
-		await thread.members.add(participant.userId);
+	if (thread) {
+		for (const participant of participants) {
+			try {
+				await thread.members.add(participant.userId);
+			} catch (error) {
+				console.error(
+					`Failed to add participant ${participant.userId} to thread:`,
+					error,
+				);
+			}
+		}
+	}
+
+	const guild = message.guild as Guild;
+	const voiceNames = ['👥 Group', '🔵 Team A', '🔴 Team B'];
+	const voiceChannels: string[] = [];
+
+	for (let i = 1; i <= 3; i++) {
+		try {
+			const voiceChannel = await guild.channels.create({
+				name: `${voiceNames[i - 1]} - ${shortId}`,
+				type: ChannelType.GuildVoice,
+				parent: channel.parent,
+				permissionOverwrites: [
+					{
+						id: guild.roles.everyone.id,
+						deny: [
+							PermissionFlagsBits.Connect,
+							PermissionFlagsBits.ViewChannel,
+						],
+						type: OverwriteType.Role,
+					},
+					{
+						id: appClient.user?.id || '',
+						allow: [
+							PermissionFlagsBits.Connect,
+							PermissionFlagsBits.ViewChannel,
+							PermissionFlagsBits.ManageChannels,
+						],
+						type: OverwriteType.Member,
+					},
+					...participants.map((participant) => ({
+						id: participant.userId,
+						allow: [
+							PermissionFlagsBits.Connect,
+							PermissionFlagsBits.ViewChannel,
+							PermissionFlagsBits.Speak,
+						],
+						type: OverwriteType.Member,
+					})),
+				],
+			});
+
+			voiceChannels.push(voiceChannel.id);
+		} catch (error) {
+			console.error(
+				`Failed to create voice channel ${voiceNames[i - 1]}:`,
+				error,
+			);
+		}
+	}
+
+	eventVoiceChannels.set(message.id, voiceChannels);
+
+	if (thread) {
+		try {
+			await thread.send({
+				content: `**Voice Channels Created**\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+			});
+		} catch (error) {
+			console.error('Failed to send voice channel info to thread:', error);
+		}
 	}
 
 	telemetry?.trackEventStarted({
@@ -712,22 +947,25 @@ async function updateParticipantEmbed(
 			.join('\n'),
 	);
 
-	await interaction.deferUpdate();
-	await interaction.message.edit({ embeds: [embed] });
+	await interaction.editReply({ embeds: [embed] });
 
 	const timeElapsed = Date.now() - timerData.startTime;
 	const timeIsUpOrNotSet =
-		timerData.duration === 0 || timeElapsed >= timerData.duration;
+		!timerData.duration || timeElapsed >= timerData.duration;
 
 	if (participantMap.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
-		await startEvent(interaction.message, participantMap);
+		embed.setColor(COLORS.FINALIZING);
+		updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINALIZING);
+		await interaction.editReply({ embeds: [embed] });
+
+		createEventStartTimeout(interaction.message, 0.2);
 	}
 }
 
 /**
  * Returns true if the supplied user is already registered in any event.
  */
-function isUserInAnyEvent(userId: string): boolean {
+function isUserInAnyEvent(userId: string) {
 	for (const [_, participantSet] of eventParticipants.entries()) {
 		if (participantSet.has(userId)) {
 			return true;
@@ -737,18 +975,27 @@ function isUserInAnyEvent(userId: string): boolean {
 }
 
 /**
+ * Checks if a user has administrator permissions.
+ */
+function isUserAdmin(member: GuildMember) {
+	return ADMIN_PERMISSIONS.some((permission) =>
+		member.permissions.has(PermissionFlagsBits[permission]),
+	);
+}
+
+/**
  * Resolves which roles to ping for the current guild based on the lobby type.
  */
 function getPingsForServer(
 	interaction: ChatInputCommandInteraction,
 	casual: boolean,
-): string | null {
+) {
 	if (!interaction.guild) return null;
 
-	const roles = interaction.guild.roles.cache.filter(
-		(role) =>
-			PING_ROLE_NAMES.includes(role.name) &&
-			(casual || !role.name.toLowerCase().includes('casual')),
+	const roles = interaction.guild.roles.cache.filter((role) =>
+		casual
+			? role.name === PING_ROLE_NAMES.casual
+			: role.name === PING_ROLE_NAMES.competitive,
 	);
 
 	if (roles.size === 0) return null;
@@ -757,20 +1004,104 @@ function getPingsForServer(
 }
 
 /**
- * Clears all data associated with a specific event.
+ * Returns the Excalibur rank of the interacting user if they are in the Excalibur server.
  */
-function cleanupEvent(messageId: string) {
-	const timeout = eventTimeouts.get(messageId);
-	if (timeout) {
-		clearTimeout(timeout);
-		eventTimeouts.delete(messageId);
+function getExcaliburRankOfUser(
+	interaction:
+		| ChatInputCommandInteraction
+		| ButtonInteraction
+		| StringSelectMenuInteraction,
+) {
+	if (interaction.guild?.id !== EXCALIBUR_GUILD_ID) return null;
+
+	const roles = interaction.member?.roles;
+	if (!roles || Array.isArray(roles)) return null;
+
+	const resolved = Array.from(roles.valueOf()).map((r) => {
+		return { id: r[1].id, name: r[1].name };
+	});
+
+	for (const rankKey in EXCALIBUR_RANKS) {
+		const rank = EXCALIBUR_RANKS[rankKey as keyof typeof EXCALIBUR_RANKS];
+		if (resolved.find((r) => r.id === rank.id)) {
+			return rankKey as keyof typeof EXCALIBUR_RANKS;
+		}
+		if (resolved.find((r) => r.name === rank.name)) {
+			return rankKey as keyof typeof EXCALIBUR_RANKS;
+		}
 	}
 
-	eventParticipants.delete(messageId);
-	eventCreators.delete(messageId);
-	eventTimers.delete(messageId);
-	eventThreads.delete(messageId);
-	eventMatchIds.delete(messageId);
+	return null;
+}
+
+/**
+ * Helper functions to manage processing states for race condition protection
+ */
+function isProcessing(messageId: string, operation: EventOperation) {
+	const states = eventProcessingStates.get(messageId) || new Set();
+	return states.has(operation);
+}
+
+function setProcessing(messageId: string, operation: EventOperation) {
+	const states = eventProcessingStates.get(messageId) || new Set();
+	states.add(operation);
+	eventProcessingStates.set(messageId, states);
+
+	// Its possible for an operation to get stuck (like a bot crash),
+	// so we want to auto-clear the processing state after a timeout
+	setTimeout(() => {
+		clearProcessing(messageId, operation);
+	}, 10000);
+}
+
+function clearProcessing(messageId: string, operation: EventOperation) {
+	const states = eventProcessingStates.get(messageId);
+	if (!states) return;
+
+	states.delete(operation);
+	if (states.size === 0) {
+		eventProcessingStates.delete(messageId);
+	}
+}
+
+/**
+ * Clears all data associated with a specific event.
+ */
+async function cleanupEvent(messageId: string) {
+	if (isProcessing(messageId, 'cleanup')) return;
+
+	setProcessing(messageId, 'cleanup');
+	try {
+		const timeout = eventTimeouts.get(messageId);
+		if (timeout) {
+			clearTimeout(timeout);
+			eventTimeouts.delete(messageId);
+		}
+
+		eventParticipants.delete(messageId);
+		eventCreators.delete(messageId);
+		eventTimers.delete(messageId);
+		eventThreads.delete(messageId);
+		eventMatchIds.delete(messageId);
+
+		const voiceChannelIds = eventVoiceChannels.get(messageId);
+		if (voiceChannelIds) {
+			for (const channelId of voiceChannelIds) {
+				try {
+					const channel = await appClient.channels.fetch(channelId);
+					if (channel?.isVoiceBased()) {
+						await channel.delete();
+					}
+				} catch (error) {
+					console.error(`Failed to delete voice channel ${channelId}:`, error);
+				}
+			}
+			eventVoiceChannels.delete(messageId);
+		}
+	} finally {
+		clearProcessing(messageId, 'cleanup');
+		eventProcessingStates.delete(messageId);
+	}
 }
 
 /**
@@ -788,45 +1119,96 @@ async function cleanupStaleEvents() {
 			for (const [_, channel] of appClient.channels.cache) {
 				if (!channel.isTextBased() || channel.isDMBased()) continue;
 
-				const message = await channel.messages.fetch(messageId);
+				try {
+					const message = await channel.messages.fetch(messageId);
 
-				const embed = EmbedBuilder.from(message.embeds[0]).setColor(
-					COLORS.CANCELLED,
-				);
-				updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
+					const embed = EmbedBuilder.from(message.embeds[0]).setColor(
+						COLORS.CANCELLED,
+					);
+					updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
 
-				await message.edit({ embeds: [embed], components: [] });
+					await message.edit({ embeds: [embed], components: [] });
 
-				const threadId = eventThreads.get(messageId);
-				if (threadId && channel.isThread() === false) {
-					const thread = await (channel as TextChannel).threads.fetch(threadId);
-					if (thread) {
-						await thread.setLocked(true);
-						await thread.setArchived(true);
+					const threadId = eventThreads.get(messageId);
+					if (threadId && channel.isThread() === false) {
+						try {
+							const thread = await (channel as TextChannel).threads.fetch(
+								threadId,
+							);
+							if (thread) {
+								await thread.setLocked(true);
+								await thread.setArchived(true);
+							}
+						} catch (threadError) {
+							console.error(
+								`Failed to manage thread ${threadId}:`,
+								threadError,
+							);
+						}
 					}
+
+					const matchId = eventMatchIds.get(messageId);
+					telemetry?.trackEventExpired({
+						guildId: message.guild?.id || 'unknown',
+						eventId: messageId,
+						userId: appClient.user?.id || 'unknown',
+						participants: Array.from(
+							(eventParticipants.get(messageId) || new Map()).values(),
+						),
+						channelId: message.channelId,
+						matchId: matchId || 'unknown',
+					});
+
+					break;
+				} catch (error) {
+					console.error(
+						`Failed to fetch message ${messageId} in channel ${channel.id}:`,
+						error,
+					);
 				}
-
-				const matchId = eventMatchIds.get(messageId);
-				telemetry?.trackEventExpired({
-					guildId: message.guild?.id || 'unknown',
-					eventId: messageId,
-					userId: '1434173887888887908',
-					participants: Array.from(
-						(eventParticipants.get(messageId) || new Map()).values(),
-					),
-					channelId: message.channelId,
-					matchId: matchId || 'unknown',
-				});
-
-				break;
 			}
 		} catch (error) {
-			console.error(error);
+			console.error(`Failed to clean up stale event ${messageId}:`, error);
 		} finally {
-			cleanupEvent(messageId);
+			await cleanupEvent(messageId);
 		}
 	}
 }
 
 setInterval(cleanupStaleEvents, 60 * 60 * 1000);
-appClient.login(botToken);
+
+/**
+ * Message deletion handler to remove non-command messages from non-admin users
+ */
+appClient.on('messageCreate', async (message) => {
+	if (message.author.bot || !message.guild) return;
+
+	try {
+		const member = message.member;
+		if (!member) return;
+
+		if (!isUserAdmin(member) && message.interactionMetadata?.type !== 2) {
+			await message.delete();
+		}
+	} catch (error) {
+		console.error('Error handling message deletion:', error);
+	}
+});
+
+appClient.on('error', (error) => {
+	console.error('Discord client error:', error);
+});
+
+appClient.on('warn', (warning) => {
+	console.warn('Discord client warning:', warning);
+});
+
+process.on('uncaughtException', (error) => {
+	console.error('Uncaught Exception:', error);
+	process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+	console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+	process.exit(1);
+});

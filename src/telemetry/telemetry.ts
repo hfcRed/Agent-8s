@@ -1,4 +1,5 @@
-import type { EventRecorder } from './event-recorder.js';
+import dotenv from 'dotenv';
+import { EventRecorder } from './event-recorder.js';
 import { recordTelemetryDispatch, recordTelemetryFailure } from './metrics.js';
 import type { TelemetryEventData } from './types.js';
 
@@ -10,10 +11,21 @@ export class TelemetryService {
 	private apiKey: string;
 	private recorder?: EventRecorder;
 
-	constructor(backendUrl: string, apiKey: string, recorder?: EventRecorder) {
-		this.backendUrl = backendUrl;
-		this.apiKey = apiKey;
-		this.recorder = recorder;
+	constructor(telemetryUrl: string, telemetryToken: string) {
+		dotenv.config();
+		const databaseUrl = process.env.DATABASE_URL;
+		const databaseSchema = process.env.DATABASE_SCHEMA;
+		const telemetryEventsTable = process.env.TELEMETRY_EVENTS_TABLE;
+
+		this.backendUrl = telemetryUrl;
+		this.apiKey = telemetryToken;
+
+		this.recorder = databaseUrl
+			? new EventRecorder(databaseUrl, {
+					schema: databaseSchema,
+					table: telemetryEventsTable,
+				})
+			: undefined;
 
 		this.recorder
 			?.initialize()

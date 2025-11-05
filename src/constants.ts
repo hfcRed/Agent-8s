@@ -1,9 +1,41 @@
-export const MAX_PARTICIPANTS = 8;
+export const MAX_PARTICIPANTS = 2;
 
-export const PING_ROLE_NAMES = ['Comp 8s', 'Casual 8s'];
+export const PING_ROLE_NAMES = {
+	casual: 'Casual 8s',
+	competitive: 'Comp 8s',
+} as const;
+
+export const EXCALIBUR_GUILD_ID = '1428966578501849193';
+export const EXCALIBUR_RANKS = {
+	'1': {
+		name: 'TX Grandmaster',
+		id: '1429217994168598669',
+	},
+	'2': {
+		name: 'T1 Legend',
+		id: '1428997469303341166',
+	},
+	'3': {
+		name: 'T2 Ascendant',
+		id: '1428997715106332815',
+	},
+	'4': {
+		name: 'T3 Elite',
+		id: '1428998081126596618',
+	},
+	'5': {
+		name: 'T4 Knight',
+		id: '1428998361188532264',
+	},
+	'6': {
+		name: 'T5 Novice',
+		id: '1428998419250286704',
+	},
+} as const;
 
 export const COLORS = {
 	OPEN: '#626CE9',
+	FINALIZING: '#E9D662',
 	STARTED: '#1cff5c',
 	CANCELLED: '#ff1c1c',
 	FINISHED: '#ff1c1c',
@@ -12,6 +44,7 @@ export const COLORS = {
 export const STATUS_MESSAGES = {
 	OPEN: '🟢 Open for Sign Ups',
 	READY: '✅ Ready to Start!',
+	FINALIZING: '⏳ Finalizing...',
 	STARTED: '✅ Event Started!',
 	CANCELLED: '❌ Event cancelled',
 	FINISHED: '🏁 Event Finished',
@@ -22,9 +55,28 @@ export const ERROR_MESSAGES = {
 	ALREADY_SIGNED_UP:
 		'You are already signed up for an event. Please sign out, cancel, or wait for the event to finish before joining a new one.',
 	CREATOR_ONLY_START: 'Only the event creator can start the event.',
-	CREATOR_ONLY_CANCEL: 'Only the event creator can cancel this event.',
-	CREATOR_ONLY_FINISH: 'Only the event creator can finish this event.',
+	CREATOR_ONLY_CANCEL:
+		'Only the event creator or administrators can cancel this event.',
+	CREATOR_ONLY_FINISH:
+		'Only the event creator or administrators can finish this event.',
 	CREATOR_CANNOT_SIGNOUT:
 		'The event creator cannot sign out. Please cancel the event instead.',
 	NOT_SIGNED_UP: 'You need to be signed up to perform this action.',
+	EVENT_FULL: 'This event is already full! You cannot sign up.',
+	NOT_ENOUGH_PARTICIPANTS:
+		'Cannot start the event yet - not enough participants signed up.',
 } as const;
+
+export const PROCESSING_MESSAGES = {
+	ALREADY_STARTING: 'Event is already starting, please wait...',
+	STILL_STARTING: 'Event is still starting, please wait...',
+	ALREADY_FINISHING: 'Event is already being finished...',
+	ALREADY_CANCELLING: 'Event is already being cancelled...',
+} as const;
+
+export const ADMIN_PERMISSIONS = [
+	'Administrator',
+	'ManageMessages',
+	'ManageChannels',
+	'ModerateMembers',
+] as const;
