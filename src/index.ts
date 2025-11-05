@@ -33,6 +33,7 @@ import {
 	PING_ROLE_NAMES,
 	PROCESSING_MESSAGES,
 	STATUS_MESSAGES,
+	WEAPON_ROLES,
 } from './constants.js';
 import { TelemetryService } from './telemetry/telemetry.js';
 import type { EventOperation, EventTimer, ParticipantMap } from './types.js';
@@ -319,18 +320,11 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		.setCustomId('select')
 		.setPlaceholder('Select a weapon role')
 		.addOptions(
-			new StringSelectMenuOptionBuilder().setLabel('Slayer').setValue('slayer'),
-			new StringSelectMenuOptionBuilder()
-				.setLabel('Support')
-				.setValue('support'),
-			new StringSelectMenuOptionBuilder()
-				.setLabel('Skirmisher')
-				.setValue('skirmisher'),
-			new StringSelectMenuOptionBuilder()
-				.setLabel('Backline')
-				.setValue('backline'),
-			new StringSelectMenuOptionBuilder().setLabel('Flex').setValue('flex'),
-			new StringSelectMenuOptionBuilder().setLabel('Cooler').setValue('cooler'),
+			WEAPON_ROLES.map((role) =>
+				new StringSelectMenuOptionBuilder()
+					.setLabel(role)
+					.setValue(role.toLowerCase()),
+			),
 		);
 
 	const selectRow =
@@ -344,7 +338,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		},
 		{
 			name: 'Role',
-			value: '- None',
+			value: WEAPON_ROLES[0],
 			inline: true,
 		},
 		{
@@ -382,7 +376,7 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 				interaction.user.id,
 				{
 					userId: interaction.user.id,
-					role: null,
+					role: WEAPON_ROLES[0],
 					rank: getExcaliburRankOfUser(interaction),
 				},
 			],

@@ -76,6 +76,19 @@ export const PROCESSING_MESSAGES = {
 	ALREADY_CANCELLING: 'Event is already being cancelled...',
 } as const;
 
+export const WEAPON_ROLES = [
+	'⚫ None',
+	'🔪 Slayer',
+	'🏹 Skirmisher',
+	'🛡️ Support',
+	'⚔️ Midline',
+	'🏰 Backline',
+	'⚙️ Flex',
+	'🥤 Cooler (Frontline)',
+	'🥤 Cooler (Midline)',
+	'🥤 Cooler (Backline)',
+] as const;
+
 export const ADMIN_PERMISSIONS = [
 	'Administrator',
 	'ManageMessages',
