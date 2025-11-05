@@ -350,8 +350,8 @@ async function handleCreateCommand(interaction: ChatInputCommandInteraction) {
 		{
 			name: 'Start',
 			value: timeInMinutes
-				? `<t:${Math.floor((startTime + timeInMinutes * 60 * 1000) / 1000)}:R>`
-				: 'When 8 players have signed up',
+				? `⏳ <t:${Math.floor((startTime + timeInMinutes * 60 * 1000) / 1000)}:R>`
+				: '👥 When 8 players have signed up',
 		},
 		{ name: 'Status', value: STATUS_MESSAGES.OPEN },
 	];
@@ -428,7 +428,7 @@ async function createEventStartTimeout(
 	updateEmbedField(
 		embed,
 		'Start',
-		`<t:${Math.floor((Date.now() + timeInMinutes * 60 * 1000) / 1000)}:R>`,
+		`⏳ <t:${Math.floor((Date.now() + timeInMinutes * 60 * 1000) / 1000)}:R>`,
 	);
 	await message.edit({ embeds: [embed] });
 
@@ -458,7 +458,7 @@ async function createEventStartTimeout(
 					}
 				} else {
 					const embed = EmbedBuilder.from(message.embeds[0]);
-					updateEmbedField(embed, 'Start', 'When 8 players have signed up');
+					updateEmbedField(embed, 'Start', '👥 When 8 players have signed up');
 					await message.edit({ embeds: [embed] });
 				}
 			} catch (error) {
@@ -770,7 +770,7 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 	const embed = EmbedBuilder.from(message.embeds[0]).setColor(COLORS.STARTED);
 
 	updateEmbedField(embed, 'Status', STATUS_MESSAGES.STARTED);
-	updateEmbedField(embed, 'Start', `<t:${Math.floor(Date.now() / 1000)}:R>`);
+	updateEmbedField(embed, 'Start', `⏳ <t:${Math.floor(Date.now() / 1000)}:R>`);
 
 	const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()
@@ -791,9 +791,10 @@ async function startEvent(message: Message, participantMap: ParticipantMap) {
 			type: ChannelType.PrivateThread,
 		});
 
-		await createdThread.send({
+		const startMessage = await createdThread.send({
 			embeds: [EmbedBuilder.from(message.embeds[0])],
 		});
+		await startMessage.pin();
 
 		eventThreads.set(message.id, createdThread.id);
 		thread = createdThread;
