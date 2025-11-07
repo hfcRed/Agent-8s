@@ -59,7 +59,7 @@ export async function handleSignUpButton(
 		return;
 	}
 
-	participantMap.set(userId, {
+	eventManager.addParticipant(messageId, userId, {
 		userId: userId,
 		role: WEAPON_ROLES[0],
 		rank: getExcaliburRankOfUser(interaction),
@@ -106,7 +106,7 @@ export async function handleSignOutButton(
 		return;
 	}
 
-	participantMap.delete(userId);
+	eventManager.removeParticipant(messageId, userId);
 
 	const matchId = eventManager.getMatchId(messageId);
 	telemetry?.trackUserSignOut({
@@ -307,7 +307,7 @@ export async function handleDropOutButton(
 		return;
 	}
 
-	participantMap.delete(userId);
+	eventManager.removeParticipant(messageId, userId);
 
 	const threadId = eventManager.getThread(messageId);
 	if (threadId) {
@@ -375,7 +375,7 @@ export async function handleDropInButton(
 		return;
 	}
 
-	participantMap.set(userId, {
+	eventManager.addParticipant(messageId, userId, {
 		userId: userId,
 		role: WEAPON_ROLES[0],
 		rank: getExcaliburRankOfUser(interaction),

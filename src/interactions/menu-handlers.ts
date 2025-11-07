@@ -32,7 +32,7 @@ export async function handleRoleSelection(
 	);
 	const selectedRole = selectedOption?.label || selectedValue;
 
-	participantMap.set(userId, {
+	eventManager.addParticipant(messageId, userId, {
 		userId: userId,
 		role: selectedRole,
 		rank: getExcaliburRankOfUser(interaction),

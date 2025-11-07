@@ -15,6 +15,7 @@ export class EventManager {
 	private matchIds = new Map<string, string>();
 	private voiceChannels = new Map<string, string[]>();
 	private processingStates = new Map<string, Set<EventOperation>>();
+	private userToEventIndex = new Map<string, string>();
 
 	getParticipants(eventId: string) {
 		return this.participants.get(eventId);
@@ -25,11 +26,47 @@ export class EventManager {
 	}
 
 	setParticipants(eventId: string, participants: ParticipantMap) {
+		const oldParticipants = this.participants.get(eventId);
+		if (oldParticipants) {
+			for (const userId of oldParticipants.keys()) {
+				this.userToEventIndex.delete(userId);
+			}
+		}
+
 		this.participants.set(eventId, participants);
+		for (const userId of participants.keys()) {
+			this.userToEventIndex.set(userId, eventId);
+		}
 	}
 
 	deleteParticipants(eventId: string) {
+		const participants = this.participants.get(eventId);
+		if (participants) {
+			for (const userId of participants.keys()) {
+				this.userToEventIndex.delete(userId);
+			}
+		}
 		this.participants.delete(eventId);
+	}
+
+	addParticipant(
+		eventId: string,
+		userId: string,
+		participantData: { userId: string; role: string; rank: string | null },
+	) {
+		const participants = this.participants.get(eventId);
+		if (participants) {
+			participants.set(userId, participantData);
+			this.userToEventIndex.set(userId, eventId);
+		}
+	}
+
+	removeParticipant(eventId: string, userId: string) {
+		const participants = this.participants.get(eventId);
+		if (participants) {
+			participants.delete(userId);
+			this.userToEventIndex.delete(userId);
+		}
 	}
 
 	getCreator(eventId: string) {
@@ -138,12 +175,7 @@ export class EventManager {
 	}
 
 	isUserInAnyEvent(userId: string) {
-		for (const [_, participantSet] of this.participants.entries()) {
-			if (participantSet.has(userId)) {
-				return true;
-			}
-		}
-		return false;
+		return this.userToEventIndex.has(userId);
 	}
 
 	isEventFinalizing(message: Message) {
