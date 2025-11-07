@@ -25,6 +25,7 @@ export async function handleCreateCommand(
 	}
 
 	const casual = !!interaction.options.getBoolean('casual', false);
+	const info = interaction.options.getString('info', false) ?? undefined;
 	const timeInMinutes =
 		interaction.options.getInteger('time', false) ?? undefined;
 	const startTime = Date.now();
@@ -38,6 +39,7 @@ export async function handleCreateCommand(
 		interaction.user.id,
 		casual,
 		timeInMinutes,
+		info,
 	);
 
 	const rolePing = getPingsForServer(interaction, casual);

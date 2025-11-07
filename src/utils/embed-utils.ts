@@ -48,9 +48,14 @@ export function createEventEmbed(
 	userId: string,
 	casual: boolean,
 	timeInMinutes?: number,
+	info?: string,
 ) {
 	const startTime = Date.now();
 	const embedFields = [
+		{
+			name: '',
+			value: '',
+		},
 		{
 			name: 'Participants (1)',
 			value: `- <@${userId}>`,
@@ -78,7 +83,7 @@ export function createEventEmbed(
 		{ name: 'Status', value: STATUS_MESSAGES.OPEN },
 	];
 
-	return new EmbedBuilder()
+	const embed = new EmbedBuilder()
 		.setAuthor({
 			name: username,
 			iconURL: avatarUrl,
@@ -86,6 +91,10 @@ export function createEventEmbed(
 		.setTitle(`${casual ? '[Casual] ' : '[Competitive]'} 8s Sign Up`)
 		.addFields(embedFields)
 		.setColor(COLORS.OPEN);
+
+	if (info) embed.setDescription(info);
+
+	return embed;
 }
 
 export function createEventButtons(timeInMinutes?: number) {

@@ -58,6 +58,12 @@ const commands = [
 				.setDescription('Whether to ping casual roles.')
 				.setRequired(false),
 		)
+		.addStringOption((option) =>
+			option
+				.setName('info')
+				.setDescription('Add a description to the event.')
+				.setRequired(false),
+		)
 		.toJSON(),
 	new SlashCommandBuilder()
 		.setName('status')
