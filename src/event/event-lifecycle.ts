@@ -108,6 +108,25 @@ export async function cleanupEvent(
 
 	eventManager.setProcessing(eventId, 'cleanup');
 	try {
+		const threadId = eventManager.getThread(eventId);
+		if (threadId) {
+			for (const [_, channel] of appClient.channels.cache) {
+				if (!channel.isTextBased() || channel.isDMBased() || channel.isThread())
+					continue;
+
+				try {
+					const thread = await threadManager.fetchThread(
+						channel as TextChannel,
+						threadId,
+					);
+					if (thread) {
+						await threadManager.lockAndArchive(thread);
+						break;
+					}
+				} catch {}
+			}
+		}
+
 		const voiceChannelIds = eventManager.getVoiceChannels(eventId);
 		if (voiceChannelIds) {
 			await voiceChannelManager.deleteChannels(appClient, voiceChannelIds);
@@ -144,17 +163,6 @@ export async function cleanupStaleEvents(
 					updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
 
 					await message.edit({ embeds: [embed], components: [] });
-
-					const threadId = eventManager.getThread(messageId);
-					if (threadId && channel.isThread() === false) {
-						const thread = await threadManager.fetchThread(
-							channel as TextChannel,
-							threadId,
-						);
-						if (thread) {
-							await threadManager.lockAndArchive(thread);
-						}
-					}
 
 					const matchId = eventManager.getMatchId(messageId);
 					const participants = eventManager.getParticipants(messageId);

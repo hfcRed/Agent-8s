@@ -251,15 +251,6 @@ export async function handleFinishButton(
 
 	eventManager.setProcessing(messageId, 'finishing');
 	try {
-		const threadId = eventManager.getThread(messageId);
-		const channel = interaction.channel as TextChannel | null;
-		if (threadId && channel) {
-			const thread = await threadManager.fetchThread(channel, threadId);
-			if (thread) {
-				await threadManager.lockAndArchive(thread);
-			}
-		}
-
 		const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
 			COLORS.FINISHED,
 		);
