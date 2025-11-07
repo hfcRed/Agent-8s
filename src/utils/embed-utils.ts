@@ -137,7 +137,7 @@ export function createEventStartedButtons() {
 			.setLabel('Drop Out')
 			.setStyle(ButtonStyle.Danger),
 		new ButtonBuilder()
-			.setEmoji('🚀')
+			.setEmoji('📝')
 			.setCustomId('dropin')
 			.setLabel('Drop In')
 			.setStyle(ButtonStyle.Primary),
