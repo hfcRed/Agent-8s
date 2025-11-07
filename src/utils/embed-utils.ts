@@ -62,10 +62,18 @@ export function createEventEmbed(
 			inline: true,
 		},
 		{
+			name: '',
+			value: '',
+		},
+		{
 			name: 'Start',
 			value: timeInMinutes
 				? `⏳ <t:${Math.floor((startTime + timeInMinutes * 60 * 1000) / 1000)}:R>`
 				: '👥 When 8 players have signed up',
+		},
+		{
+			name: '',
+			value: '',
 		},
 		{ name: 'Status', value: STATUS_MESSAGES.OPEN },
 	];
