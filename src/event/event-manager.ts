@@ -20,6 +20,10 @@ export class EventManager {
 		return this.participants.get(eventId);
 	}
 
+	getAllParticipants() {
+		return this.participants.entries();
+	}
+
 	setParticipants(eventId: string, participants: ParticipantMap) {
 		this.participants.set(eventId, participants);
 	}

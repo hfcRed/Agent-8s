@@ -8,6 +8,7 @@ import {
 	setupMessageDeletionHandler,
 } from './client/discord-client.js';
 import { handleCreateCommand } from './commands/create-command.js';
+import { handleStatusCommand } from './commands/status-command.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
 import { EventManager } from './event/event-manager.js';
 import {
@@ -58,6 +59,10 @@ const commands = [
 				.setRequired(false),
 		)
 		.toJSON(),
+	new SlashCommandBuilder()
+		.setName('status')
+		.setDescription('Display bot status and statistics')
+		.toJSON(),
 ];
 
 appClient.once('clientReady', async () => {
@@ -78,6 +83,14 @@ appClient.on('interactionCreate', async (interaction) => {
 			interaction.commandName === 'create'
 		) {
 			await handleCreateCommand(interaction, eventManager, telemetry);
+			return;
+		}
+
+		if (
+			interaction.isChatInputCommand() &&
+			interaction.commandName === 'status'
+		) {
+			await handleStatusCommand(interaction, eventManager, telemetry);
 			return;
 		}
 
