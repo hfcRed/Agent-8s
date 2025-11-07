@@ -14,6 +14,8 @@ import { EventManager } from './event/event-manager.js';
 import {
 	checkProcessingStates,
 	handleCancelButton,
+	handleDropInButton,
+	handleDropOutButton,
 	handleFinishButton,
 	handleSignOutButton,
 	handleSignUpButton,
@@ -141,6 +143,22 @@ appClient.on('interactionCreate', async (interaction) => {
 					break;
 				case 'finish':
 					await handleFinishButton(
+						interaction,
+						eventManager,
+						appClient,
+						telemetry,
+					);
+					break;
+				case 'dropout':
+					await handleDropOutButton(
+						interaction,
+						eventManager,
+						appClient,
+						telemetry,
+					);
+					break;
+				case 'dropin':
+					await handleDropInButton(
 						interaction,
 						eventManager,
 						appClient,

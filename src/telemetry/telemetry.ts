@@ -71,6 +71,14 @@ export class TelemetryService {
 		await this.sendEvent('user_signed_out', data);
 	}
 
+	async trackUserDropOut(data: TelemetryEventData) {
+		await this.sendEvent('user_dropped_out', data);
+	}
+
+	async trackUserDropIn(data: TelemetryEventData) {
+		await this.sendEvent('user_dropped_in', data);
+	}
+
 	async trackEventCancelled(data: TelemetryEventData) {
 		await this.sendEvent('event_cancelled', data);
 	}

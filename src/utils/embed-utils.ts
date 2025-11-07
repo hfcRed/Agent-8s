@@ -129,8 +129,18 @@ export function createEventButtons(timeInMinutes?: number) {
 	return new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons);
 }
 
-export function createFinishButton() {
+export function createEventStartedButtons() {
 	return new ActionRowBuilder<ButtonBuilder>().addComponents(
+		new ButtonBuilder()
+			.setEmoji('🚪')
+			.setCustomId('dropout')
+			.setLabel('Drop Out')
+			.setStyle(ButtonStyle.Danger),
+		new ButtonBuilder()
+			.setEmoji('🚀')
+			.setCustomId('dropin')
+			.setLabel('Drop In')
+			.setStyle(ButtonStyle.Primary),
 		new ButtonBuilder()
 			.setEmoji('🏁')
 			.setCustomId('finish')
@@ -191,7 +201,11 @@ export function updateParticipantFields(
 	const timeIsUpOrNotSet =
 		!timerData.duration || timeElapsed >= timerData.duration;
 
-	if (participantMap.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
+	if (
+		participantMap.size === MAX_PARTICIPANTS &&
+		timeIsUpOrNotSet &&
+		!timerData.hasStarted
+	) {
 		embed.setColor(COLORS.FINALIZING);
 		updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINALIZING);
 	}

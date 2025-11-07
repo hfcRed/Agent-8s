@@ -287,6 +287,179 @@ export async function handleFinishButton(
 	}
 }
 
+export async function handleDropOutButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	appClient: Client,
+	telemetry?: TelemetryService,
+) {
+	const messageId = interaction.message.id;
+	const userId = interaction.user.id;
+	const participantMap = eventManager.getParticipants(messageId);
+	const creatorId = eventManager.getCreator(messageId);
+	const timerData = eventManager.getTimer(messageId);
+
+	if (!participantMap || !creatorId || !timerData) return;
+
+	await interaction.deferUpdate();
+
+	if (userId === creatorId) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	if (!participantMap.has(userId)) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.NOT_SIGNED_UP,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	participantMap.delete(userId);
+
+	const threadId = eventManager.getThread(messageId);
+	if (threadId) {
+		try {
+			const channel = interaction.channel as TextChannel | null;
+			if (channel) {
+				const thread = await channel.threads.fetch(threadId);
+				if (thread) {
+					await thread.members.remove(userId);
+				}
+			}
+		} catch (error) {
+			console.error(`Failed to remove user ${userId} from thread:`, error);
+		}
+	}
+
+	const voiceChannelIds = eventManager.getVoiceChannels(messageId);
+	if (voiceChannelIds) {
+		for (const channelId of voiceChannelIds) {
+			try {
+				const voiceChannel = await appClient.channels.fetch(channelId);
+				if (voiceChannel?.isVoiceBased()) {
+					await voiceChannel.permissionOverwrites.edit(userId, {
+						Connect: false,
+						ViewChannel: false,
+						Speak: false,
+					});
+				}
+			} catch (error) {
+				console.error(
+					`Failed to revoke voice channel access for ${userId} in ${channelId}:`,
+					error,
+				);
+			}
+		}
+	}
+
+	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+	updateParticipantFields(embed, participantMap, timerData, false);
+	await interaction.editReply({ embeds: [embed] });
+
+	const matchId = eventManager.getMatchId(messageId);
+	telemetry?.trackUserDropOut({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: messageId,
+		userId: userId,
+		participants: Array.from(participantMap.values()),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
+}
+
+export async function handleDropInButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	appClient: Client,
+	telemetry?: TelemetryService,
+) {
+	const messageId = interaction.message.id;
+	const userId = interaction.user.id;
+	const participantMap = eventManager.getParticipants(messageId);
+	const timerData = eventManager.getTimer(messageId);
+
+	if (!participantMap || !timerData) return;
+
+	await interaction.deferUpdate();
+
+	if (participantMap.has(userId)) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	if (participantMap.size >= MAX_PARTICIPANTS) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.EVENT_FULL,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	participantMap.set(userId, {
+		userId: userId,
+		role: WEAPON_ROLES[0],
+		rank: getExcaliburRankOfUser(interaction),
+	});
+
+	const threadId = eventManager.getThread(messageId);
+	if (threadId) {
+		try {
+			const channel = interaction.channel as TextChannel | null;
+			if (channel) {
+				const thread = await channel.threads.fetch(threadId);
+				if (thread) {
+					await thread.members.add(userId);
+				}
+			}
+		} catch (error) {
+			console.error(`Failed to add user ${userId} to thread:`, error);
+		}
+	}
+
+	const voiceChannelIds = eventManager.getVoiceChannels(messageId);
+	if (voiceChannelIds) {
+		for (const channelId of voiceChannelIds) {
+			try {
+				const voiceChannel = await appClient.channels.fetch(channelId);
+				if (voiceChannel?.isVoiceBased()) {
+					await voiceChannel.permissionOverwrites.edit(userId, {
+						Connect: true,
+						ViewChannel: true,
+						Speak: true,
+					});
+				}
+			} catch (error) {
+				console.error(
+					`Failed to grant voice channel access for ${userId} in ${channelId}:`,
+					error,
+				);
+			}
+		}
+	}
+
+	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+	updateParticipantFields(embed, participantMap, timerData, false);
+	await interaction.editReply({ embeds: [embed] });
+
+	const matchId = eventManager.getMatchId(messageId);
+	telemetry?.trackUserDropIn({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: messageId,
+		userId: userId,
+		participants: Array.from(participantMap.values()),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
+}
+
 async function updateParticipantEmbed(
 	interaction: ButtonInteraction,
 	participantMap: ParticipantMap,
@@ -307,7 +480,11 @@ async function updateParticipantEmbed(
 	const timeIsUpOrNotSet =
 		!timerData.duration || timeElapsed >= timerData.duration;
 
-	if (participantMap.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
+	if (
+		participantMap.size === MAX_PARTICIPANTS &&
+		timeIsUpOrNotSet &&
+		!timerData.hasStarted
+	) {
 		await interaction.editReply({ embeds: [embed] });
 		createEventStartTimeout(interaction.message, 0.25, eventManager);
 		return;
@@ -328,7 +505,6 @@ export async function checkProcessingStates(
 		});
 		return true;
 	}
-
 	if (eventManager.isProcessing(messageId, 'finishing')) {
 		await interaction?.reply({
 			content: PROCESSING_MESSAGES.ALREADY_FINISHING,

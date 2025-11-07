@@ -12,7 +12,11 @@ import { COLORS, MAX_PARTICIPANTS, STATUS_MESSAGES } from '../constants.js';
 import { checkProcessingStates } from '../interactions/button-handlers.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import type { ParticipantMap } from '../types.js';
-import { createFinishButton, updateEmbedField } from '../utils/embed-utils.js';
+import {
+	createEventStartedButtons,
+	createRoleSelectMenu,
+	updateEmbedField,
+} from '../utils/embed-utils.js';
 import type { EventManager } from './event-manager.js';
 
 export async function startEvent(
@@ -40,9 +44,10 @@ export async function startEvent(
 	updateEmbedField(embed, 'Status', STATUS_MESSAGES.STARTED);
 	updateEmbedField(embed, 'Start', `⏳ <t:${Math.floor(Date.now() / 1000)}:R>`);
 
-	const row = createFinishButton();
+	const buttonRow = createEventStartedButtons();
+	const selectRow = createRoleSelectMenu();
 
-	await message.edit({ embeds: [embed], components: [row] });
+	await message.edit({ embeds: [embed], components: [buttonRow, selectRow] });
 
 	const channel = message.channel as TextChannel;
 	let thread = null;
@@ -299,7 +304,7 @@ export async function createEventStartTimeout(
 
 				if (
 					currentParticipantMap.size === MAX_PARTICIPANTS &&
-					!checkProcessingStates(message.id, eventManager)
+					!(await checkProcessingStates(message.id, eventManager))
 				) {
 					eventManager.setProcessing(message.id, 'starting');
 					try {
@@ -314,7 +319,11 @@ export async function createEventStartTimeout(
 					}
 				} else {
 					const embed = EmbedBuilder.from(message.embeds[0]);
+					embed.setColor(COLORS.OPEN);
+
 					updateEmbedField(embed, 'Start', '👥 When 8 players have signed up');
+					updateEmbedField(embed, 'Status', STATUS_MESSAGES.OPEN);
+
 					await message.edit({ embeds: [embed] });
 				}
 			} catch (error) {
