@@ -120,7 +120,7 @@ export class EventManager {
 
 		setTimeout(() => {
 			this.clearProcessing(eventId, operation);
-		}, 10000);
+		}, 30000);
 	}
 
 	clearProcessing(eventId: string, operation: EventOperation) {
