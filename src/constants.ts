@@ -70,10 +70,10 @@ export const ERROR_MESSAGES = {
 } as const;
 
 export const PROCESSING_MESSAGES = {
-	ALREADY_STARTING: 'Event is already starting, please wait...',
 	STILL_STARTING: 'Event is still starting, please wait...',
 	ALREADY_FINISHING: 'Event is already being finished...',
 	ALREADY_CANCELLING: 'Event is already being cancelled...',
+	CLEANING_UP: 'Event is cleaning up, no actions can be performed anymore...',
 } as const;
 
 export const WEAPON_ROLES = [

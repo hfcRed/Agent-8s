@@ -87,3 +87,15 @@ export class TelemetryService {
 		await this.sendEvent('event_expired', data);
 	}
 }
+
+export function initializeTelemetry(
+	telemetryUrl: string | undefined,
+	telemetryToken: string | undefined,
+) {
+	if (!telemetryUrl || !telemetryToken) {
+		return undefined;
+	}
+
+	const { TelemetryService } = require('../telemetry/telemetry.js');
+	return new TelemetryService(telemetryUrl, telemetryToken) as TelemetryService;
+}

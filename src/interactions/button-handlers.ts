@@ -1,0 +1,365 @@
+import type {
+	ButtonInteraction,
+	Client,
+	GuildMember,
+	TextChannel,
+} from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
+import {
+	COLORS,
+	ERROR_MESSAGES,
+	MAX_PARTICIPANTS,
+	PROCESSING_MESSAGES,
+	STATUS_MESSAGES,
+	WEAPON_ROLES,
+} from '../constants.js';
+import {
+	cleanupEvent,
+	createEventStartTimeout,
+	startEvent,
+} from '../event/event-lifecycle.js';
+import type { EventManager } from '../event/event-manager.js';
+import type { TelemetryService } from '../telemetry/telemetry.js';
+import type { ParticipantMap } from '../types.js';
+import {
+	updateEmbedField,
+	updateParticipantFields,
+} from '../utils/embed-utils.js';
+import { getExcaliburRankOfUser, isUserAdmin } from '../utils/helpers.js';
+
+export async function handleSignUpButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	telemetry?: TelemetryService,
+) {
+	const messageId = interaction.message.id;
+	const userId = interaction.user.id;
+	const participantMap = eventManager.getParticipants(messageId);
+	const timerData = eventManager.getTimer(messageId);
+
+	if (!participantMap || !timerData) return;
+
+	await interaction.deferUpdate();
+
+	if (participantMap.size >= MAX_PARTICIPANTS && !participantMap.has(userId)) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.EVENT_FULL,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	if (eventManager.isUserInAnyEvent(userId)) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	participantMap.set(userId, {
+		userId: userId,
+		role: WEAPON_ROLES[0],
+		rank: getExcaliburRankOfUser(interaction),
+	});
+
+	const matchId = eventManager.getMatchId(messageId);
+	telemetry?.trackUserSignUp({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: messageId,
+		userId: userId,
+		participants: Array.from(participantMap.values()),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
+
+	await updateParticipantEmbed(
+		interaction,
+		participantMap,
+		timerData,
+		eventManager,
+	);
+}
+
+export async function handleSignOutButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	telemetry?: TelemetryService,
+) {
+	const messageId = interaction.message.id;
+	const userId = interaction.user.id;
+	const participantMap = eventManager.getParticipants(messageId);
+	const creatorId = eventManager.getCreator(messageId);
+	const timerData = eventManager.getTimer(messageId);
+
+	if (!participantMap || !creatorId || !timerData) return;
+
+	await interaction.deferUpdate();
+
+	if (userId === creatorId) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	participantMap.delete(userId);
+
+	const matchId = eventManager.getMatchId(messageId);
+	telemetry?.trackUserSignOut({
+		guildId: interaction.guild?.id || 'unknown',
+		eventId: messageId,
+		userId: userId,
+		participants: Array.from(participantMap.values()),
+		channelId: interaction.channelId,
+		matchId: matchId || 'unknown',
+	});
+
+	await updateParticipantEmbed(
+		interaction,
+		participantMap,
+		timerData,
+		eventManager,
+	);
+}
+
+export async function handleCancelButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	appClient: Client,
+	telemetry?: TelemetryService,
+) {
+	const messageId = interaction.message.id;
+	const userId = interaction.user.id;
+	const participantMap = eventManager.getParticipants(messageId);
+	const creatorId = eventManager.getCreator(messageId);
+
+	if (!participantMap || !creatorId) return;
+
+	await interaction.deferUpdate();
+
+	const isCreator = userId === creatorId;
+	const isAdmin = isUserAdmin(interaction.member as GuildMember);
+
+	if (!isCreator && !isAdmin) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.CREATOR_ONLY_CANCEL,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	eventManager.setProcessing(messageId, 'cancelling');
+	try {
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+			COLORS.CANCELLED,
+		);
+
+		updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
+
+		await interaction.editReply({ embeds: [embed], components: [] });
+
+		const matchId = eventManager.getMatchId(messageId);
+		telemetry?.trackEventCancelled({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+
+		await cleanupEvent(messageId, eventManager, appClient);
+	} finally {
+		eventManager.clearProcessing(messageId, 'cancelling');
+	}
+}
+
+export async function handleStartNowButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	appClient: Client,
+	telemetry?: TelemetryService,
+) {
+	const messageId = interaction.message.id;
+	const userId = interaction.user.id;
+	const participantMap = eventManager.getParticipants(messageId);
+	const creatorId = eventManager.getCreator(messageId);
+
+	if (!participantMap || !creatorId) return;
+
+	await interaction.deferUpdate();
+
+	if (userId !== creatorId) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.CREATOR_ONLY_START,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	if (participantMap.size !== MAX_PARTICIPANTS) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.NOT_ENOUGH_PARTICIPANTS,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	eventManager.setProcessing(messageId, 'starting');
+	try {
+		await startEvent(
+			interaction.message,
+			participantMap,
+			eventManager,
+			appClient,
+			telemetry,
+		);
+	} finally {
+		eventManager.clearProcessing(messageId, 'starting');
+	}
+}
+
+export async function handleFinishButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	appClient: Client,
+	telemetry?: TelemetryService,
+) {
+	const messageId = interaction.message.id;
+	const userId = interaction.user.id;
+	const participantMap = eventManager.getParticipants(messageId);
+	const creatorId = eventManager.getCreator(messageId);
+
+	if (!participantMap || !creatorId) return;
+
+	await interaction.deferUpdate();
+
+	const isCreator = userId === creatorId;
+	const isAdmin = isUserAdmin(interaction.member as GuildMember);
+
+	if (!isCreator && !isAdmin) {
+		await interaction.followUp({
+			content: ERROR_MESSAGES.CREATOR_ONLY_FINISH,
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
+	eventManager.setProcessing(messageId, 'finishing');
+	try {
+		const threadId = eventManager.getThread(messageId);
+		const channel = interaction.channel as TextChannel | null;
+		if (threadId && channel) {
+			try {
+				const thread = await channel.threads.fetch(threadId);
+				if (thread) {
+					await thread.setLocked(true);
+					await thread.setArchived(true);
+				}
+			} catch (error) {
+				console.error(`Failed to manage thread ${threadId}:`, error);
+			}
+		}
+
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+			COLORS.FINISHED,
+		);
+
+		updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
+
+		await interaction.editReply({ embeds: [embed], components: [] });
+
+		const matchId = eventManager.getMatchId(messageId);
+		telemetry?.trackEventFinished({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+
+		await cleanupEvent(messageId, eventManager, appClient);
+	} finally {
+		eventManager.clearProcessing(messageId, 'finishing');
+	}
+}
+
+async function updateParticipantEmbed(
+	interaction: ButtonInteraction,
+	participantMap: ParticipantMap,
+	timerData: { startTime: number; duration?: number; hasStarted: boolean },
+	eventManager: EventManager,
+) {
+	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+	const isFinalizing = eventManager.isEventFinalizing(interaction.message);
+
+	updateParticipantFields(embed, participantMap, timerData, isFinalizing);
+
+	if (isFinalizing) {
+		await interaction.editReply({ embeds: [embed] });
+		return;
+	}
+
+	const timeElapsed = Date.now() - timerData.startTime;
+	const timeIsUpOrNotSet =
+		!timerData.duration || timeElapsed >= timerData.duration;
+
+	if (participantMap.size === MAX_PARTICIPANTS && timeIsUpOrNotSet) {
+		await interaction.editReply({ embeds: [embed] });
+		createEventStartTimeout(interaction.message, 0.25, eventManager);
+		return;
+	}
+
+	await interaction.editReply({ embeds: [embed] });
+}
+
+export async function checkProcessingStates(
+	messageId: string,
+	eventManager: EventManager,
+	interaction?: ButtonInteraction,
+) {
+	if (eventManager.isProcessing(messageId, 'starting')) {
+		await interaction?.reply({
+			content: PROCESSING_MESSAGES.STILL_STARTING,
+			flags: ['Ephemeral'],
+		});
+		return true;
+	}
+
+	if (eventManager.isProcessing(messageId, 'finishing')) {
+		await interaction?.reply({
+			content: PROCESSING_MESSAGES.ALREADY_FINISHING,
+			flags: ['Ephemeral'],
+		});
+		return true;
+	}
+
+	if (eventManager.isProcessing(messageId, 'cancelling')) {
+		await interaction?.reply({
+			content: PROCESSING_MESSAGES.ALREADY_CANCELLING,
+			flags: ['Ephemeral'],
+		});
+		return true;
+	}
+
+	if (eventManager.isProcessing(messageId, 'cleanup')) {
+		await interaction?.reply({
+			content: PROCESSING_MESSAGES.CLEANING_UP,
+			flags: ['Ephemeral'],
+		});
+		return true;
+	}
+
+	if (interaction && eventManager.isEventFinalizing(interaction.message)) {
+		await interaction.reply({
+			content: ERROR_MESSAGES.EVENT_FINALIZING,
+			flags: ['Ephemeral'],
+		});
+		return true;
+	}
+
+	return false;
+}
