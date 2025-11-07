@@ -132,15 +132,15 @@ export function createEventButtons(timeInMinutes?: number) {
 export function createEventStartedButtons() {
 	return new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()
-			.setEmoji('🚪')
-			.setCustomId('dropout')
-			.setLabel('Drop Out')
-			.setStyle(ButtonStyle.Danger),
-		new ButtonBuilder()
 			.setEmoji('📝')
 			.setCustomId('dropin')
 			.setLabel('Drop In')
 			.setStyle(ButtonStyle.Primary),
+		new ButtonBuilder()
+			.setEmoji('🚪')
+			.setCustomId('dropout')
+			.setLabel('Drop Out')
+			.setStyle(ButtonStyle.Danger),
 		new ButtonBuilder()
 			.setEmoji('🏁')
 			.setCustomId('finish')
