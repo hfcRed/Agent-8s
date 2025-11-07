@@ -1,15 +1,14 @@
 import {
-	ChannelType,
 	type Client,
 	EmbedBuilder,
 	type Guild,
 	type Message,
-	OverwriteType,
-	PermissionFlagsBits,
 	type TextChannel,
 } from 'discord.js';
 import { COLORS, MAX_PARTICIPANTS, STATUS_MESSAGES } from '../constants.js';
 import { checkProcessingStates } from '../interactions/button-handlers.js';
+import { threadManager } from '../managers/thread-manager.js';
+import { voiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import type { ParticipantMap } from '../types.js';
 import {
@@ -50,44 +49,33 @@ export async function startEvent(
 	await message.edit({ embeds: [embed], components: [buttonRow, selectRow] });
 
 	const channel = message.channel as TextChannel;
-	let thread = null;
-	try {
-		const createdThread = await channel.threads.create({
-			name: `8s Event - ${shortId}`,
-			autoArchiveDuration: 60,
-			type: ChannelType.PrivateThread,
-		});
 
-		const startMessage = await createdThread.send({
-			embeds: [EmbedBuilder.from(message.embeds[0])],
-		});
-		await startMessage.pin();
+	const thread = await threadManager.createEventThread(
+		channel,
+		shortId || 'unknown',
+	);
 
-		eventManager.setThread(message.id, createdThread.id);
-		thread = createdThread;
-	} catch (error) {
-		console.error('Failed to create or send message to thread:', error);
+	if (thread) {
+		await threadManager.sendAndPinEmbed(
+			thread,
+			EmbedBuilder.from(message.embeds[0]),
+		);
+		eventManager.setThread(message.id, thread.id);
 	}
 
 	const participants = Array.from(participantMap.values());
 
 	if (thread) {
-		for (const participant of participants) {
-			try {
-				await thread.members.add(participant.userId);
-			} catch (error) {
-				console.error(
-					`Failed to add participant ${participant.userId} to thread:`,
-					error,
-				);
-			}
-		}
+		await threadManager.addMembers(
+			thread,
+			participants.map((p) => p.userId),
+		);
 	}
 
-	const voiceChannels = await createVoiceChannels(
+	const voiceChannels = await voiceChannelManager.createEventVoiceChannels(
 		message.guild as Guild,
 		channel,
-		participants,
+		participants.map((p) => p.userId),
 		shortId || 'unknown',
 		appClient,
 	);
@@ -95,13 +83,10 @@ export async function startEvent(
 	eventManager.setVoiceChannels(message.id, voiceChannels);
 
 	if (thread) {
-		try {
-			await thread.send({
-				content: `**Voice Channels Created**\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
-			});
-		} catch (error) {
-			console.error('Failed to send voice channel info to thread:', error);
-		}
+		await threadManager.sendMessage(
+			thread,
+			`**Voice Channels Created**\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+		);
 	}
 
 	telemetry?.trackEventStarted({
@@ -112,64 +97,6 @@ export async function startEvent(
 		channelId: message.channelId,
 		matchId: matchId || 'unknown',
 	});
-}
-
-async function createVoiceChannels(
-	guild: Guild,
-	channel: TextChannel,
-	participants: Array<{ userId: string; role: string; rank: string | null }>,
-	shortId: string,
-	appClient: Client,
-) {
-	const voiceNames = ['👥 Group', '🔵 Team A', '🔴 Team B'];
-	const voiceChannels: string[] = [];
-
-	for (let i = 1; i <= 3; i++) {
-		try {
-			const voiceChannel = await guild.channels.create({
-				name: `${voiceNames[i - 1]} - ${shortId}`,
-				type: ChannelType.GuildVoice,
-				parent: channel.parent,
-				permissionOverwrites: [
-					{
-						id: guild.roles.everyone.id,
-						deny: [
-							PermissionFlagsBits.Connect,
-							PermissionFlagsBits.ViewChannel,
-						],
-						type: OverwriteType.Role,
-					},
-					{
-						id: appClient.user?.id || '',
-						allow: [
-							PermissionFlagsBits.Connect,
-							PermissionFlagsBits.ViewChannel,
-							PermissionFlagsBits.ManageChannels,
-						],
-						type: OverwriteType.Member,
-					},
-					...participants.map((participant) => ({
-						id: participant.userId,
-						allow: [
-							PermissionFlagsBits.Connect,
-							PermissionFlagsBits.ViewChannel,
-							PermissionFlagsBits.Speak,
-						],
-						type: OverwriteType.Member,
-					})),
-				],
-			});
-
-			voiceChannels.push(voiceChannel.id);
-		} catch (error) {
-			console.error(
-				`Failed to create voice channel ${voiceNames[i - 1]}:`,
-				error,
-			);
-		}
-	}
-
-	return voiceChannels;
 }
 
 export async function cleanupEvent(
@@ -183,16 +110,7 @@ export async function cleanupEvent(
 	try {
 		const voiceChannelIds = eventManager.getVoiceChannels(eventId);
 		if (voiceChannelIds) {
-			for (const channelId of voiceChannelIds) {
-				try {
-					const channel = await appClient.channels.fetch(channelId);
-					if (channel?.isVoiceBased()) {
-						await channel.delete();
-					}
-				} catch (error) {
-					console.error(`Failed to delete voice channel ${channelId}:`, error);
-				}
-			}
+			await voiceChannelManager.deleteChannels(appClient, voiceChannelIds);
 		}
 
 		eventManager.clearAllEventData(eventId);
@@ -229,19 +147,12 @@ export async function cleanupStaleEvents(
 
 					const threadId = eventManager.getThread(messageId);
 					if (threadId && channel.isThread() === false) {
-						try {
-							const thread = await (channel as TextChannel).threads.fetch(
-								threadId,
-							);
-							if (thread) {
-								await thread.setLocked(true);
-								await thread.setArchived(true);
-							}
-						} catch (threadError) {
-							console.error(
-								`Failed to manage thread ${threadId}:`,
-								threadError,
-							);
+						const thread = await threadManager.fetchThread(
+							channel as TextChannel,
+							threadId,
+						);
+						if (thread) {
+							await threadManager.lockAndArchive(thread);
 						}
 					}
 

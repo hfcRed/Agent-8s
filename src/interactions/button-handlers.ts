@@ -1,10 +1,10 @@
-import type {
-	ButtonInteraction,
-	Client,
-	GuildMember,
-	TextChannel,
+import {
+	type ButtonInteraction,
+	type Client,
+	EmbedBuilder,
+	type GuildMember,
+	type TextChannel,
 } from 'discord.js';
-import { EmbedBuilder } from 'discord.js';
 import {
 	COLORS,
 	ERROR_MESSAGES,
@@ -19,6 +19,8 @@ import {
 	startEvent,
 } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
+import { threadManager } from '../managers/thread-manager.js';
+import { voiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import type { ParticipantMap } from '../types.js';
 import {
@@ -252,14 +254,9 @@ export async function handleFinishButton(
 		const threadId = eventManager.getThread(messageId);
 		const channel = interaction.channel as TextChannel | null;
 		if (threadId && channel) {
-			try {
-				const thread = await channel.threads.fetch(threadId);
-				if (thread) {
-					await thread.setLocked(true);
-					await thread.setArchived(true);
-				}
-			} catch (error) {
-				console.error(`Failed to manage thread ${threadId}:`, error);
+			const thread = await threadManager.fetchThread(channel, threadId);
+			if (thread) {
+				await threadManager.lockAndArchive(thread);
 			}
 		}
 
@@ -323,38 +320,22 @@ export async function handleDropOutButton(
 
 	const threadId = eventManager.getThread(messageId);
 	if (threadId) {
-		try {
-			const channel = interaction.channel as TextChannel | null;
-			if (channel) {
-				const thread = await channel.threads.fetch(threadId);
-				if (thread) {
-					await thread.members.remove(userId);
-				}
+		const channel = interaction.channel as TextChannel | null;
+		if (channel) {
+			const thread = await threadManager.fetchThread(channel, threadId);
+			if (thread) {
+				await threadManager.removeMember(thread, userId);
 			}
-		} catch (error) {
-			console.error(`Failed to remove user ${userId} from thread:`, error);
 		}
 	}
 
 	const voiceChannelIds = eventManager.getVoiceChannels(messageId);
 	if (voiceChannelIds) {
-		for (const channelId of voiceChannelIds) {
-			try {
-				const voiceChannel = await appClient.channels.fetch(channelId);
-				if (voiceChannel?.isVoiceBased()) {
-					await voiceChannel.permissionOverwrites.edit(userId, {
-						Connect: false,
-						ViewChannel: false,
-						Speak: false,
-					});
-				}
-			} catch (error) {
-				console.error(
-					`Failed to revoke voice channel access for ${userId} in ${channelId}:`,
-					error,
-				);
-			}
-		}
+		await voiceChannelManager.revokeAccessFromChannels(
+			appClient,
+			voiceChannelIds,
+			userId,
+		);
 	}
 
 	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
@@ -411,38 +392,22 @@ export async function handleDropInButton(
 
 	const threadId = eventManager.getThread(messageId);
 	if (threadId) {
-		try {
-			const channel = interaction.channel as TextChannel | null;
-			if (channel) {
-				const thread = await channel.threads.fetch(threadId);
-				if (thread) {
-					await thread.members.add(userId);
-				}
+		const channel = interaction.channel as TextChannel | null;
+		if (channel) {
+			const thread = await threadManager.fetchThread(channel, threadId);
+			if (thread) {
+				await threadManager.addMember(thread, userId);
 			}
-		} catch (error) {
-			console.error(`Failed to add user ${userId} to thread:`, error);
 		}
 	}
 
 	const voiceChannelIds = eventManager.getVoiceChannels(messageId);
 	if (voiceChannelIds) {
-		for (const channelId of voiceChannelIds) {
-			try {
-				const voiceChannel = await appClient.channels.fetch(channelId);
-				if (voiceChannel?.isVoiceBased()) {
-					await voiceChannel.permissionOverwrites.edit(userId, {
-						Connect: true,
-						ViewChannel: true,
-						Speak: true,
-					});
-				}
-			} catch (error) {
-				console.error(
-					`Failed to grant voice channel access for ${userId} in ${channelId}:`,
-					error,
-				);
-			}
-		}
+		await voiceChannelManager.grantAccessToChannels(
+			appClient,
+			voiceChannelIds,
+			userId,
+		);
 	}
 
 	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
