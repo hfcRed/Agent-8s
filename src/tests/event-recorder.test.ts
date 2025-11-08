@@ -1,7 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { EventRecorder } from '../telemetry/event-recorder.js';
-import type { TelemetryEventData } from '../telemetry/types.js';
+import type { TelemetryEventData } from '../types.js';
 
 // Mock pg module
 vi.mock('pg', () => {

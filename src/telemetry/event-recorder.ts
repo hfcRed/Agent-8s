@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import type { EventRecorderOptions, TelemetryEventData } from './types.js';
+import type { EventRecorderOptions, TelemetryEventData } from '../types.js';
 
 export const DEFAULT_SCHEMA = 'public';
 export const DEFAULT_TABLE = 'telemetry_events';

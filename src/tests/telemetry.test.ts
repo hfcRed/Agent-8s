@@ -3,7 +3,7 @@ import {
 	initializeTelemetry,
 	TelemetryService,
 } from '../telemetry/telemetry.js';
-import type { TelemetryEventData } from '../telemetry/types.js';
+import type { TelemetryEventData } from '../types.js';
 
 vi.mock('./event-recorder.js', () => {
 	return {
