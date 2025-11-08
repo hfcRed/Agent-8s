@@ -5,6 +5,7 @@ import {
 	loginClient,
 	registerCommands,
 	setupErrorHandlers,
+	setupEventMessageDeleteHandler,
 	setupMessageDeletionHandler,
 } from './client/discord-client.js';
 import { handleCreateCommand } from './commands/create-command.js';
@@ -201,6 +202,7 @@ appClient.on('interactionCreate', async (interaction) => {
 });
 
 setupMessageDeletionHandler(appClient);
+setupEventMessageDeleteHandler(appClient, eventManager);
 setupErrorHandlers(appClient);
 
 setInterval(

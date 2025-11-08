@@ -1,4 +1,6 @@
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
+import { cleanupEvent } from '../event/event-lifecycle.js';
+import type { EventManager } from '../event/event-manager.js';
 import { isUserAdmin } from '../utils/helpers.js';
 
 export function createDiscordClient() {
@@ -79,6 +81,27 @@ export function setupMessageDeletionHandler(client: Client) {
 			}
 		} catch (error) {
 			console.error('Error handling message deletion:', error);
+		}
+	});
+}
+
+export function setupEventMessageDeleteHandler(
+	client: Client,
+	eventManager: EventManager,
+) {
+	client.on('messageDelete', async (message) => {
+		if (!message.author?.bot || message.author.id !== client.user?.id) return;
+
+		const eventData = eventManager.getParticipants(message.id);
+		if (!eventData) return;
+
+		try {
+			await cleanupEvent(message.id, eventManager, client);
+		} catch (error) {
+			console.error(
+				`Failed to cleanup event after message deletion ${message.id}:`,
+				error,
+			);
 		}
 	});
 }
