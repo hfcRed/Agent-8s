@@ -1,12 +1,13 @@
-export const MAX_PARTICIPANTS = 2;
+export const DEV = process.env.NODE_ENV === 'development';
 
-// Timing constants (in milliseconds)
+export const MAX_PARTICIPANTS = DEV ? 2 : 8;
+
 export const TIMINGS = {
 	MINUTE_IN_MS: 60 * 1000,
 	HOUR_IN_MS: 60 * 60 * 1000,
 	DAY_IN_MS: 24 * 60 * 60 * 1000,
 	PROCESSING_TIMEOUT_MS: 30000,
-	EVENT_START_DELAY_MINUTES: 0.25,
+	EVENT_START_DELAY_MINUTES: DEV ? 0 : 0.25,
 } as const;
 
 export const PING_ROLE_NAMES = {
