@@ -72,6 +72,10 @@ export async function handleCreateCommand(
 		hasStarted: false,
 	});
 	eventManager.setMatchId(message.id, matchId);
+	eventManager.setChannelId(message.id, message.channelId);
+	if (interaction.guildId) {
+		eventManager.setGuildId(message.id, interaction.guildId);
+	}
 
 	const participants = eventManager.getParticipants(message.id);
 	telemetry?.trackEventCreated({

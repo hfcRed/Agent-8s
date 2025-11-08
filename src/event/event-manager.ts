@@ -16,6 +16,8 @@ export class EventManager {
 	private voiceChannels = new Map<string, string[]>();
 	private processingStates = new Map<string, Set<EventOperation>>();
 	private userToEventIndex = new Map<string, string>();
+	private channelIds = new Map<string, string>();
+	private guildIds = new Map<string, string>();
 
 	getParticipants(eventId: string) {
 		return this.participants.get(eventId);
@@ -145,6 +147,30 @@ export class EventManager {
 		this.voiceChannels.delete(eventId);
 	}
 
+	getChannelId(eventId: string) {
+		return this.channelIds.get(eventId);
+	}
+
+	setChannelId(eventId: string, channelId: string) {
+		this.channelIds.set(eventId, channelId);
+	}
+
+	deleteChannelId(eventId: string) {
+		this.channelIds.delete(eventId);
+	}
+
+	getGuildId(eventId: string) {
+		return this.guildIds.get(eventId);
+	}
+
+	setGuildId(eventId: string, guildId: string) {
+		this.guildIds.set(eventId, guildId);
+	}
+
+	deleteGuildId(eventId: string) {
+		this.guildIds.delete(eventId);
+	}
+
 	isProcessing(eventId: string, operation: EventOperation) {
 		const states = this.processingStates.get(eventId) || new Set();
 		return states.has(operation);
@@ -194,6 +220,8 @@ export class EventManager {
 		this.deleteMatchId(eventId);
 		this.deleteVoiceChannels(eventId);
 		this.deleteProcessingStates(eventId);
+		this.deleteChannelId(eventId);
+		this.deleteGuildId(eventId);
 
 		const timeout = this.getTimeout(eventId);
 		if (timeout) {

@@ -109,21 +109,27 @@ export async function cleanupEvent(
 	eventManager.setProcessing(eventId, 'cleanup');
 	try {
 		const threadId = eventManager.getThread(eventId);
-		if (threadId) {
-			for (const [_, channel] of appClient.channels.cache) {
-				if (!channel.isTextBased() || channel.isDMBased() || channel.isThread())
-					continue;
+		const channelId = eventManager.getChannelId(eventId);
 
-				try {
+		if (threadId && channelId) {
+			try {
+				const channel = await appClient.channels.fetch(channelId);
+
+				if (channel?.isTextBased() && !channel.isDMBased()) {
 					const thread = await threadManager.fetchThread(
 						channel as TextChannel,
 						threadId,
 					);
+
 					if (thread) {
 						await threadManager.lockAndArchive(thread);
-						break;
 					}
-				} catch {}
+				}
+			} catch (error) {
+				console.error(
+					`Failed to fetch thread ${threadId} from channel ${channelId}:`,
+					error,
+				);
 			}
 		}
 
@@ -151,37 +157,44 @@ export async function cleanupStaleEvents(
 		if (now - timerData.startTime < MAX_EVENT_LIFETIME) continue;
 
 		try {
-			for (const [_, channel] of appClient.channels.cache) {
-				if (!channel.isTextBased() || channel.isDMBased()) continue;
+			const channelId = eventManager.getChannelId(messageId);
+			const guildId = eventManager.getGuildId(messageId);
 
+			let message: Message | null = null;
+
+			if (channelId) {
 				try {
-					const message = await channel.messages.fetch(messageId);
-
-					const embed = EmbedBuilder.from(message.embeds[0]).setColor(
-						COLORS.CANCELLED,
-					);
-					updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
-
-					await message.edit({ embeds: [embed], components: [] });
-
-					const matchId = eventManager.getMatchId(messageId);
-					const participants = eventManager.getParticipants(messageId);
-					telemetry?.trackEventExpired({
-						guildId: message.guild?.id || 'unknown',
-						eventId: messageId,
-						userId: appClient.user?.id || 'unknown',
-						participants: Array.from((participants || new Map()).values()),
-						channelId: message.channelId,
-						matchId: matchId || 'unknown',
-					});
-
-					break;
+					const channel = await appClient.channels.fetch(channelId);
+					if (channel?.isTextBased() && !channel.isDMBased()) {
+						message = await channel.messages.fetch(messageId);
+					}
 				} catch (error) {
 					console.error(
-						`Failed to fetch message ${messageId} in channel ${channel.id}:`,
+						`Failed to fetch message ${messageId} from channel ${channelId}:`,
 						error,
 					);
 				}
+			}
+
+			if (message) {
+				const embed = EmbedBuilder.from(message.embeds[0]).setColor(
+					COLORS.CANCELLED,
+				);
+				updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
+
+				await message.edit({ embeds: [embed], components: [] });
+
+				const matchId = eventManager.getMatchId(messageId);
+				const participants = eventManager.getParticipants(messageId);
+
+				telemetry?.trackEventExpired({
+					guildId: guildId || message.guild?.id || 'unknown',
+					eventId: messageId,
+					userId: appClient.user?.id || 'unknown',
+					participants: Array.from((participants || new Map()).values()),
+					channelId: message.channelId,
+					matchId: matchId || 'unknown',
+				});
 			}
 		} catch (error) {
 			console.error(`Failed to clean up stale event ${messageId}:`, error);
