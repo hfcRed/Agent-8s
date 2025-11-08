@@ -213,6 +213,7 @@ export async function createEventStartTimeout(
 	message: Message,
 	timeInMinutes: number,
 	eventManager: EventManager,
+	telemetry?: TelemetryService,
 ) {
 	const existingTimeout = eventManager.getTimeout(message.id);
 	if (existingTimeout) {
@@ -249,6 +250,7 @@ export async function createEventStartTimeout(
 						currentParticipantMap,
 						eventManager,
 						message.client,
+						telemetry,
 					);
 				} finally {
 					eventManager.clearProcessing(message.id, 'starting');

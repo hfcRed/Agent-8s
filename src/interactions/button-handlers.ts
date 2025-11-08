@@ -81,6 +81,7 @@ export async function handleSignUpButton(
 		participantMap,
 		timerData,
 		eventManager,
+		telemetry,
 	);
 }
 
@@ -124,6 +125,7 @@ export async function handleSignOutButton(
 		participantMap,
 		timerData,
 		eventManager,
+		telemetry,
 	);
 }
 
@@ -422,6 +424,7 @@ async function updateParticipantEmbed(
 	participantMap: ParticipantMap,
 	timerData: { startTime: number; duration?: number; hasStarted: boolean },
 	eventManager: EventManager,
+	telemetry?: TelemetryService,
 ) {
 	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
 	const isFinalizing = eventManager.isEventFinalizing(interaction.message);
@@ -447,6 +450,7 @@ async function updateParticipantEmbed(
 			interaction.message,
 			TIMINGS.EVENT_START_DELAY_MINUTES,
 			eventManager,
+			telemetry,
 		);
 		return;
 	}

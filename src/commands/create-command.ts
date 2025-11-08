@@ -89,6 +89,6 @@ export async function handleCreateCommand(
 	});
 
 	if (timeInMinutes) {
-		createEventStartTimeout(message, timeInMinutes, eventManager);
+		createEventStartTimeout(message, timeInMinutes, eventManager, telemetry);
 	}
 }
