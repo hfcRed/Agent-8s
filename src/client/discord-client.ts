@@ -1,6 +1,8 @@
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { cleanupEvent } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
+import type { ThreadManager } from '../managers/thread-manager.js';
+import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import { isUserAdmin } from '../utils/helpers.js';
 
 export function createDiscordClient() {
@@ -86,6 +88,8 @@ export function setupMessageDeletionHandler(client: Client) {
 export function setupEventMessageDeleteHandler(
 	client: Client,
 	eventManager: EventManager,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 ) {
 	client.on('messageDelete', async (message) => {
 		if (!message.author?.bot || message.author.id !== client.user?.id) return;
@@ -94,7 +98,13 @@ export function setupEventMessageDeleteHandler(
 		if (!eventData) return;
 
 		try {
-			await cleanupEvent(message.id, eventManager, client);
+			await cleanupEvent(
+				message.id,
+				eventManager,
+				client,
+				threadManager,
+				voiceChannelManager,
+			);
 		} catch (error) {
 			console.error(
 				`Failed to cleanup event after message deletion ${message.id}:`,

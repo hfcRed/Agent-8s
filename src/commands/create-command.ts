@@ -3,6 +3,8 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { ERROR_MESSAGES, TIMINGS, WEAPON_ROLES } from '../constants.js';
 import { createEventStartTimeout } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
+import type { ThreadManager } from '../managers/thread-manager.js';
+import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import {
 	createEventButtons,
@@ -14,6 +16,8 @@ import { getExcaliburRankOfUser, getPingsForServer } from '../utils/helpers.js';
 export async function handleCreateCommand(
 	interaction: ChatInputCommandInteraction,
 	eventManager: EventManager,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	if (eventManager.isUserInAnyEvent(interaction.user.id)) {
@@ -89,6 +93,13 @@ export async function handleCreateCommand(
 	});
 
 	if (timeInMinutes) {
-		createEventStartTimeout(message, timeInMinutes, eventManager, telemetry);
+		createEventStartTimeout(
+			message,
+			timeInMinutes,
+			eventManager,
+			threadManager,
+			voiceChannelManager,
+			telemetry,
+		);
 	}
 }

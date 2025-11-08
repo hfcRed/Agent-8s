@@ -9,7 +9,7 @@ import {
  * Manages Discord thread operations for events.
  * Provides an interface for creating, managing, and interacting with threads.
  */
-class ThreadManager {
+export class ThreadManager {
 	async createEventThread(channel: TextChannel, shortId: string) {
 		try {
 			const thread = await channel.threads.create({
@@ -92,5 +92,3 @@ class ThreadManager {
 		}
 	}
 }
-
-export const threadManager = new ThreadManager();

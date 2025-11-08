@@ -12,8 +12,8 @@ import {
 	TIMINGS,
 } from '../constants.js';
 import { checkProcessingStates } from '../interactions/button-handlers.js';
-import { threadManager } from '../managers/thread-manager.js';
-import { voiceChannelManager } from '../managers/voice-channel-manager.js';
+import type { ThreadManager } from '../managers/thread-manager.js';
+import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import type { ParticipantMap } from '../types.js';
 import {
@@ -28,6 +28,8 @@ export async function startEvent(
 	participantMap: ParticipantMap,
 	eventManager: EventManager,
 	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const timerData = eventManager.getTimer(message.id);
@@ -108,6 +110,8 @@ export async function cleanupEvent(
 	eventId: string,
 	eventManager: EventManager,
 	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 ) {
 	if (eventManager.isProcessing(eventId, 'cleanup')) return;
 
@@ -153,6 +157,8 @@ export async function cleanupEvent(
 export async function cleanupStaleEvents(
 	eventManager: EventManager,
 	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const MAX_EVENT_LIFETIME = TIMINGS.DAY_IN_MS;
@@ -204,7 +210,13 @@ export async function cleanupStaleEvents(
 		} catch (error) {
 			console.error(`Failed to clean up stale event ${messageId}:`, error);
 		} finally {
-			await cleanupEvent(messageId, eventManager, appClient);
+			await cleanupEvent(
+				messageId,
+				eventManager,
+				appClient,
+				threadManager,
+				voiceChannelManager,
+			);
 		}
 	}
 }
@@ -213,6 +225,8 @@ export async function createEventStartTimeout(
 	message: Message,
 	timeInMinutes: number,
 	eventManager: EventManager,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const existingTimeout = eventManager.getTimeout(message.id);
@@ -250,6 +264,8 @@ export async function createEventStartTimeout(
 						currentParticipantMap,
 						eventManager,
 						message.client,
+						threadManager,
+						voiceChannelManager,
 						telemetry,
 					);
 				} finally {

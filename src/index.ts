@@ -24,6 +24,8 @@ import {
 	handleStartNowButton,
 } from './interactions/button-handlers.js';
 import { handleRoleSelection } from './interactions/menu-handlers.js';
+import { ThreadManager } from './managers/thread-manager.js';
+import { VoiceChannelManager } from './managers/voice-channel-manager.js';
 import { initializeTelemetry } from './telemetry/telemetry.js';
 
 dotenv.config();
@@ -39,6 +41,8 @@ const telemetryToken = process.env.TELEMETRY_TOKEN;
 
 const telemetry = initializeTelemetry(telemetryUrl, telemetryToken);
 const eventManager = new EventManager();
+const threadManager = new ThreadManager();
+const voiceChannelManager = new VoiceChannelManager();
 const appClient = createDiscordClient();
 
 loginClient(appClient, botToken).then();
@@ -92,7 +96,13 @@ appClient.on('interactionCreate', async (interaction) => {
 			interaction.isChatInputCommand() &&
 			interaction.commandName === 'create'
 		) {
-			await handleCreateCommand(interaction, eventManager, telemetry);
+			await handleCreateCommand(
+				interaction,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+				telemetry,
+			);
 			return;
 		}
 
@@ -122,16 +132,30 @@ appClient.on('interactionCreate', async (interaction) => {
 
 			switch (interaction.customId) {
 				case 'signup':
-					await handleSignUpButton(interaction, eventManager, telemetry);
+					await handleSignUpButton(
+						interaction,
+						eventManager,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					);
 					break;
 				case 'signout':
-					await handleSignOutButton(interaction, eventManager, telemetry);
+					await handleSignOutButton(
+						interaction,
+						eventManager,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					);
 					break;
 				case 'cancel':
 					await handleCancelButton(
 						interaction,
 						eventManager,
 						appClient,
+						threadManager,
+						voiceChannelManager,
 						telemetry,
 					);
 					break;
@@ -140,6 +164,8 @@ appClient.on('interactionCreate', async (interaction) => {
 						interaction,
 						eventManager,
 						appClient,
+						threadManager,
+						voiceChannelManager,
 						telemetry,
 					);
 					break;
@@ -148,6 +174,8 @@ appClient.on('interactionCreate', async (interaction) => {
 						interaction,
 						eventManager,
 						appClient,
+						threadManager,
+						voiceChannelManager,
 						telemetry,
 					);
 					break;
@@ -156,6 +184,8 @@ appClient.on('interactionCreate', async (interaction) => {
 						interaction,
 						eventManager,
 						appClient,
+						threadManager,
+						voiceChannelManager,
 						telemetry,
 					);
 					break;
@@ -164,6 +194,8 @@ appClient.on('interactionCreate', async (interaction) => {
 						interaction,
 						eventManager,
 						appClient,
+						threadManager,
+						voiceChannelManager,
 						telemetry,
 					);
 					break;
@@ -202,10 +234,22 @@ appClient.on('interactionCreate', async (interaction) => {
 });
 
 setupMessageDeletionHandler(appClient);
-setupEventMessageDeleteHandler(appClient, eventManager);
+setupEventMessageDeleteHandler(
+	appClient,
+	eventManager,
+	threadManager,
+	voiceChannelManager,
+);
 setupErrorHandlers(appClient);
 
 setInterval(
-	() => cleanupStaleEvents(eventManager, appClient, telemetry),
+	() =>
+		cleanupStaleEvents(
+			eventManager,
+			appClient,
+			threadManager,
+			voiceChannelManager,
+			telemetry,
+		),
 	TIMINGS.HOUR_IN_MS,
 );

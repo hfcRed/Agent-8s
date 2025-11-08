@@ -20,8 +20,8 @@ import {
 	startEvent,
 } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
-import { threadManager } from '../managers/thread-manager.js';
-import { voiceChannelManager } from '../managers/voice-channel-manager.js';
+import type { ThreadManager } from '../managers/thread-manager.js';
+import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import type { ParticipantMap } from '../types.js';
 import {
@@ -33,6 +33,8 @@ import { getExcaliburRankOfUser, isUserAdmin } from '../utils/helpers.js';
 export async function handleSignUpButton(
 	interaction: ButtonInteraction,
 	eventManager: EventManager,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const messageId = interaction.message.id;
@@ -81,6 +83,8 @@ export async function handleSignUpButton(
 		participantMap,
 		timerData,
 		eventManager,
+		threadManager,
+		voiceChannelManager,
 		telemetry,
 	);
 }
@@ -88,6 +92,8 @@ export async function handleSignUpButton(
 export async function handleSignOutButton(
 	interaction: ButtonInteraction,
 	eventManager: EventManager,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const messageId = interaction.message.id;
@@ -125,6 +131,8 @@ export async function handleSignOutButton(
 		participantMap,
 		timerData,
 		eventManager,
+		threadManager,
+		voiceChannelManager,
 		telemetry,
 	);
 }
@@ -133,6 +141,8 @@ export async function handleCancelButton(
 	interaction: ButtonInteraction,
 	eventManager: EventManager,
 	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const messageId = interaction.message.id;
@@ -175,7 +185,13 @@ export async function handleCancelButton(
 			matchId: matchId || 'unknown',
 		});
 
-		await cleanupEvent(messageId, eventManager, appClient);
+		await cleanupEvent(
+			messageId,
+			eventManager,
+			appClient,
+			threadManager,
+			voiceChannelManager,
+		);
 	} finally {
 		eventManager.clearProcessing(messageId, 'cancelling');
 	}
@@ -185,6 +201,8 @@ export async function handleStartNowButton(
 	interaction: ButtonInteraction,
 	eventManager: EventManager,
 	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const messageId = interaction.message.id;
@@ -219,6 +237,8 @@ export async function handleStartNowButton(
 			participantMap,
 			eventManager,
 			appClient,
+			threadManager,
+			voiceChannelManager,
 			telemetry,
 		);
 	} finally {
@@ -230,6 +250,8 @@ export async function handleFinishButton(
 	interaction: ButtonInteraction,
 	eventManager: EventManager,
 	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const messageId = interaction.message.id;
@@ -272,7 +294,13 @@ export async function handleFinishButton(
 			matchId: matchId || 'unknown',
 		});
 
-		await cleanupEvent(messageId, eventManager, appClient);
+		await cleanupEvent(
+			messageId,
+			eventManager,
+			appClient,
+			threadManager,
+			voiceChannelManager,
+		);
 	} finally {
 		eventManager.clearProcessing(messageId, 'finishing');
 	}
@@ -282,6 +310,8 @@ export async function handleDropOutButton(
 	interaction: ButtonInteraction,
 	eventManager: EventManager,
 	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const messageId = interaction.message.id;
@@ -351,6 +381,8 @@ export async function handleDropInButton(
 	interaction: ButtonInteraction,
 	eventManager: EventManager,
 	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const messageId = interaction.message.id;
@@ -424,6 +456,8 @@ async function updateParticipantEmbed(
 	participantMap: ParticipantMap,
 	timerData: { startTime: number; duration?: number; hasStarted: boolean },
 	eventManager: EventManager,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
 	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
@@ -450,6 +484,8 @@ async function updateParticipantEmbed(
 			interaction.message,
 			TIMINGS.EVENT_START_DELAY_MINUTES,
 			eventManager,
+			threadManager,
+			voiceChannelManager,
 			telemetry,
 		);
 		return;

@@ -11,7 +11,7 @@ import {
  * Manages Discord voice channel operations for events.
  * Provides an interface for creating, managing permissions, and cleaning up voice channels.
  */
-class VoiceChannelManager {
+export class VoiceChannelManager {
 	async createEventVoiceChannels(
 		guild: Guild,
 		parentChannel: TextChannel,
@@ -152,5 +152,3 @@ class VoiceChannelManager {
 		}
 	}
 }
-
-export const voiceChannelManager = new VoiceChannelManager();
