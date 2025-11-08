@@ -95,7 +95,7 @@ export class EventRecorder {
 	private resolveIdentifier(
 		value: string | null | undefined,
 		fallback: string,
-	): string {
+	) {
 		if (!value) return fallback;
 
 		const trimmed = value.trim();

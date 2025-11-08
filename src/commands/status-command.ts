@@ -72,7 +72,7 @@ export async function handleStatusCommand(
 	});
 }
 
-function formatUptime(milliseconds: number): string {
+function formatUptime(milliseconds: number) {
 	const units = [
 		{ label: 'd', value: Math.floor(milliseconds / 86400000) },
 		{ label: 'h', value: Math.floor((milliseconds / 3600000) % 24) },
@@ -88,7 +88,7 @@ function formatUptime(milliseconds: number): string {
 	);
 }
 
-function formatMemoryUsage(bytes: number): string {
+function formatMemoryUsage(bytes: number) {
 	const mb = bytes / 1024 / 1024;
 	return `${mb.toFixed(2)} MB`;
 }
