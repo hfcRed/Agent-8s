@@ -1,0 +1,254 @@
+import { faker } from '@faker-js/faker';
+import { PermissionFlagsBits } from 'discord.js';
+import { describe, expect, it, vi } from 'vitest';
+import { EXCALIBUR_GUILD_ID, EXCALIBUR_RANKS } from '../constants.js';
+import {
+	getExcaliburRankOfUser,
+	getPingsForServer,
+	isUserAdmin,
+} from '../utils/helpers.js';
+
+describe('helpers', () => {
+	describe('isUserAdmin', () => {
+		it('should return true when member has Administrator permission', () => {
+			const member = {
+				permissions: {
+					has: vi.fn((perm) => perm === PermissionFlagsBits.Administrator),
+				},
+			} as never;
+
+			expect(isUserAdmin(member)).toBe(true);
+		});
+
+		it('should return true when member has ManageGuild permission', () => {
+			const member = {
+				permissions: {
+					has: vi.fn((perm) => perm === PermissionFlagsBits.ManageMessages),
+				},
+			} as never;
+
+			expect(isUserAdmin(member)).toBe(true);
+		});
+
+		it('should return false when member has no admin permissions', () => {
+			const member = {
+				permissions: {
+					has: vi.fn().mockReturnValue(false),
+				},
+			} as never;
+
+			expect(isUserAdmin(member)).toBe(false);
+		});
+	});
+
+	describe('getPingsForServer', () => {
+		it('should return competitive role pings when casual is false', () => {
+			const roleId = faker.string.uuid();
+			const mockCollection = {
+				size: 1,
+				map: vi.fn((callback) =>
+					[{ id: roleId, name: 'Comp 8s' }].map(callback),
+				),
+			};
+			const interaction = {
+				guild: {
+					roles: {
+						cache: {
+							filter: vi.fn().mockReturnValue(mockCollection),
+						},
+					},
+				},
+			} as never;
+
+			const result = getPingsForServer(interaction, false);
+			expect(result).toBe(`||<@&${roleId}>||`);
+		});
+
+		it('should return casual role pings when casual is true', () => {
+			const roleId = faker.string.uuid();
+			const mockCollection = {
+				size: 1,
+				map: vi.fn((callback) =>
+					[{ id: roleId, name: 'Casual 8s' }].map(callback),
+				),
+			};
+			const interaction = {
+				guild: {
+					roles: {
+						cache: {
+							filter: vi.fn().mockReturnValue(mockCollection),
+						},
+					},
+				},
+			} as never;
+
+			const result = getPingsForServer(interaction, true);
+			expect(result).toBe(`||<@&${roleId}>||`);
+		});
+
+		it('should return null when no matching roles found', () => {
+			const mockCollection = {
+				size: 0,
+				map: vi.fn(),
+			};
+			const interaction = {
+				guild: {
+					roles: {
+						cache: {
+							filter: vi.fn().mockReturnValue(mockCollection),
+						},
+					},
+				},
+			} as never;
+
+			const result = getPingsForServer(interaction, false);
+			expect(result).toBeNull();
+		});
+
+		it('should return null when guild is not available', () => {
+			const interaction = {
+				guild: null,
+			} as never;
+
+			const result = getPingsForServer(interaction, false);
+			expect(result).toBeNull();
+		});
+
+		it('should handle multiple role pings', () => {
+			const roleId1 = faker.string.uuid();
+			const roleId2 = faker.string.uuid();
+			const mockCollection = {
+				size: 2,
+				map: vi.fn((callback) =>
+					[
+						{ id: roleId1, name: 'Comp 8s' },
+						{ id: roleId2, name: 'Comp 8s' },
+					].map(callback),
+				),
+			};
+			const interaction = {
+				guild: {
+					roles: {
+						cache: {
+							filter: vi.fn().mockReturnValue(mockCollection),
+						},
+					},
+				},
+			} as never;
+
+			const result = getPingsForServer(interaction, false);
+			expect(result).toContain(`||<@&${roleId1}>||`);
+			expect(result).toContain(`||<@&${roleId2}>||`);
+		});
+	});
+
+	describe('getExcaliburRankOfUser', () => {
+		it('should return null when guild is not Excalibur', () => {
+			const interaction = {
+				guild: {
+					id: faker.string.uuid(),
+				},
+				member: {
+					roles: new Map(),
+				},
+			} as never;
+
+			expect(getExcaliburRankOfUser(interaction)).toBeNull();
+		});
+
+		it('should return null when member roles are not available', () => {
+			const interaction = {
+				guild: {
+					id: EXCALIBUR_GUILD_ID,
+				},
+				member: {
+					roles: undefined,
+				},
+			} as never;
+
+			expect(getExcaliburRankOfUser(interaction)).toBeNull();
+		});
+
+		it('should return null when member roles is an array', () => {
+			const interaction = {
+				guild: {
+					id: EXCALIBUR_GUILD_ID,
+				},
+				member: {
+					roles: [],
+				},
+			} as never;
+
+			expect(getExcaliburRankOfUser(interaction)).toBeNull();
+		});
+
+		it('should return rank when user has matching role by ID', () => {
+			const interaction = {
+				guild: {
+					id: EXCALIBUR_GUILD_ID,
+				},
+				member: {
+					roles: {
+						valueOf: vi.fn().mockReturnValue([
+							[
+								'1',
+								{
+									id: EXCALIBUR_RANKS['2'].id,
+									name: 'T1 Legend',
+								},
+							],
+						]),
+					},
+				},
+			} as never;
+
+			expect(getExcaliburRankOfUser(interaction)).toBe('2');
+		});
+
+		it('should return rank when user has matching role by name', () => {
+			const interaction = {
+				guild: {
+					id: EXCALIBUR_GUILD_ID,
+				},
+				member: {
+					roles: {
+						valueOf: vi.fn().mockReturnValue([
+							[
+								faker.string.uuid(),
+								{
+									id: faker.string.uuid(),
+									name: EXCALIBUR_RANKS['4'].name,
+								},
+							],
+						]),
+					},
+				},
+			} as never;
+
+			expect(getExcaliburRankOfUser(interaction)).toBe('4');
+		});
+
+		it('should return null when user has no matching Excalibur rank', () => {
+			const interaction = {
+				guild: {
+					id: EXCALIBUR_GUILD_ID,
+				},
+				member: {
+					roles: {
+						valueOf: vi.fn().mockReturnValue([
+							[
+								faker.string.uuid(),
+								{
+									id: faker.string.uuid(),
+									name: 'Some Other Role',
+								},
+							],
+						]),
+					},
+				},
+			} as never;
+
+			expect(getExcaliburRankOfUser(interaction)).toBeNull();
+		});
+	});
+});

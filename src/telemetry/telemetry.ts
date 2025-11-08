@@ -104,6 +104,5 @@ export function initializeTelemetry(
 		return undefined;
 	}
 
-	const { TelemetryService } = require('../telemetry/telemetry.js');
-	return new TelemetryService(telemetryUrl, telemetryToken) as TelemetryService;
+	return new TelemetryService(telemetryUrl, telemetryToken);
 }
