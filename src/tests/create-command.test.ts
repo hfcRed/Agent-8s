@@ -141,9 +141,7 @@ describe('handleCreateCommand', () => {
 	});
 
 	it('should create casual event', async () => {
-		interaction.options.getBoolean = vi.fn((name) =>
-			name === 'casual' ? true : false,
-		);
+		interaction.options.getBoolean = vi.fn((name) => name === 'casual');
 
 		await handleCreateCommand(
 			interaction,
