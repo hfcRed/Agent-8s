@@ -18,7 +18,7 @@ class VoiceChannelManager {
 		participantIds: string[],
 		shortId: string,
 		appClient: Client,
-	): Promise<string[]> {
+	) {
 		const voiceNames = ['👥 Group', '🔵 Team A', '🔴 Team B'];
 		const voiceChannels: string[] = [];
 
