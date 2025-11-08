@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+
+dotenv.config({ quiet: true });
 export const DEV = process.env.NODE_ENV === 'development';
 
 export const MAX_PARTICIPANTS = DEV ? 2 : 8;
