@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ChatInputCommandInteraction } from 'discord.js';
-import { ERROR_MESSAGES, WEAPON_ROLES } from '../constants.js';
+import { ERROR_MESSAGES, TIMINGS, WEAPON_ROLES } from '../constants.js';
 import { createEventStartTimeout } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -68,7 +68,7 @@ export async function handleCreateCommand(
 	eventManager.setCreator(message.id, interaction.user.id);
 	eventManager.setTimer(message.id, {
 		startTime,
-		duration: timeInMinutes ? timeInMinutes * 60 * 1000 : undefined,
+		duration: timeInMinutes ? timeInMinutes * TIMINGS.MINUTE_IN_MS : undefined,
 		hasStarted: false,
 	});
 	eventManager.setMatchId(message.id, matchId);

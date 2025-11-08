@@ -1,5 +1,14 @@
 export const MAX_PARTICIPANTS = 2;
 
+// Timing constants (in milliseconds)
+export const TIMINGS = {
+	MINUTE_IN_MS: 60 * 1000,
+	HOUR_IN_MS: 60 * 60 * 1000,
+	DAY_IN_MS: 24 * 60 * 60 * 1000,
+	PROCESSING_TIMEOUT_MS: 30000,
+	EVENT_START_DELAY_MINUTES: 0.25,
+} as const;
+
 export const PING_ROLE_NAMES = {
 	casual: 'Casual 8s',
 	competitive: 'Comp 8s',

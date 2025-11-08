@@ -9,6 +9,7 @@ import {
 } from './client/discord-client.js';
 import { handleCreateCommand } from './commands/create-command.js';
 import { handleStatusCommand } from './commands/status-command.js';
+import { TIMINGS } from './constants.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
 import { EventManager } from './event/event-manager.js';
 import {
@@ -204,5 +205,5 @@ setupErrorHandlers(appClient);
 
 setInterval(
 	() => cleanupStaleEvents(eventManager, appClient, telemetry),
-	60 * 60 * 1000,
+	TIMINGS.HOUR_IN_MS,
 );

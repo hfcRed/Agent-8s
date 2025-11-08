@@ -11,6 +11,7 @@ import {
 	MAX_PARTICIPANTS,
 	PROCESSING_MESSAGES,
 	STATUS_MESSAGES,
+	TIMINGS,
 	WEAPON_ROLES,
 } from '../constants.js';
 import {
@@ -442,7 +443,11 @@ async function updateParticipantEmbed(
 		!timerData.hasStarted
 	) {
 		await interaction.editReply({ embeds: [embed] });
-		createEventStartTimeout(interaction.message, 0.25, eventManager);
+		createEventStartTimeout(
+			interaction.message,
+			TIMINGS.EVENT_START_DELAY_MINUTES,
+			eventManager,
+		);
 		return;
 	}
 

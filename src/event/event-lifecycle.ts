@@ -5,7 +5,12 @@ import {
 	type Message,
 	type TextChannel,
 } from 'discord.js';
-import { COLORS, MAX_PARTICIPANTS, STATUS_MESSAGES } from '../constants.js';
+import {
+	COLORS,
+	MAX_PARTICIPANTS,
+	STATUS_MESSAGES,
+	TIMINGS,
+} from '../constants.js';
 import { checkProcessingStates } from '../interactions/button-handlers.js';
 import { threadManager } from '../managers/thread-manager.js';
 import { voiceChannelManager } from '../managers/voice-channel-manager.js';
@@ -150,7 +155,7 @@ export async function cleanupStaleEvents(
 	appClient: Client,
 	telemetry?: TelemetryService,
 ) {
-	const MAX_EVENT_LIFETIME = 24 * 60 * 60 * 1000;
+	const MAX_EVENT_LIFETIME = TIMINGS.DAY_IN_MS;
 	const now = Date.now();
 
 	for (const [messageId, timerData] of eventManager.getAllTimers()) {
@@ -219,56 +224,53 @@ export async function createEventStartTimeout(
 	updateEmbedField(
 		embed,
 		'Start',
-		`⏳ <t:${Math.floor((Date.now() + timeInMinutes * 60 * 1000) / 1000)}:R>`,
+		`⏳ <t:${Math.floor((Date.now() + timeInMinutes * TIMINGS.MINUTE_IN_MS) / 1000)}:R>`,
 	);
 	await message.edit({ embeds: [embed] });
 
-	const timeout = setTimeout(
-		async () => {
-			try {
-				const currentParticipantMap = eventManager.getParticipants(message.id);
-				const timerData = eventManager.getTimer(message.id);
+	const timeout = setTimeout(async () => {
+		try {
+			const currentParticipantMap = eventManager.getParticipants(message.id);
+			const timerData = eventManager.getTimer(message.id);
 
-				if (!currentParticipantMap || !timerData || timerData.hasStarted) {
-					eventManager.deleteTimeout(message.id);
-					return;
-				}
-
-				if (
-					currentParticipantMap.size === MAX_PARTICIPANTS &&
-					!(await checkProcessingStates(message.id, eventManager))
-				) {
-					eventManager.setProcessing(message.id, 'starting');
-					try {
-						await startEvent(
-							message,
-							currentParticipantMap,
-							eventManager,
-							message.client,
-						);
-					} finally {
-						eventManager.clearProcessing(message.id, 'starting');
-					}
-				} else {
-					const embed = EmbedBuilder.from(message.embeds[0]);
-					embed.setColor(COLORS.OPEN);
-
-					updateEmbedField(embed, 'Start', '👥 When 8 players have signed up');
-					updateEmbedField(embed, 'Status', STATUS_MESSAGES.OPEN);
-
-					await message.edit({ embeds: [embed] });
-				}
-			} catch (error) {
-				console.error(
-					`Error in timeout callback for event ${message.id}:`,
-					error,
-				);
-			} finally {
+			if (!currentParticipantMap || !timerData || timerData.hasStarted) {
 				eventManager.deleteTimeout(message.id);
+				return;
 			}
-		},
-		timeInMinutes * 60 * 1000,
-	);
+
+			if (
+				currentParticipantMap.size === MAX_PARTICIPANTS &&
+				!(await checkProcessingStates(message.id, eventManager))
+			) {
+				eventManager.setProcessing(message.id, 'starting');
+				try {
+					await startEvent(
+						message,
+						currentParticipantMap,
+						eventManager,
+						message.client,
+					);
+				} finally {
+					eventManager.clearProcessing(message.id, 'starting');
+				}
+			} else {
+				const embed = EmbedBuilder.from(message.embeds[0]);
+				embed.setColor(COLORS.OPEN);
+
+				updateEmbedField(embed, 'Start', '👥 When 8 players have signed up');
+				updateEmbedField(embed, 'Status', STATUS_MESSAGES.OPEN);
+
+				await message.edit({ embeds: [embed] });
+			}
+		} catch (error) {
+			console.error(
+				`Error in timeout callback for event ${message.id}:`,
+				error,
+			);
+		} finally {
+			eventManager.deleteTimeout(message.id);
+		}
+	}, timeInMinutes * TIMINGS.MINUTE_IN_MS);
 
 	eventManager.setTimeout(message.id, timeout);
 }

@@ -10,6 +10,7 @@ import {
 	COLORS,
 	MAX_PARTICIPANTS,
 	STATUS_MESSAGES,
+	TIMINGS,
 	WEAPON_ROLES,
 } from '../constants.js';
 import type { EventTimer, ParticipantMap } from '../types.js';
@@ -65,7 +66,7 @@ export function createEventEmbed(
 		{
 			name: 'Start',
 			value: timeInMinutes
-				? `⏳ <t:${Math.floor((startTime + timeInMinutes * 60 * 1000) / 1000)}:R>`
+				? `⏳ <t:${Math.floor((startTime + timeInMinutes * TIMINGS.MINUTE_IN_MS) / 1000)}:R>`
 				: '👥 When 8 players have signed up',
 		},
 		{ name: 'Status', value: STATUS_MESSAGES.OPEN },

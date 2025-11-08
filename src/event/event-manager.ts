@@ -1,5 +1,5 @@
 import type { Message } from 'discord.js';
-import { STATUS_MESSAGES } from '../constants.js';
+import { STATUS_MESSAGES, TIMINGS } from '../constants.js';
 import type { EventOperation, EventTimer, ParticipantMap } from '../types.js';
 
 /**
@@ -183,7 +183,7 @@ export class EventManager {
 
 		setTimeout(() => {
 			this.clearProcessing(eventId, operation);
-		}, 30000);
+		}, TIMINGS.PROCESSING_TIMEOUT_MS);
 	}
 
 	clearProcessing(eventId: string, operation: EventOperation) {
