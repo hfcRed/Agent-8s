@@ -28,7 +28,7 @@ import { ThreadManager } from './managers/thread-manager.js';
 import { VoiceChannelManager } from './managers/voice-channel-manager.js';
 import { initializeTelemetry } from './telemetry/telemetry.js';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 const botToken = process.env.BOT_TOKEN;
 
 if (!botToken) {

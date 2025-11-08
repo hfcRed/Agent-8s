@@ -12,7 +12,7 @@ export class TelemetryService {
 	private recorder?: EventRecorder;
 
 	constructor(telemetryUrl: string, telemetryToken: string) {
-		dotenv.config();
+		dotenv.config({ quiet: true });
 		const databaseUrl = process.env.DATABASE_URL;
 		const databaseSchema = process.env.DATABASE_SCHEMA;
 		const telemetryEventsTable = process.env.TELEMETRY_EVENTS_TABLE;
