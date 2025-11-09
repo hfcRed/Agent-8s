@@ -433,7 +433,7 @@ describe('helpers', () => {
 			expect(fetchSpy).toHaveBeenCalledTimes(1); // Still only called once
 
 			// Advance time by 1 minute
-			vi.advanceTimersByTime(60000);
+			vi.advanceTimersByTime(60 * 5 * 1000);
 
 			// Third call after cache expiry should fetch again
 			const result3 = await checkCommandPermissions(guild, channelId);
