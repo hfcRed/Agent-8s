@@ -18,6 +18,7 @@ vi.mock('../event/event-lifecycle.js', () => ({
 
 vi.mock('../utils/helpers.js', () => ({
 	isUserAdmin: vi.fn(),
+	checkCommandPermissions: vi.fn(),
 }));
 
 describe('discord-client', () => {
@@ -162,6 +163,7 @@ describe('discord-client', () => {
 		let mockMessage: Message;
 		let mockMember: GuildMember;
 		let isUserAdminMock: ReturnType<typeof vi.fn>;
+		let checkCommandPermissionsMock: ReturnType<typeof vi.fn>;
 		let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 		beforeEach(async () => {
@@ -174,6 +176,7 @@ describe('discord-client', () => {
 			mockMessage = {
 				author: { bot: false },
 				guild: {},
+				channel: { id: 'channel-123' },
 				member: mockMember,
 				delete: vi.fn(),
 				interactionMetadata: null,
@@ -181,6 +184,8 @@ describe('discord-client', () => {
 
 			const helpersModule = await import('../utils/helpers.js');
 			isUserAdminMock = helpersModule.isUserAdmin as ReturnType<typeof vi.fn>;
+			checkCommandPermissionsMock =
+				helpersModule.checkCommandPermissions as ReturnType<typeof vi.fn>;
 
 			consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		});
@@ -196,17 +201,23 @@ describe('discord-client', () => {
 
 		it('should delete non-admin user messages', async () => {
 			isUserAdminMock.mockReturnValue(false);
+			checkCommandPermissionsMock.mockResolvedValue(true);
 			setupMessageDeletionHandler(mockClient);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
 				.calls[0][1];
 			await messageHandler(mockMessage);
 
+			expect(checkCommandPermissionsMock).toHaveBeenCalledWith(
+				mockMessage.guild,
+				mockMessage.channel.id,
+			);
 			expect(mockMessage.delete).toHaveBeenCalled();
 		});
 
 		it('should not delete admin user messages', async () => {
 			isUserAdminMock.mockReturnValue(true);
+			checkCommandPermissionsMock.mockResolvedValue(true);
 			setupMessageDeletionHandler(mockClient);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
@@ -259,6 +270,7 @@ describe('discord-client', () => {
 
 		it('should not delete slash command responses', async () => {
 			isUserAdminMock.mockReturnValue(false);
+			checkCommandPermissionsMock.mockResolvedValue(true);
 			const messageWithInteraction = {
 				...mockMessage,
 				interactionMetadata: { type: 2 },
@@ -273,8 +285,25 @@ describe('discord-client', () => {
 			expect(mockMessage.delete).not.toHaveBeenCalled();
 		});
 
+		it('should not delete messages when channel permissions not allowed', async () => {
+			isUserAdminMock.mockReturnValue(false);
+			checkCommandPermissionsMock.mockResolvedValue(false);
+			setupMessageDeletionHandler(mockClient);
+
+			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
+				.calls[0][1];
+			await messageHandler(mockMessage);
+
+			expect(checkCommandPermissionsMock).toHaveBeenCalledWith(
+				mockMessage.guild,
+				mockMessage.channel.id,
+			);
+			expect(mockMessage.delete).not.toHaveBeenCalled();
+		});
+
 		it('should handle deletion errors', async () => {
 			isUserAdminMock.mockReturnValue(false);
+			checkCommandPermissionsMock.mockResolvedValue(true);
 			const error = new Error('Delete failed');
 			mockMessage.delete = vi.fn().mockRejectedValue(error);
 

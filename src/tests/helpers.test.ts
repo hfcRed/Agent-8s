@@ -1,8 +1,12 @@
 import { faker } from '@faker-js/faker';
-import { PermissionFlagsBits } from 'discord.js';
+import {
+	ApplicationCommandPermissionType,
+	PermissionFlagsBits,
+} from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 import { EXCALIBUR_GUILD_ID, EXCALIBUR_RANKS } from '../constants.js';
 import {
+	checkCommandPermissions,
 	getExcaliburRankOfUser,
 	getPingsForServer,
 	isUserAdmin,
@@ -249,6 +253,145 @@ describe('helpers', () => {
 			} as never;
 
 			expect(getExcaliburRankOfUser(interaction)).toBeNull();
+		});
+	});
+
+	describe('checkCommandPermissions', () => {
+		it('should return false when no permissions are configured', async () => {
+			const guild = {
+				commands: {
+					permissions: {
+						fetch: vi.fn().mockResolvedValue(new Map()),
+					},
+				},
+			} as never;
+
+			const result = await checkCommandPermissions(guild, 'channel-123');
+			expect(result).toBe(false);
+		});
+
+		it('should return true when channel is explicitly allowed', async () => {
+			const channelId = faker.string.uuid();
+			const permissions = [
+				{
+					id: channelId,
+					type: ApplicationCommandPermissionType.Channel,
+					permission: true,
+				},
+			];
+			const permissionsMap = new Map([['command-123', permissions]]);
+
+			const guild = {
+				commands: {
+					permissions: {
+						fetch: vi.fn().mockResolvedValue(permissionsMap),
+					},
+				},
+			} as never;
+
+			const result = await checkCommandPermissions(guild, channelId);
+			expect(result).toBe(true);
+		});
+
+		it('should return false when channel is not in allowed list', async () => {
+			const channelId = faker.string.uuid();
+			const differentChannelId = faker.string.uuid();
+			const permissions = [
+				{
+					id: differentChannelId,
+					type: ApplicationCommandPermissionType.Channel,
+					permission: true,
+				},
+			];
+			const permissionsMap = new Map([['command-123', permissions]]);
+
+			const guild = {
+				commands: {
+					permissions: {
+						fetch: vi.fn().mockResolvedValue(permissionsMap),
+					},
+				},
+			} as never;
+
+			const result = await checkCommandPermissions(guild, channelId);
+			expect(result).toBe(false);
+		});
+
+		it('should return false when no channel permissions are configured', async () => {
+			const permissions = [
+				{
+					id: faker.string.uuid(),
+					type: ApplicationCommandPermissionType.Role,
+					permission: true,
+				},
+			];
+			const permissionsMap = new Map([['command-123', permissions]]);
+
+			const guild = {
+				commands: {
+					permissions: {
+						fetch: vi.fn().mockResolvedValue(permissionsMap),
+					},
+				},
+			} as never;
+
+			const result = await checkCommandPermissions(guild, faker.string.uuid());
+			expect(result).toBe(false);
+		});
+
+		it('should return false when permission check errors', async () => {
+			const consoleErrorSpy = vi
+				.spyOn(console, 'error')
+				.mockImplementation(() => {});
+
+			const guild = {
+				commands: {
+					permissions: {
+						fetch: vi.fn().mockRejectedValue(new Error('API Error')),
+					},
+				},
+			} as never;
+
+			const result = await checkCommandPermissions(guild, 'channel-123');
+			expect(result).toBe(false);
+			expect(consoleErrorSpy).toHaveBeenCalledWith(
+				'Error checking command permissions:',
+				expect.any(Error),
+			);
+
+			consoleErrorSpy.mockRestore();
+		});
+
+		it('should handle multiple channel permissions correctly', async () => {
+			const channelId1 = faker.string.uuid();
+			const channelId2 = faker.string.uuid();
+			const permissions = [
+				{
+					id: channelId1,
+					type: ApplicationCommandPermissionType.Channel,
+					permission: true,
+				},
+				{
+					id: channelId2,
+					type: ApplicationCommandPermissionType.Channel,
+					permission: true,
+				},
+			];
+			const permissionsMap = new Map([['command-123', permissions]]);
+
+			const guild = {
+				commands: {
+					permissions: {
+						fetch: vi.fn().mockResolvedValue(permissionsMap),
+					},
+				},
+			} as never;
+
+			const result1 = await checkCommandPermissions(guild, channelId1);
+			const result2 = await checkCommandPermissions(guild, channelId2);
+
+			expect(result1).toBe(true);
+			expect(result2).toBe(true);
 		});
 	});
 });

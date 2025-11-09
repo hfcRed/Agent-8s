@@ -1,10 +1,14 @@
 import type {
 	ButtonInteraction,
 	ChatInputCommandInteraction,
+	Guild,
 	GuildMember,
 	StringSelectMenuInteraction,
 } from 'discord.js';
-import { PermissionFlagsBits } from 'discord.js';
+import {
+	ApplicationCommandPermissionType,
+	PermissionFlagsBits,
+} from 'discord.js';
 import {
 	ADMIN_PERMISSIONS,
 	EXCALIBUR_GUILD_ID,
@@ -33,6 +37,37 @@ export function getPingsForServer(
 	if (roles.size === 0) return null;
 
 	return roles.map((role) => `||<@&${role.id}>||`).join(' ');
+}
+
+export async function checkCommandPermissions(guild: Guild, channelId: string) {
+	try {
+		const allPermissions = await guild.commands.permissions.fetch({});
+		if (allPermissions.size === 0) return false;
+
+		const permissions = Array.from(allPermissions)[0][1];
+		let isChannelAllowed = false;
+
+		const channels = permissions.filter(
+			(perm) =>
+				perm.type === ApplicationCommandPermissionType.Channel &&
+				perm.permission === true,
+		);
+
+		if (channels.length === 0) {
+			isChannelAllowed = false;
+		}
+
+		channels.forEach((channelPerm) => {
+			if (channelPerm.id === channelId) {
+				isChannelAllowed = true;
+			}
+		});
+
+		return isChannelAllowed;
+	} catch (error) {
+		console.error('Error checking command permissions:', error);
+		return false;
+	}
 }
 
 export function getExcaliburRankOfUser(
