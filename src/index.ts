@@ -10,7 +10,7 @@ import {
 } from './client/discord-client.js';
 import { handleCreateCommand } from './commands/create-command.js';
 import { handleStatusCommand } from './commands/status-command.js';
-import { TIMINGS } from './constants.js';
+import { ERROR_MESSAGES, TIMINGS } from './constants.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
 import { EventManager } from './event/event-manager.js';
 import {
@@ -84,12 +84,29 @@ appClient.once('clientReady', async () => {
 });
 
 appClient.on('interactionCreate', async (interaction) => {
+	const channel = interaction.channel;
+	const bot = appClient.user?.id;
+
+	const permitted = !!(
+		interaction.guild &&
+		interaction.member &&
+		interaction.member instanceof GuildMember &&
+		channel &&
+		bot &&
+		!channel.isDMBased() &&
+		channel.permissionsFor(bot)?.has('ViewChannel')
+	);
+
 	if (
-		!interaction.guild ||
-		!interaction.member ||
-		!(interaction.member instanceof GuildMember)
-	)
+		!permitted &&
+		(interaction.isMessageComponent() || interaction.isChatInputCommand())
+	) {
+		await interaction.reply({
+			content: ERROR_MESSAGES.NO_BOT_PERMISSIONS,
+			flags: ['Ephemeral'],
+		});
 		return;
+	}
 
 	try {
 		if (

@@ -80,6 +80,7 @@ export const ERROR_MESSAGES = {
 		'Cannot start the event yet - not enough participants signed up.',
 	EVENT_FINALIZING:
 		'The event is finalizing and will start soon. Only role changes are allowed.',
+	NO_BOT_PERMISSIONS: 'I do not have permission to interact in this channel.',
 } as const;
 
 export const PROCESSING_MESSAGES = {
