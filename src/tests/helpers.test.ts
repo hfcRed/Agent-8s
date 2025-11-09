@@ -1,13 +1,9 @@
 import { faker } from '@faker-js/faker';
-import {
-	ApplicationCommandPermissionType,
-	PermissionFlagsBits,
-} from 'discord.js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PermissionFlagsBits } from 'discord.js';
+import { describe, expect, it, vi } from 'vitest';
 import { EXCALIBUR_GUILD_ID, EXCALIBUR_RANKS } from '../constants.js';
 import {
-	checkCommandPermissions,
-	clearPermissionsCache,
+	botHasPermission,
 	getExcaliburRankOfUser,
 	getPingsForServer,
 	isUserAdmin,
@@ -257,255 +253,175 @@ describe('helpers', () => {
 		});
 	});
 
-	describe('checkCommandPermissions', () => {
-		beforeEach(() => {
-			vi.useFakeTimers();
-			clearPermissionsCache();
-		});
-
-		it('should return false when no permissions are configured', async () => {
-			const guild = {
-				commands: {
-					permissions: {
-						fetch: vi.fn().mockResolvedValue(new Map()),
-					},
+	describe('botHasPermission', () => {
+		it('should return true when bot has the specified permission', () => {
+			const client = {
+				user: {
+					id: faker.string.uuid(),
 				},
 			} as never;
 
-			const result = await checkCommandPermissions(guild, 'channel-123');
-			expect(result).toBe(false);
-		});
-
-		it('should return true when channel is explicitly allowed', async () => {
-			const channelId = faker.string.uuid();
-			const permissions = [
-				{
-					id: channelId,
-					type: ApplicationCommandPermissionType.Channel,
-					permission: true,
-				},
-			];
-			const permissionsMap = new Map([['command-123', permissions]]);
-
-			const guild = {
-				commands: {
-					permissions: {
-						fetch: vi.fn().mockResolvedValue(permissionsMap),
-					},
-				},
+			const channel = {
+				isTextBased: vi.fn().mockReturnValue(true),
+				isDMBased: vi.fn().mockReturnValue(false),
+				permissionsFor: vi.fn().mockReturnValue({
+					has: vi.fn().mockReturnValue(true),
+				}),
 			} as never;
 
-			const result = await checkCommandPermissions(guild, channelId);
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
 			expect(result).toBe(true);
 		});
 
-		it('should return false when channel is not in allowed list', async () => {
-			const channelId = faker.string.uuid();
-			const differentChannelId = faker.string.uuid();
-			const permissions = [
-				{
-					id: differentChannelId,
-					type: ApplicationCommandPermissionType.Channel,
-					permission: true,
-				},
-			];
-			const permissionsMap = new Map([['command-123', permissions]]);
-
-			const guild = {
-				commands: {
-					permissions: {
-						fetch: vi.fn().mockResolvedValue(permissionsMap),
-					},
-				},
-			} as never;
-
-			const result = await checkCommandPermissions(guild, channelId);
-			expect(result).toBe(false);
-		});
-
-		it('should return false when no channel permissions are configured', async () => {
-			const permissions = [
-				{
+		it('should return false when bot does not have the specified permission', () => {
+			const client = {
+				user: {
 					id: faker.string.uuid(),
-					type: ApplicationCommandPermissionType.Role,
-					permission: true,
-				},
-			];
-			const permissionsMap = new Map([['command-123', permissions]]);
-
-			const guild = {
-				commands: {
-					permissions: {
-						fetch: vi.fn().mockResolvedValue(permissionsMap),
-					},
 				},
 			} as never;
 
-			const result = await checkCommandPermissions(guild, faker.string.uuid());
+			const channel = {
+				isTextBased: vi.fn().mockReturnValue(true),
+				isDMBased: vi.fn().mockReturnValue(false),
+				permissionsFor: vi.fn().mockReturnValue({
+					has: vi.fn().mockReturnValue(false),
+				}),
+			} as never;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
 			expect(result).toBe(false);
 		});
 
-		it('should return false when permission check errors', async () => {
-			const consoleErrorSpy = vi
-				.spyOn(console, 'error')
-				.mockImplementation(() => {});
+		it('should return false when client user is not available', () => {
+			const client = {
+				user: null,
+			} as never;
 
-			const guild = {
-				commands: {
-					permissions: {
-						fetch: vi.fn().mockRejectedValue(new Error('API Error')),
-					},
+			const channel = {
+				isTextBased: vi.fn().mockReturnValue(true),
+				isDMBased: vi.fn().mockReturnValue(false),
+			} as never;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
+			expect(result).toBe(false);
+		});
+
+		it('should return false when channel is null', () => {
+			const client = {
+				user: {
+					id: faker.string.uuid(),
 				},
 			} as never;
 
-			const result = await checkCommandPermissions(guild, 'channel-123');
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				null,
+			);
 			expect(result).toBe(false);
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				'Error checking command permissions:',
-				expect.any(Error),
+		});
+
+		it('should return false when channel is not text-based', () => {
+			const client = {
+				user: {
+					id: faker.string.uuid(),
+				},
+			} as never;
+
+			const channel = {
+				isTextBased: vi.fn().mockReturnValue(false),
+				isDMBased: vi.fn().mockReturnValue(false),
+			} as never;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
+			expect(result).toBe(false);
+		});
+
+		it('should return false when channel is DM-based', () => {
+			const client = {
+				user: {
+					id: faker.string.uuid(),
+				},
+			} as never;
+
+			const channel = {
+				isTextBased: vi.fn().mockReturnValue(true),
+				isDMBased: vi.fn().mockReturnValue(true),
+			} as never;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
+			expect(result).toBe(false);
+		});
+
+		it('should return false when permissionsFor returns null', () => {
+			const client = {
+				user: {
+					id: faker.string.uuid(),
+				},
+			} as never;
+
+			const channel = {
+				isTextBased: vi.fn().mockReturnValue(true),
+				isDMBased: vi.fn().mockReturnValue(false),
+				permissionsFor: vi.fn().mockReturnValue(null),
+			} as never;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
+			expect(result).toBe(false);
+		});
+
+		it('should work with different permission types', () => {
+			const client = {
+				user: {
+					id: faker.string.uuid(),
+				},
+			} as never;
+
+			const channel = {
+				isTextBased: vi.fn().mockReturnValue(true),
+				isDMBased: vi.fn().mockReturnValue(false),
+				permissionsFor: vi.fn().mockReturnValue({
+					has: vi.fn().mockReturnValue(true),
+				}),
+			} as never;
+
+			const resultManageMessages = botHasPermission(
+				PermissionFlagsBits.ManageMessages,
+				client,
+				channel,
+			);
+			const resultAdministrator = botHasPermission(
+				PermissionFlagsBits.Administrator,
+				client,
+				channel,
 			);
 
-			consoleErrorSpy.mockRestore();
-		});
-
-		it('should handle multiple channel permissions correctly', async () => {
-			const channelId1 = faker.string.uuid();
-			const channelId2 = faker.string.uuid();
-			const permissions = [
-				{
-					id: channelId1,
-					type: ApplicationCommandPermissionType.Channel,
-					permission: true,
-				},
-				{
-					id: channelId2,
-					type: ApplicationCommandPermissionType.Channel,
-					permission: true,
-				},
-			];
-			const permissionsMap = new Map([['command-123', permissions]]);
-
-			const guild = {
-				commands: {
-					permissions: {
-						fetch: vi.fn().mockResolvedValue(permissionsMap),
-					},
-				},
-			} as never;
-
-			const result1 = await checkCommandPermissions(guild, channelId1);
-			const result2 = await checkCommandPermissions(guild, channelId2);
-
-			expect(result1).toBe(true);
-			expect(result2).toBe(true);
-		});
-
-		it('should cache permission results for 1 minute', async () => {
-			const guildId = faker.string.uuid();
-			const channelId = faker.string.uuid();
-			const permissions = [
-				{
-					id: channelId,
-					type: ApplicationCommandPermissionType.Channel,
-					permission: true,
-				},
-			];
-			const permissionsMap = new Map([['command-123', permissions]]);
-			const fetchSpy = vi.fn().mockResolvedValue(permissionsMap);
-
-			const guild = {
-				id: guildId,
-				commands: {
-					permissions: {
-						fetch: fetchSpy,
-					},
-				},
-			} as never;
-
-			// First call should fetch
-			const result1 = await checkCommandPermissions(guild, channelId);
-			expect(result1).toBe(true);
-			expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-			// Second call within 1 minute should use cache
-			const result2 = await checkCommandPermissions(guild, channelId);
-			expect(result2).toBe(true);
-			expect(fetchSpy).toHaveBeenCalledTimes(1); // Still only called once
-
-			// Advance time by 1 minute
-			vi.advanceTimersByTime(60 * 5 * 1000);
-
-			// Third call after cache expiry should fetch again
-			const result3 = await checkCommandPermissions(guild, channelId);
-			expect(result3).toBe(true);
-			expect(fetchSpy).toHaveBeenCalledTimes(2);
-
-			vi.useRealTimers();
-		});
-
-		it('should maintain separate cache entries for different guild-channel combinations', async () => {
-			const guildId1 = faker.string.uuid();
-			const guildId2 = faker.string.uuid();
-			const channelId1 = faker.string.uuid();
-			const channelId2 = faker.string.uuid();
-
-			const permissions1 = [
-				{
-					id: channelId1,
-					type: ApplicationCommandPermissionType.Channel,
-					permission: true,
-				},
-			];
-			const permissions2 = [
-				{
-					id: channelId2,
-					type: ApplicationCommandPermissionType.Channel,
-					permission: true,
-				},
-			];
-
-			const fetchSpy1 = vi
-				.fn()
-				.mockResolvedValue(new Map([['command-123', permissions1]]));
-			const fetchSpy2 = vi
-				.fn()
-				.mockResolvedValue(new Map([['command-123', permissions2]]));
-
-			const guild1 = {
-				id: guildId1,
-				commands: {
-					permissions: {
-						fetch: fetchSpy1,
-					},
-				},
-			} as never;
-
-			const guild2 = {
-				id: guildId2,
-				commands: {
-					permissions: {
-						fetch: fetchSpy2,
-					},
-				},
-			} as never;
-
-			// Call for different guild-channel combinations
-			await checkCommandPermissions(guild1, channelId1);
-			await checkCommandPermissions(guild2, channelId2);
-			await checkCommandPermissions(guild1, channelId2);
-
-			// Each unique combination should trigger a fetch
-			expect(fetchSpy1).toHaveBeenCalledTimes(2); // guild1-channel1 and guild1-channel2
-			expect(fetchSpy2).toHaveBeenCalledTimes(1); // guild2-channel2
-
-			// Second calls should use cache
-			await checkCommandPermissions(guild1, channelId1);
-			await checkCommandPermissions(guild2, channelId2);
-
-			expect(fetchSpy1).toHaveBeenCalledTimes(2); // Still 2
-			expect(fetchSpy2).toHaveBeenCalledTimes(1); // Still 1
-
-			vi.useRealTimers();
+			expect(resultManageMessages).toBe(true);
+			expect(resultAdministrator).toBe(true);
 		});
 	});
 });
