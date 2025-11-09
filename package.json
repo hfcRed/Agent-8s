@@ -8,7 +8,7 @@
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"check": "biome check --write .",
-		"test": "vitest",
+		"test": "vitest --run",
 		"test:watch": "vitest --watch",
 		"test:coverage": "vitest --coverage",
 		"run-all": "pnpm run format && pnpm run lint && pnpm run check && pnpm run test"

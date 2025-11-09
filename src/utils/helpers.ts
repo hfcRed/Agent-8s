@@ -39,10 +39,27 @@ export function getPingsForServer(
 	return roles.map((role) => `||<@&${role.id}>||`).join(' ');
 }
 
+const permissionsCache = new Map();
+const CACHE_DURATION = 60 * 5 * 1000;
+
+export function clearPermissionsCache() {
+	permissionsCache.clear();
+}
+
 export async function checkCommandPermissions(guild: Guild, channelId: string) {
 	try {
+		const cacheKey = `${guild.id}-${channelId}`;
+		const cached = permissionsCache.get(cacheKey);
+
+		if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+			return cached.data;
+		}
+
 		const allPermissions = await guild.commands.permissions.fetch({});
-		if (allPermissions.size === 0) return false;
+		if (allPermissions.size === 0) {
+			permissionsCache.set(cacheKey, { data: false, timestamp: Date.now() });
+			return false;
+		}
 
 		const permissions = Array.from(allPermissions)[0][1];
 		let isChannelAllowed = false;
@@ -63,6 +80,10 @@ export async function checkCommandPermissions(guild: Guild, channelId: string) {
 			}
 		});
 
+		permissionsCache.set(cacheKey, {
+			data: isChannelAllowed,
+			timestamp: Date.now(),
+		});
 		return isChannelAllowed;
 	} catch (error) {
 		console.error('Error checking command permissions:', error);
