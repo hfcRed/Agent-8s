@@ -24,6 +24,8 @@ Under ``Server Settings > Integrations > Agent 8s > Channels`` disable ``All Cha
 Now create two new roles ``Comp 8s`` and ``Casual 8s``. These are the roles the bot will ping when a new event is created.  
 <img width="50%" alt="02-15-03-20-Discord" src="https://github.com/user-attachments/assets/69ce3f73-cef8-4a47-b262-48df0a5ac7b3" />
 
+If you want to use the bot in a channel that is in a Private Category, make sure to add the bot user to the categories permissions with the "Add members or roles" button. The bot requires this to be able to create voice channels in the category.
+
 ### Using the bot
 
 The bot has a single command ``/create`` that can be used in the permitted channels to create a new event. The command allows two optional parameters:
@@ -41,6 +43,19 @@ After an event has started, users can use the ``Drop In`` and ``Drop Out`` butto
 Admins can cancel and finish events at any point, even if they are not part of the event.
 
 Should an event not start because not enough players are found, or the event is not manually finished, the bot will automatically close and archive the event after 24 hours.
+
+## Permission scopes
+
+The bot requires a handful of permissions to be granted when added to a server. Disabling permissions is not recommended, and there is no gurantee the bot will be able to function properly without them. Here is a breakdown of all the permissions:
+
+- **Manage Roles**: Required to remove a users access to voice channels if they drop out of an event
+- **Manage Channels**: Required to create and delete voice channels
+- **View Channels**: Required to view all public channels
+- **Send Messages**: Required to reply to commands with a message
+- **Send Messages in Threads**: Required to send messages in threads
+- **Create Private Threads**: Required to create new private threads
+- **Manage Messages**: Required to delete messages that arent commands
+- **Manage Threads**: Required to add/remove users from a thread, pin messages in threads, and close and archive threads
 
 ## Running locally
 
