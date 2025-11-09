@@ -78,9 +78,9 @@ export class ThreadManager {
 	}
 
 	async addMembers(thread: ThreadChannel, userIds: string[]) {
-		for (const userId of userIds) {
-			await this.addMember(thread, userId);
-		}
+		await Promise.allSettled(
+			userIds.map((userId) => this.addMember(thread, userId)),
+		);
 	}
 
 	async lockAndArchive(thread: ThreadChannel) {

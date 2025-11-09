@@ -117,9 +117,11 @@ export class VoiceChannelManager {
 		channelIds: string[],
 		userId: string,
 	) {
-		for (const channelId of channelIds) {
-			await this.grantAccess(appClient, channelId, userId);
-		}
+		await Promise.allSettled(
+			channelIds.map((channelId) =>
+				this.grantAccess(appClient, channelId, userId),
+			),
+		);
 	}
 
 	async revokeAccessFromChannels(
@@ -127,9 +129,11 @@ export class VoiceChannelManager {
 		channelIds: string[],
 		userId: string,
 	) {
-		for (const channelId of channelIds) {
-			await this.revokeAccess(appClient, channelId, userId);
-		}
+		await Promise.allSettled(
+			channelIds.map((channelId) =>
+				this.revokeAccess(appClient, channelId, userId),
+			),
+		);
 	}
 
 	async deleteChannel(appClient: Client, channelId: string) {
@@ -147,8 +151,8 @@ export class VoiceChannelManager {
 	}
 
 	async deleteChannels(appClient: Client, channelIds: string[]) {
-		for (const channelId of channelIds) {
-			await this.deleteChannel(appClient, channelId);
-		}
+		await Promise.allSettled(
+			channelIds.map((channelId) => this.deleteChannel(appClient, channelId)),
+		);
 	}
 }
