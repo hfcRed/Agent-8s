@@ -36,8 +36,10 @@ export class ThreadManager {
 
 	async sendAndPinEmbed(thread: ThreadChannel, embed: EmbedBuilder) {
 		try {
-			const message = await thread.send({ embeds: [embed] });
-			await message.pin();
+			await thread.send({ embeds: [embed] });
+			// Pinning requires the Manage Messages permission, which may not be granted.
+			// Wait until Discord has updated their permissions system for pinning to be separate.
+			// await message.pin();
 			return true;
 		} catch (error) {
 			console.error('Failed to send and pin message to thread:', error);

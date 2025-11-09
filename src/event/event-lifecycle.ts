@@ -55,29 +55,12 @@ export async function startEvent(
 
 	await message.edit({ embeds: [embed], components: [buttonRow, selectRow] });
 
+	const participants = Array.from(participantMap.values());
 	const channel = message.channel as TextChannel;
-
 	const thread = await threadManager.createEventThread(
 		channel,
 		shortId || 'unknown',
 	);
-
-	if (thread) {
-		await threadManager.sendAndPinEmbed(
-			thread,
-			EmbedBuilder.from(message.embeds[0]),
-		);
-		eventManager.setThread(message.id, thread.id);
-	}
-
-	const participants = Array.from(participantMap.values());
-
-	if (thread) {
-		await threadManager.addMembers(
-			thread,
-			participants.map((p) => p.userId),
-		);
-	}
 
 	const voiceChannels = await voiceChannelManager.createEventVoiceChannels(
 		message.guild as Guild,
@@ -86,13 +69,24 @@ export async function startEvent(
 		shortId || 'unknown',
 		appClient,
 	);
-
 	eventManager.setVoiceChannels(message.id, voiceChannels);
 
 	if (thread) {
+		eventManager.setThread(message.id, thread.id);
+
+		await threadManager.sendAndPinEmbed(
+			thread,
+			EmbedBuilder.from(message.embeds[0]),
+		);
+
 		await threadManager.sendMessage(
 			thread,
-			`**Voice Channels Created**\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+			`**Voice Channels Created**\n\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+		);
+
+		await threadManager.addMembers(
+			thread,
+			participants.map((p) => p.userId),
 		);
 	}
 
