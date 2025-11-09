@@ -3,6 +3,7 @@ import type { EventManager } from '../event/event-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 
 const BOT_START_TIME = Date.now();
+const BOT_VERSION = process.env.npm_package_version || 'unknown';
 
 export async function handleStatusCommand(
 	interaction: ChatInputCommandInteraction,
@@ -11,6 +12,8 @@ export async function handleStatusCommand(
 ) {
 	const uptime = Date.now() - BOT_START_TIME;
 	const memoryUsage = process.memoryUsage();
+	const guildCount = interaction.client.guilds.cache.size;
+	const nodeVersion = process.version;
 
 	let activeEventsCount = 0;
 	let totalParticipants = 0;
@@ -23,6 +26,21 @@ export async function handleStatusCommand(
 		.setColor(0x5865f2)
 		.setTitle('Bot Status')
 		.addFields(
+			{
+				name: '📦 Version',
+				value: BOT_VERSION,
+				inline: true,
+			},
+			{
+				name: '🟢 Node.js',
+				value: nodeVersion,
+				inline: true,
+			},
+			{
+				name: '🌐 Guilds',
+				value: `${guildCount}`,
+				inline: true,
+			},
 			{
 				name: '⏱️ Uptime',
 				value: formatUptime(uptime),
@@ -39,10 +57,6 @@ export async function handleStatusCommand(
 				inline: true,
 			},
 			{
-				name: '',
-				value: '',
-			},
-			{
 				name: '📊 Active Events',
 				value: `${activeEventsCount}`,
 				inline: true,
@@ -51,10 +65,6 @@ export async function handleStatusCommand(
 				name: '👥 Total Participants',
 				value: `${totalParticipants}`,
 				inline: true,
-			},
-			{
-				name: '',
-				value: '',
 			},
 			{
 				name: '💾 Memory Usage',

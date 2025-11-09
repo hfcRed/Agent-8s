@@ -50,6 +50,11 @@ describe('handleStatusCommand', () => {
 		interaction = {
 			client: {
 				ws: { ping: 42 },
+				guilds: {
+					cache: {
+						size: 5,
+					},
+				},
 			} as Client,
 			guild: { id: faker.string.uuid() },
 			reply: vi.fn(),
@@ -204,5 +209,43 @@ describe('handleStatusCommand', () => {
 
 		expect(activeEventsField?.value).toBe('0');
 		expect(participantsField?.value).toBe('0');
+	});
+
+	it('should show guild count', async () => {
+		await handleStatusCommand(interaction, eventManager, telemetry);
+
+		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const fields = getEmbedFields(call);
+		const guildField = fields?.find(
+			(f: APIEmbedField) => f.name === '🌐 Guilds',
+		);
+
+		expect(guildField?.value).toBe('5');
+	});
+
+	it('should show bot version', async () => {
+		await handleStatusCommand(interaction, eventManager, telemetry);
+
+		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const fields = getEmbedFields(call);
+		const versionField = fields?.find(
+			(f: APIEmbedField) => f.name === '📦 Version',
+		);
+
+		expect(versionField?.value).toBeDefined();
+		expect(versionField?.value).toMatch(/\d+\.\d+\.\d+/);
+	});
+
+	it('should show Node.js version', async () => {
+		await handleStatusCommand(interaction, eventManager, telemetry);
+
+		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const fields = getEmbedFields(call);
+		const nodeField = fields?.find(
+			(f: APIEmbedField) => f.name === '🟢 Node.js',
+		);
+
+		expect(nodeField?.value).toBeDefined();
+		expect(nodeField?.value).toMatch(/^v\d+\.\d+\.\d+/);
 	});
 });
