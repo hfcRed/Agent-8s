@@ -27,7 +27,7 @@ import { handleRoleSelection } from './interactions/menu-handlers.js';
 import { ThreadManager } from './managers/thread-manager.js';
 import { VoiceChannelManager } from './managers/voice-channel-manager.js';
 import { initializeTelemetry } from './telemetry/telemetry.js';
-import { checkCommandPermissions } from './utils/helpers.js';
+import { botHasPermission } from './utils/helpers.js';
 
 dotenv.config({ quiet: true });
 const botToken = process.env.BOT_TOKEN;
@@ -113,7 +113,7 @@ appClient.on('interactionCreate', async (interaction) => {
 		if (
 			interaction.guild &&
 			interaction.isChatInputCommand() &&
-			!(await checkCommandPermissions(interaction.guild, interaction.channelId))
+			!botHasPermission('ViewChannel', appClient, interaction.channel)
 		) {
 			await interaction.reply({
 				content: ERROR_MESSAGES.NO_BOT_PERMISSIONS,

@@ -1,14 +1,14 @@
 import type {
 	ButtonInteraction,
 	ChatInputCommandInteraction,
-	Guild,
+	Client,
 	GuildMember,
+	GuildTextBasedChannel,
+	PermissionResolvable,
 	StringSelectMenuInteraction,
+	TextBasedChannel,
 } from 'discord.js';
-import {
-	ApplicationCommandPermissionType,
-	PermissionFlagsBits,
-} from 'discord.js';
+import { PermissionFlagsBits } from 'discord.js';
 import {
 	ADMIN_PERMISSIONS,
 	EXCALIBUR_GUILD_ID,
@@ -39,56 +39,20 @@ export function getPingsForServer(
 	return roles.map((role) => `||<@&${role.id}>||`).join(' ');
 }
 
-const permissionsCache = new Map();
-const CACHE_DURATION = 60 * 5 * 1000;
+export function botHasPermission(
+	permission: PermissionResolvable,
+	client: Client,
+	channel: GuildTextBasedChannel | TextBasedChannel | null,
+) {
+	const bot = client.user;
 
-export function clearPermissionsCache() {
-	permissionsCache.clear();
-}
-
-export async function checkCommandPermissions(guild: Guild, channelId: string) {
-	try {
-		const cacheKey = `${guild.id}-${channelId}`;
-		const cached = permissionsCache.get(cacheKey);
-
-		if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-			return cached.data;
-		}
-
-		const allPermissions = await guild.commands.permissions.fetch({});
-		if (allPermissions.size === 0) {
-			permissionsCache.set(cacheKey, { data: false, timestamp: Date.now() });
-			return false;
-		}
-
-		const permissions = Array.from(allPermissions)[0][1];
-		let isChannelAllowed = false;
-
-		const channels = permissions.filter(
-			(perm) =>
-				perm.type === ApplicationCommandPermissionType.Channel &&
-				perm.permission === true,
-		);
-
-		if (channels.length === 0) {
-			isChannelAllowed = false;
-		}
-
-		channels.forEach((channelPerm) => {
-			if (channelPerm.id === channelId) {
-				isChannelAllowed = true;
-			}
-		});
-
-		permissionsCache.set(cacheKey, {
-			data: isChannelAllowed,
-			timestamp: Date.now(),
-		});
-		return isChannelAllowed;
-	} catch (error) {
-		console.error('Error checking command permissions:', error);
+	if (!bot || !channel || !channel.isTextBased() || channel.isDMBased())
 		return false;
-	}
+
+	const botPermissions = channel.permissionsFor(bot);
+	if (!botPermissions || !botPermissions.has(permission)) return false;
+
+	return true;
 }
 
 export function getExcaliburRankOfUser(

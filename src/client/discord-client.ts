@@ -3,7 +3,7 @@ import { cleanupEvent } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
-import { checkCommandPermissions, isUserAdmin } from '../utils/helpers.js';
+import { botHasPermission, isUserAdmin } from '../utils/helpers.js';
 
 export function createDiscordClient() {
 	return new Client({
@@ -70,14 +70,14 @@ export function setupErrorHandlers(client: Client) {
 
 export function setupMessageDeletionHandler(client: Client) {
 	client.on('messageCreate', async (message) => {
-		if (message.author.bot || !message.guild) return;
-
-		const hasPermission = await checkCommandPermissions(
-			message.guild,
-			message.channel.id,
-		);
-
-		if (!hasPermission) return;
+		if (
+			message.author.bot ||
+			!message.guild ||
+			message.channel.isThread() ||
+			!botHasPermission('ViewChannel', client, message.channel) ||
+			!botHasPermission('ManageMessages', client, message.channel)
+		)
+			return;
 
 		try {
 			const member = message.member;
