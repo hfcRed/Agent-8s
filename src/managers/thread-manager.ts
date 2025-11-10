@@ -39,6 +39,7 @@ export class ThreadManager {
 			await thread.send({ embeds: [embed] });
 			// Pinning requires the Manage Messages permission, which may not be granted.
 			// Wait until Discord has updated their permissions system for pinning to be separate.
+			// Make sure to update test if this is enabled.
 			// await message.pin();
 			return true;
 		} catch (error) {
