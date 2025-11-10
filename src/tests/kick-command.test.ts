@@ -85,7 +85,8 @@ describe('handleKickCommand', () => {
 			user: mockUser,
 			client: mockClient,
 			guildId: faker.string.uuid(),
-			reply: vi.fn(),
+			deferReply: vi.fn(),
+			editReply: vi.fn(),
 			options: {
 				getUser: vi.fn(() => mockTargetUser),
 			} as unknown as CommandInteractionOptionResolver,
@@ -100,9 +101,11 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: ERROR_MESSAGES.NO_EVENT_OWNED,
+		expect(interaction.deferReply).toHaveBeenCalledWith({
 			flags: ['Ephemeral'],
+		});
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: ERROR_MESSAGES.NO_EVENT_OWNED,
 		});
 	});
 
@@ -120,9 +123,11 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: 'You cannot kick yourself from your own event.',
+		expect(interaction.deferReply).toHaveBeenCalledWith({
 			flags: ['Ephemeral'],
+		});
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: 'You cannot kick yourself from your own event.',
 		});
 	});
 
@@ -143,9 +148,11 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: `<@${mockTargetUser.id}> is not signed up for your event.`,
+		expect(interaction.deferReply).toHaveBeenCalledWith({
 			flags: ['Ephemeral'],
+		});
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: `<@${mockTargetUser.id}> is not signed up for your event.`,
 		});
 	});
 
@@ -170,9 +177,11 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+		expect(interaction.deferReply).toHaveBeenCalledWith({
 			flags: ['Ephemeral'],
+		});
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
 		});
 	});
 
@@ -202,9 +211,11 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
+		expect(interaction.deferReply).toHaveBeenCalledWith({
 			flags: ['Ephemeral'],
+		});
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
 		});
 	});
 
@@ -237,9 +248,11 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: ERROR_MESSAGES.MESSAGE_NOT_FOUND,
+		expect(interaction.deferReply).toHaveBeenCalledWith({
 			flags: ['Ephemeral'],
+		});
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: ERROR_MESSAGES.MESSAGE_NOT_FOUND,
 		});
 	});
 
@@ -284,14 +297,16 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
+		expect(interaction.deferReply).toHaveBeenCalledWith({
+			flags: ['Ephemeral'],
+		});
 		expect(mockClient.channels.fetch).toHaveBeenCalledWith(channelId);
 		expect(mockChannel.messages.fetch).toHaveBeenCalledWith(eventId);
 		expect(fetchThreadSpy).toHaveBeenCalledWith(mockChannel, threadId);
 		expect(removeMemberSpy).toHaveBeenCalledWith(mockThread, mockTargetUser.id);
 		expect(mockMessage.edit).toHaveBeenCalled();
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: `Successfully kicked <@${mockTargetUser.id}> from your event.`,
-			flags: ['Ephemeral'],
 		});
 
 		// Verify participant was removed
@@ -336,14 +351,16 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
+		expect(interaction.deferReply).toHaveBeenCalledWith({
+			flags: ['Ephemeral'],
+		});
 		expect(revokeAccessSpy).toHaveBeenCalledWith(
 			mockClient,
 			voiceChannelIds,
 			mockTargetUser.id,
 		);
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: `Successfully kicked <@${mockTargetUser.id}> from your event.`,
-			flags: ['Ephemeral'],
 		});
 	});
 
@@ -377,13 +394,15 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
+		expect(interaction.deferReply).toHaveBeenCalledWith({
+			flags: ['Ephemeral'],
+		});
 		expect(consoleSpy).toHaveBeenCalledWith(
 			'Error in kick command:',
 			expect.any(Error),
 		);
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: 'An error occurred while trying to kick the user.',
-			flags: ['Ephemeral'],
 		});
 
 		consoleSpy.mockRestore();
@@ -423,11 +442,13 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
+		expect(interaction.deferReply).toHaveBeenCalledWith({
+			flags: ['Ephemeral'],
+		});
 		expect(fetchThreadSpy).not.toHaveBeenCalled();
 		expect(removeMemberSpy).not.toHaveBeenCalled();
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: `Successfully kicked <@${mockTargetUser.id}> from your event.`,
-			flags: ['Ephemeral'],
 		});
 	});
 
@@ -467,10 +488,12 @@ describe('handleKickCommand', () => {
 			voiceChannelManager,
 		);
 
-		expect(revokeAccessSpy).not.toHaveBeenCalled();
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: `Successfully kicked <@${mockTargetUser.id}> from your event.`,
+		expect(interaction.deferReply).toHaveBeenCalledWith({
 			flags: ['Ephemeral'],
+		});
+		expect(revokeAccessSpy).not.toHaveBeenCalled();
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: `Successfully kicked <@${mockTargetUser.id}> from your event.`,
 		});
 	});
 });
