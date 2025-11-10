@@ -16,13 +16,14 @@ export async function handleKickCommand(
 	threadManager: ThreadManager,
 	voiceChannelManager: VoiceChannelManager,
 ) {
+	await interaction.deferReply({ flags: ['Ephemeral'] });
+
 	const userId = interaction.user.id;
 	const userEventId = eventManager.userOwnsEvent(userId);
 
 	if (!userEventId) {
-		await interaction.reply({
+		await interaction.editReply({
 			content: ERROR_MESSAGES.NO_EVENT_OWNED,
-			flags: ['Ephemeral'],
 		});
 		return;
 	}
@@ -38,27 +39,24 @@ export async function handleKickCommand(
 	const targetUserId = targetUser.id;
 
 	if (targetUserId === userId) {
-		await interaction.reply({
+		await interaction.editReply({
 			content: 'You cannot kick yourself from your own event.',
-			flags: ['Ephemeral'],
 		});
 		return;
 	}
 
 	const participants = eventManager.getParticipants(userEventId);
 	if (!participants || !participants.has(targetUserId)) {
-		await interaction.reply({
+		await interaction.editReply({
 			content: `<@${targetUserId}> is not signed up for your event.`,
-			flags: ['Ephemeral'],
 		});
 		return;
 	}
 
 	const channelId = eventManager.getChannelId(userEventId);
 	if (!channelId) {
-		await interaction.reply({
+		await interaction.editReply({
 			content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
-			flags: ['Ephemeral'],
 		});
 		return;
 	}
@@ -66,18 +64,16 @@ export async function handleKickCommand(
 	try {
 		const channel = await interaction.client.channels.fetch(channelId);
 		if (!channel || !channel.isTextBased()) {
-			await interaction.reply({
+			await interaction.editReply({
 				content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
-				flags: ['Ephemeral'],
 			});
 			return;
 		}
 
 		const message = await channel.messages.fetch(userEventId);
 		if (!message) {
-			await interaction.reply({
+			await interaction.editReply({
 				content: ERROR_MESSAGES.MESSAGE_NOT_FOUND,
-				flags: ['Ephemeral'],
 			});
 			return;
 		}
@@ -113,16 +109,14 @@ export async function handleKickCommand(
 			await message.edit({ embeds: [embed] });
 		}
 
-		await interaction.reply({
+		await interaction.editReply({
 			content: `Successfully kicked <@${targetUserId}> from your event.`,
-			flags: ['Ephemeral'],
 		});
 	} catch (error) {
 		console.error('Error in kick command:', error);
 
-		await interaction.reply({
+		await interaction.editReply({
 			content: 'An error occurred while trying to kick the user.',
-			flags: ['Ephemeral'],
 		});
 	}
 }
