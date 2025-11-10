@@ -11,7 +11,7 @@ import { EventManager } from '../event/event-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 
 // Helper function to extract embeds and fields from interaction reply
-function getEmbedFields(call: unknown): APIEmbedField[] | undefined {
+function getEmbedFields(call: unknown) {
 	if (
 		typeof call !== 'string' &&
 		call &&

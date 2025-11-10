@@ -81,6 +81,12 @@ export const ERROR_MESSAGES = {
 	EVENT_FINALIZING:
 		'The event is finalizing and will start soon. Only role changes are allowed.',
 	NO_BOT_PERMISSIONS: 'I do not have permission to interact in this channel.',
+	NO_EVENT_OWNED: "You don't own any active events.",
+	CHANNEL_NOT_FOUND: 'Could not find the event channel.',
+	CHANNEL_NO_ACCESS: 'Could not access the event channel.',
+	MESSAGE_NOT_FOUND: 'Could not find the event message.',
+	ROLE_NOT_FOUND: 'Could not find the appropriate role to ping in this server.',
+	REPING_EVENT_FULL: 'Your event is already full. No need to re-ping roles.',
 } as const;
 
 export const PROCESSING_MESSAGES = {

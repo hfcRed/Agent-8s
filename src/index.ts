@@ -9,6 +9,7 @@ import {
 	setupMessageDeletionHandler,
 } from './client/discord-client.js';
 import { handleCreateCommand } from './commands/create-command.js';
+import { handleRepingCommand } from './commands/reping-command.js';
 import { handleStatusCommand } from './commands/status-command.js';
 import { ERROR_MESSAGES, TIMINGS } from './constants.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
@@ -76,7 +77,11 @@ const commands = [
 		.toJSON(),
 	new SlashCommandBuilder()
 		.setName('status')
-		.setDescription('Display bot status and statistics')
+		.setDescription('Display bot status and statistics.')
+		.toJSON(),
+	new SlashCommandBuilder()
+		.setName('re-ping')
+		.setDescription('Re-ping the roles for your event.')
 		.toJSON(),
 ];
 
@@ -141,6 +146,14 @@ appClient.on('interactionCreate', async (interaction) => {
 			interaction.commandName === 'status'
 		) {
 			await handleStatusCommand(interaction, eventManager, telemetry);
+			return;
+		}
+
+		if (
+			interaction.isChatInputCommand() &&
+			interaction.commandName === 're-ping'
+		) {
+			await handleRepingCommand(interaction, eventManager);
 			return;
 		}
 

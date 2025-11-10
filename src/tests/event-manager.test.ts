@@ -130,6 +130,26 @@ describe('EventManager', () => {
 			const result = eventManager.getCreator(eventId);
 			expect(result).toBeUndefined();
 		});
+
+		it('should find event owned by a user', () => {
+			const creatorId = faker.string.uuid();
+			const event1 = faker.string.uuid();
+			const event2 = faker.string.uuid();
+
+			eventManager.setCreator(event1, faker.string.uuid());
+			eventManager.setCreator(event2, creatorId);
+
+			const result = eventManager.userOwnsEvent(creatorId);
+			expect(result).toBe(event2);
+		});
+
+		it('should return undefined when user does not own any event', () => {
+			const creatorId = faker.string.uuid();
+			eventManager.setCreator(eventId, faker.string.uuid());
+
+			const result = eventManager.userOwnsEvent(creatorId);
+			expect(result).toBeUndefined();
+		});
 	});
 
 	describe('timers', () => {

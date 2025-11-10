@@ -75,6 +75,19 @@ export class EventManager {
 		return this.creators.get(eventId);
 	}
 
+	getAllCreators() {
+		return this.creators.entries();
+	}
+
+	userOwnsEvent(userId: string) {
+		for (const [eventId, creatorId] of this.creators.entries()) {
+			if (creatorId === userId) {
+				return eventId;
+			}
+		}
+		return undefined;
+	}
+
 	setCreator(eventId: string, creatorId: string) {
 		this.creators.set(eventId, creatorId);
 	}
