@@ -9,6 +9,7 @@ import {
 	setupMessageDeletionHandler,
 } from './client/discord-client.js';
 import { handleCreateCommand } from './commands/create-command.js';
+import { handleKickCommand } from './commands/kick-command.js';
 import { handleRepingCommand } from './commands/reping-command.js';
 import { handleStatusCommand } from './commands/status-command.js';
 import { ERROR_MESSAGES, TIMINGS } from './constants.js';
@@ -83,6 +84,13 @@ const commands = [
 		.setName('re-ping')
 		.setDescription('Re-ping the roles for your event.')
 		.toJSON(),
+	new SlashCommandBuilder()
+		.setName('kick')
+		.setDescription('Kick the selected user from your event.')
+		.addUserOption((option) =>
+			option.setName('user').setDescription('User to kick').setRequired(true),
+		)
+		.toJSON(),
 ];
 
 appClient.once('clientReady', async () => {
@@ -154,6 +162,19 @@ appClient.on('interactionCreate', async (interaction) => {
 			interaction.commandName === 're-ping'
 		) {
 			await handleRepingCommand(interaction, eventManager);
+			return;
+		}
+
+		if (
+			interaction.isChatInputCommand() &&
+			interaction.commandName === 'kick'
+		) {
+			await handleKickCommand(
+				interaction,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 			return;
 		}
 

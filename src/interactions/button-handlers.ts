@@ -1,5 +1,6 @@
 import {
 	type ButtonInteraction,
+	type ChatInputCommandInteraction,
 	type Client,
 	EmbedBuilder,
 	type GuildMember,
@@ -497,7 +498,7 @@ async function updateParticipantEmbed(
 export async function checkProcessingStates(
 	messageId: string,
 	eventManager: EventManager,
-	interaction?: ButtonInteraction,
+	interaction?: ButtonInteraction | ChatInputCommandInteraction,
 ) {
 	if (eventManager.isProcessing(messageId, 'starting')) {
 		await interaction?.reply({
@@ -530,7 +531,11 @@ export async function checkProcessingStates(
 		return true;
 	}
 
-	if (interaction && eventManager.isEventFinalizing(interaction.message)) {
+	if (
+		interaction &&
+		'message' in interaction &&
+		eventManager.isEventFinalizing(interaction.message)
+	) {
 		await interaction.reply({
 			content: ERROR_MESSAGES.EVENT_FINALIZING,
 			flags: ['Ephemeral'],
