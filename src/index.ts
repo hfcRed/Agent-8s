@@ -8,6 +8,7 @@ import {
 	setupEventMessageDeleteHandler,
 	setupMessageDeletionHandler,
 } from './client/discord-client.js';
+import { gracefulShutdown, isInShutdownMode } from './client/shutdown.js';
 import { handleCreateCommand } from './commands/create-command.js';
 import { handleKickCommand } from './commands/kick-command.js';
 import { handleRepingCommand } from './commands/reping-command.js';
@@ -98,6 +99,16 @@ appClient.once('clientReady', async () => {
 });
 
 appClient.on('interactionCreate', async (interaction) => {
+	if (isInShutdownMode()) {
+		if (!interaction.isRepliable()) return;
+
+		await interaction.reply({
+			content: 'Bot is shutting down. Please try again later.',
+			flags: ['Ephemeral'],
+		});
+		return;
+	}
+
 	const channel = interaction.channel;
 	const bot = appClient.user?.id;
 
@@ -297,6 +308,7 @@ appClient.on('interactionCreate', async (interaction) => {
 	}
 });
 
+setupErrorHandlers(appClient);
 setupMessageDeletionHandler(appClient);
 setupEventMessageDeleteHandler(
 	appClient,
@@ -304,7 +316,27 @@ setupEventMessageDeleteHandler(
 	threadManager,
 	voiceChannelManager,
 );
-setupErrorHandlers(appClient);
+
+process.on('SIGINT', () =>
+	gracefulShutdown(
+		'SIGINT',
+		appClient,
+		eventManager,
+		threadManager,
+		voiceChannelManager,
+		telemetry,
+	),
+);
+process.on('SIGTERM', () =>
+	gracefulShutdown(
+		'SIGTERM',
+		appClient,
+		eventManager,
+		threadManager,
+		voiceChannelManager,
+		telemetry,
+	),
+);
 
 setInterval(
 	() =>

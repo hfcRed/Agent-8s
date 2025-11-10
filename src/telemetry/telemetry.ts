@@ -94,6 +94,10 @@ export class TelemetryService {
 	async trackEventExpired(data: TelemetryEventData) {
 		await this.sendEvent('event_expired', data);
 	}
+
+	async dispose() {
+		await this.recorder?.dispose();
+	}
 }
 
 export function initializeTelemetry(

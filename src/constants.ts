@@ -11,6 +11,7 @@ export const TIMINGS = {
 	DAY_IN_MS: 24 * 60 * 60 * 1000,
 	PROCESSING_TIMEOUT_MS: 30000,
 	EVENT_START_DELAY_MINUTES: DEV ? 0 : 0.25,
+	SHUTDOWN_EVENT_CLEANUP_DELAY_MS: 2000,
 } as const;
 
 export const PING_ROLE_NAMES = {
@@ -62,6 +63,7 @@ export const STATUS_MESSAGES = {
 	CANCELLED: '❌ Event cancelled',
 	FINISHED: '🏁 Event Finished',
 	EXPIRED: '⏰ Event Expired (24h timeout)',
+	SHUTDOWN: '⚠️ Event closed due to bot shutdown!',
 } as const;
 
 export const ERROR_MESSAGES = {
