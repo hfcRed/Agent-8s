@@ -16,7 +16,7 @@ export function isInShutdownMode() {
 	return isShuttingDown;
 }
 
-async function gracefulShutdown(
+export async function gracefulShutdown(
 	signal: string,
 	client: Client,
 	eventManager: EventManager,

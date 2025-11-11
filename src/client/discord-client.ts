@@ -1,9 +1,12 @@
-import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, REST, Routes } from 'discord.js';
+import { AUTHOR_ID } from '../constants.js';
 import { cleanupEvent } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
+import type { TelemetryService } from '../telemetry/telemetry.js';
 import { botHasPermission, isUserAdmin } from '../utils/helpers.js';
+import { gracefulShutdown } from './shutdown.js';
 
 export function createDiscordClient() {
 	return new Client({
@@ -12,8 +15,10 @@ export function createDiscordClient() {
 			GatewayIntentBits.GuildMessages,
 			GatewayIntentBits.GuildVoiceStates,
 			GatewayIntentBits.MessageContent,
+			GatewayIntentBits.DirectMessages,
 		],
 		allowedMentions: { parse: ['roles'] },
+		partials: [Partials.Channel],
 	});
 }
 
@@ -68,8 +73,30 @@ export function setupErrorHandlers(client: Client) {
 	});
 }
 
-export function setupMessageDeletionHandler(client: Client) {
+export function setupMessageCreateHandler(
+	client: Client,
+	eventManager: EventManager,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
+	telemetry?: TelemetryService,
+) {
 	client.on('messageCreate', async (message) => {
+		if (
+			message.channel.isDMBased() &&
+			message.author.id === AUTHOR_ID &&
+			message.content.toLowerCase() === 'shutdown'
+		) {
+			await gracefulShutdown(
+				'DM Shutdown Command',
+				client,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+				telemetry,
+			);
+			process.exit(1);
+		}
+
 		if (
 			message.author.bot ||
 			!message.guild ||

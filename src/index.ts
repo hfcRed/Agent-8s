@@ -6,7 +6,7 @@ import {
 	registerCommands,
 	setupErrorHandlers,
 	setupEventMessageDeleteHandler,
-	setupMessageDeletionHandler,
+	setupMessageCreateHandler,
 } from './client/discord-client.js';
 import { isInShutdownMode, setupShutdownHandlers } from './client/shutdown.js';
 import { handleCreateCommand } from './commands/create-command.js';
@@ -309,7 +309,13 @@ appClient.on('interactionCreate', async (interaction) => {
 });
 
 setupErrorHandlers(appClient);
-setupMessageDeletionHandler(appClient);
+setupMessageCreateHandler(
+	appClient,
+	eventManager,
+	threadManager,
+	voiceChannelManager,
+	telemetry,
+);
 setupEventMessageDeleteHandler(
 	appClient,
 	eventManager,
