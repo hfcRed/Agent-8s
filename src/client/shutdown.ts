@@ -1,6 +1,6 @@
 import type { Client } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
-import { COLORS, STATUS_MESSAGES, TIMINGS } from '../constants.js';
+import { AUTHOR_ID, COLORS, STATUS_MESSAGES, TIMINGS } from '../constants.js';
 import { cleanupEvent } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
@@ -31,6 +31,13 @@ async function gracefulShutdown(
 
 	isShuttingDown = true;
 	console.log(`Received ${signal}, starting graceful shutdown...`);
+
+	if (AUTHOR_ID) {
+		const author = await client.users.fetch(AUTHOR_ID);
+		await author.send(
+			`----------------------------------\n⚠️ Bot shutdown initiated!\n\n**Reason:** ${signal}\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+		);
+	}
 
 	try {
 		const allTimers = Array.from(eventManager.getAllTimers());
@@ -109,6 +116,13 @@ async function gracefulShutdown(
 		await stopMetricsServer();
 		console.log('Metrics server stopped');
 
+		if (AUTHOR_ID) {
+			const author = await client.users.fetch(AUTHOR_ID);
+			await author.send(
+				`----------------------------------\n✅ Bot shutdown complete - disconnecting now\n\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+			);
+		}
+
 		console.log('Destroying Discord client...');
 		client.destroy();
 		console.log('Discord client destroyed');
@@ -116,6 +130,15 @@ async function gracefulShutdown(
 		console.log('Graceful shutdown complete');
 	} catch (error) {
 		console.error('Error during graceful shutdown:', error);
+
+		if (AUTHOR_ID) {
+			const author = await client.users.fetch(AUTHOR_ID);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			await author.send(
+				`----------------------------------\n❌ Error during bot shutdown\n\n**Error:** ${errorMessage}\n\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+			);
+		}
 
 		if (!hasRetried) {
 			console.log('Retrying graceful shutdown...');

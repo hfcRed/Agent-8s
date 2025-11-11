@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
 export const DEV = process.env.NODE_ENV === 'development';
+export const AUTHOR_ID = process.env.AUTHOR_ID;
 
 export const MAX_PARTICIPANTS = DEV ? 2 : 8;
 
