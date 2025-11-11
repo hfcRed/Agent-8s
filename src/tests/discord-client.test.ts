@@ -6,7 +6,7 @@ import {
 	registerCommands,
 	setupErrorHandlers,
 	setupEventMessageDeleteHandler,
-	setupMessageDeletionHandler,
+	setupMessageCreateHandler,
 } from '../client/discord-client.js';
 import { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
@@ -20,6 +20,10 @@ vi.mock('../utils/helpers.js', () => ({
 	isUserAdmin: vi.fn(),
 	checkCommandPermissions: vi.fn(),
 	botHasPermission: vi.fn(),
+}));
+
+vi.mock('../client/shutdown.js', () => ({
+	gracefulShutdown: vi.fn(),
 }));
 
 describe('discord-client', () => {
@@ -159,10 +163,13 @@ describe('discord-client', () => {
 		});
 	});
 
-	describe('setupMessageDeletionHandler', () => {
+	describe('setupMessageCreateHandler', () => {
 		let mockClient: Client;
 		let mockMessage: Message;
 		let mockMember: GuildMember;
+		let eventManager: EventManager;
+		let threadManager: ThreadManager;
+		let voiceChannelManager: VoiceChannelManager;
 		let isUserAdminMock: ReturnType<typeof vi.fn>;
 		let botHasPermissionMock: ReturnType<typeof vi.fn>;
 		let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
@@ -180,11 +187,16 @@ describe('discord-client', () => {
 				channel: {
 					id: 'channel-123',
 					isThread: vi.fn().mockReturnValue(false),
+					isDMBased: vi.fn().mockReturnValue(false),
 				},
 				member: mockMember,
 				delete: vi.fn(),
 				interactionMetadata: null,
 			} as unknown as Message;
+
+			eventManager = new EventManager();
+			threadManager = {} as ThreadManager;
+			voiceChannelManager = {} as VoiceChannelManager;
 
 			const helpersModule = await import('../utils/helpers.js');
 			isUserAdminMock = helpersModule.isUserAdmin as ReturnType<typeof vi.fn>;
@@ -195,8 +207,13 @@ describe('discord-client', () => {
 			consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		});
 
-		it('should setup message deletion handler', () => {
-			setupMessageDeletionHandler(mockClient);
+		it('should setup message create handler', () => {
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 
 			expect(mockClient.on).toHaveBeenCalledWith(
 				'messageCreate',
@@ -204,10 +221,146 @@ describe('discord-client', () => {
 			);
 		});
 
+		it('should handle shutdown command from author in DM', async () => {
+			const shutdownModule = await import('../client/shutdown.js');
+			const gracefulShutdownMock =
+				shutdownModule.gracefulShutdown as ReturnType<typeof vi.fn>;
+			gracefulShutdownMock.mockClear();
+
+			const processExitSpy = vi
+				.spyOn(process, 'exit')
+				.mockImplementation(() => undefined as never);
+
+			const authorId = process.env.AUTHOR_ID || 'author-123';
+			const dmMessage = {
+				author: { id: authorId, bot: false },
+				channel: {
+					isDMBased: vi.fn().mockReturnValue(true),
+				},
+				content: 'shutdown',
+			} as unknown as Message;
+
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
+
+			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
+				.calls[0][1];
+			await messageHandler(dmMessage);
+
+			expect(gracefulShutdownMock).toHaveBeenCalledWith(
+				'DM Shutdown Command',
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+				undefined,
+			);
+			expect(processExitSpy).toHaveBeenCalledWith(1);
+
+			processExitSpy.mockRestore();
+		});
+
+		it('should not trigger shutdown for non-author in DM', async () => {
+			const shutdownModule = await import('../client/shutdown.js');
+			const gracefulShutdownMock =
+				shutdownModule.gracefulShutdown as ReturnType<typeof vi.fn>;
+			gracefulShutdownMock.mockClear();
+
+			const dmMessage = {
+				author: { id: 'different-user-456', bot: false },
+				channel: {
+					isDMBased: vi.fn().mockReturnValue(true),
+				},
+				content: 'shutdown',
+			} as unknown as Message;
+
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
+
+			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
+				.calls[0][1];
+			await messageHandler(dmMessage);
+
+			expect(gracefulShutdownMock).not.toHaveBeenCalled();
+		});
+
+		it('should not trigger shutdown for wrong command text', async () => {
+			const shutdownModule = await import('../client/shutdown.js');
+			const gracefulShutdownMock =
+				shutdownModule.gracefulShutdown as ReturnType<typeof vi.fn>;
+			gracefulShutdownMock.mockClear();
+
+			const authorId = process.env.AUTHOR_ID || 'author-123';
+			const dmMessage = {
+				author: { id: authorId, bot: false },
+				channel: {
+					isDMBased: vi.fn().mockReturnValue(true),
+				},
+				content: 'not-shutdown',
+			} as unknown as Message;
+
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
+
+			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
+				.calls[0][1];
+			await messageHandler(dmMessage);
+
+			expect(gracefulShutdownMock).not.toHaveBeenCalled();
+		});
+
+		it('should not trigger shutdown in non-DM channel', async () => {
+			const shutdownModule = await import('../client/shutdown.js');
+			const gracefulShutdownMock =
+				shutdownModule.gracefulShutdown as ReturnType<typeof vi.fn>;
+			gracefulShutdownMock.mockClear();
+
+			const authorId = process.env.AUTHOR_ID || 'author-123';
+			const guildMessage = {
+				author: { id: authorId, bot: false },
+				guild: {},
+				channel: {
+					isDMBased: vi.fn().mockReturnValue(false),
+					isThread: vi.fn().mockReturnValue(false),
+				},
+				content: 'shutdown',
+			} as unknown as Message;
+
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
+
+			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
+				.calls[0][1];
+			await messageHandler(guildMessage);
+
+			expect(gracefulShutdownMock).not.toHaveBeenCalled();
+		});
+
 		it('should delete non-admin user messages', async () => {
 			isUserAdminMock.mockReturnValue(false);
 			botHasPermissionMock.mockReturnValue(true);
-			setupMessageDeletionHandler(mockClient);
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
 				.calls[0][1];
@@ -220,7 +373,12 @@ describe('discord-client', () => {
 		it('should not delete admin user messages', async () => {
 			isUserAdminMock.mockReturnValue(true);
 			botHasPermissionMock.mockReturnValue(true);
-			setupMessageDeletionHandler(mockClient);
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
 				.calls[0][1];
@@ -231,7 +389,12 @@ describe('discord-client', () => {
 
 		it('should not delete bot messages', async () => {
 			mockMessage.author.bot = true;
-			setupMessageDeletionHandler(mockClient);
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
 				.calls[0][1];
@@ -246,7 +409,12 @@ describe('discord-client', () => {
 				guild: null,
 			} as unknown as Message;
 
-			setupMessageDeletionHandler(mockClient);
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
 				.calls[0][1];
@@ -261,7 +429,12 @@ describe('discord-client', () => {
 				member: null,
 			} as unknown as Message;
 
-			setupMessageDeletionHandler(mockClient);
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
 				.calls[0][1];
@@ -278,7 +451,12 @@ describe('discord-client', () => {
 				interactionMetadata: { type: 2 },
 			} as unknown as Message;
 
-			setupMessageDeletionHandler(mockClient);
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
 				.calls[0][1];
@@ -290,7 +468,12 @@ describe('discord-client', () => {
 		it('should not delete messages when channel permissions not allowed', async () => {
 			isUserAdminMock.mockReturnValue(false);
 			botHasPermissionMock.mockReturnValue(false);
-			setupMessageDeletionHandler(mockClient);
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
 				.calls[0][1];
@@ -306,7 +489,12 @@ describe('discord-client', () => {
 			const error = new Error('Delete failed');
 			mockMessage.delete = vi.fn().mockRejectedValue(error);
 
-			setupMessageDeletionHandler(mockClient);
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
 
 			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
 				.calls[0][1];
