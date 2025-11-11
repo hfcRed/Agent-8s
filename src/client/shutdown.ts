@@ -32,16 +32,19 @@ export async function gracefulShutdown(
 	isShuttingDown = true;
 	console.log(`Received ${signal}, starting graceful shutdown...`);
 
-	if (AUTHOR_ID) {
-		const author = await client.users.fetch(AUTHOR_ID);
-		await author.send(
-			`----------------------------------\n⚠️ Bot shutdown initiated!\n\n**Reason:** ${signal}\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
-		);
-	}
-
 	try {
 		const allTimers = Array.from(eventManager.getAllTimers());
 		console.log(`Found ${allTimers.length} active event(s) to clean up`);
+
+		if (AUTHOR_ID) {
+			const author = await client.users.fetch(AUTHOR_ID);
+			await author.send(
+				`----------------------------------\n⚠️ Bot shutdown initiated!\n\n**Reason:** ${signal}\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+			);
+			await author.send(
+				`⚠️ Found ${allTimers.length} active event(s) to clean up before shutdown`,
+			);
+		}
 
 		for (let i = 0; i < allTimers.length; i++) {
 			const [eventId] = allTimers[i];
@@ -94,6 +97,13 @@ export async function gracefulShutdown(
 				voiceChannelManager,
 			);
 
+			if (AUTHOR_ID) {
+				const author = await client.users.fetch(AUTHOR_ID);
+				await author.send(
+					`✅ Cleaned up event ${i + 1}/${allTimers.length}: ${eventId}`,
+				);
+			}
+
 			// Timeout to avoid Discord rate limits
 			if (i < allTimers.length - 1) {
 				console.log(
@@ -119,7 +129,7 @@ export async function gracefulShutdown(
 		if (AUTHOR_ID) {
 			const author = await client.users.fetch(AUTHOR_ID);
 			await author.send(
-				`----------------------------------\n✅ Bot shutdown complete - disconnecting now\n\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+				`----------------------------------\n✅ Bot shutdown complete - disconnecting\n\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
 			);
 		}
 
