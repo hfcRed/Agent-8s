@@ -8,7 +8,7 @@ import {
 	setupEventMessageDeleteHandler,
 	setupMessageDeletionHandler,
 } from './client/discord-client.js';
-import { gracefulShutdown, isInShutdownMode } from './client/shutdown.js';
+import { isInShutdownMode, setupShutdownHandlers } from './client/shutdown.js';
 import { handleCreateCommand } from './commands/create-command.js';
 import { handleKickCommand } from './commands/kick-command.js';
 import { handleRepingCommand } from './commands/reping-command.js';
@@ -316,26 +316,12 @@ setupEventMessageDeleteHandler(
 	threadManager,
 	voiceChannelManager,
 );
-
-process.on('SIGINT', () =>
-	gracefulShutdown(
-		'SIGINT',
-		appClient,
-		eventManager,
-		threadManager,
-		voiceChannelManager,
-		telemetry,
-	),
-);
-process.on('SIGTERM', () =>
-	gracefulShutdown(
-		'SIGTERM',
-		appClient,
-		eventManager,
-		threadManager,
-		voiceChannelManager,
-		telemetry,
-	),
+setupShutdownHandlers(
+	appClient,
+	eventManager,
+	threadManager,
+	voiceChannelManager,
+	telemetry,
 );
 
 setInterval(

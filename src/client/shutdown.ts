@@ -16,7 +16,7 @@ export function isInShutdownMode() {
 	return isShuttingDown;
 }
 
-export async function gracefulShutdown(
+async function gracefulShutdown(
 	signal: string,
 	client: Client,
 	eventManager: EventManager,
@@ -133,4 +133,57 @@ export async function gracefulShutdown(
 			throw error;
 		}
 	}
+}
+
+export function setupShutdownHandlers(
+	client: Client,
+	eventManager: EventManager,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
+	telemetry?: TelemetryService,
+) {
+	process.on(
+		'SIGINT',
+		async () =>
+			await gracefulShutdown(
+				'SIGINT',
+				client,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+				telemetry,
+			),
+	);
+	process.on(
+		'SIGTERM',
+		async () =>
+			await gracefulShutdown(
+				'SIGTERM',
+				client,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+				telemetry,
+			),
+	);
+
+	client.on('shardDisconnect', async (event, shardId) => {
+		if (
+			event.code === 4004 ||
+			event.code === 4010 ||
+			event.code === 4011 ||
+			event.code === 4014
+		) {
+			console.error(`Fatal WebSocket error on shard ${shardId}:`, event);
+			await gracefulShutdown(
+				'shardDisconnect',
+				client,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+				telemetry,
+			);
+			process.exit(1);
+		}
+	});
 }
