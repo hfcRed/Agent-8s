@@ -1,5 +1,5 @@
 import type { Client, GuildMember, Message, User } from 'discord.js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	createDiscordClient,
 	loginClient,
@@ -167,6 +167,13 @@ describe('discord-client', () => {
 		let mockClient: Client;
 		let mockMessage: Message;
 		let mockMember: GuildMember;
+		let mockChannel: {
+			id: string;
+			isThread: () => boolean;
+			isDMBased: () => boolean;
+			isTextBased: () => boolean;
+			bulkDelete: ReturnType<typeof vi.fn>;
+		};
 		let eventManager: EventManager;
 		let threadManager: ThreadManager;
 		let voiceChannelManager: VoiceChannelManager;
@@ -175,20 +182,32 @@ describe('discord-client', () => {
 		let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 		beforeEach(async () => {
+			vi.useFakeTimers();
+
+			mockChannel = {
+				id: 'channel-123',
+				isThread: vi.fn().mockReturnValue(false),
+				isDMBased: vi.fn().mockReturnValue(false),
+				isTextBased: vi.fn().mockReturnValue(true),
+				bulkDelete: vi.fn().mockResolvedValue(undefined),
+			};
+
 			mockClient = {
 				on: vi.fn(),
+				channels: {
+					cache: {
+						get: vi.fn().mockReturnValue(mockChannel),
+					},
+				},
 			} as unknown as Client;
 
 			mockMember = {} as GuildMember;
 
 			mockMessage = {
+				id: 'message-123',
 				author: { bot: false },
 				guild: {},
-				channel: {
-					id: 'channel-123',
-					isThread: vi.fn().mockReturnValue(false),
-					isDMBased: vi.fn().mockReturnValue(false),
-				},
+				channel: mockChannel,
 				member: mockMember,
 				delete: vi.fn(),
 				interactionMetadata: null,
@@ -205,6 +224,10 @@ describe('discord-client', () => {
 			>;
 
 			consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
 		});
 
 		it('should setup message create handler', () => {
@@ -366,8 +389,14 @@ describe('discord-client', () => {
 				.calls[0][1];
 			await messageHandler(mockMessage);
 
+			// Advance timers to trigger bulk delete
+			await vi.advanceTimersByTimeAsync(2000);
+
 			expect(botHasPermissionMock).toHaveBeenCalled();
-			expect(mockMessage.delete).toHaveBeenCalled();
+			expect(mockChannel.bulkDelete).toHaveBeenCalledWith(
+				['message-123'],
+				true,
+			);
 		});
 
 		it('should not delete admin user messages', async () => {
@@ -384,7 +413,10 @@ describe('discord-client', () => {
 				.calls[0][1];
 			await messageHandler(mockMessage);
 
-			expect(mockMessage.delete).not.toHaveBeenCalled();
+			// Advance timers to trigger bulk delete
+			await vi.advanceTimersByTimeAsync(2000);
+
+			expect(mockChannel.bulkDelete).not.toHaveBeenCalled();
 		});
 
 		it('should not delete bot messages', async () => {
@@ -400,7 +432,10 @@ describe('discord-client', () => {
 				.calls[0][1];
 			await messageHandler(mockMessage);
 
-			expect(mockMessage.delete).not.toHaveBeenCalled();
+			// Advance timers to trigger bulk delete
+			await vi.advanceTimersByTimeAsync(2000);
+
+			expect(mockChannel.bulkDelete).not.toHaveBeenCalled();
 		});
 
 		it('should not delete messages without guild', async () => {
@@ -420,7 +455,10 @@ describe('discord-client', () => {
 				.calls[0][1];
 			await messageHandler(messageWithoutGuild);
 
-			expect(mockMessage.delete).not.toHaveBeenCalled();
+			// Advance timers to trigger bulk delete
+			await vi.advanceTimersByTimeAsync(2000);
+
+			expect(mockChannel.bulkDelete).not.toHaveBeenCalled();
 		});
 
 		it('should not delete messages without member', async () => {
@@ -440,7 +478,10 @@ describe('discord-client', () => {
 				.calls[0][1];
 			await messageHandler(messageWithoutMember);
 
-			expect(mockMessage.delete).not.toHaveBeenCalled();
+			// Advance timers to trigger bulk delete
+			await vi.advanceTimersByTimeAsync(2000);
+
+			expect(mockChannel.bulkDelete).not.toHaveBeenCalled();
 		});
 
 		it('should not delete slash command responses', async () => {
@@ -462,7 +503,10 @@ describe('discord-client', () => {
 				.calls[0][1];
 			await messageHandler(messageWithInteraction);
 
-			expect(mockMessage.delete).not.toHaveBeenCalled();
+			// Advance timers to trigger bulk delete
+			await vi.advanceTimersByTimeAsync(2000);
+
+			expect(mockChannel.bulkDelete).not.toHaveBeenCalled();
 		});
 
 		it('should not delete messages when channel permissions not allowed', async () => {
@@ -479,15 +523,18 @@ describe('discord-client', () => {
 				.calls[0][1];
 			await messageHandler(mockMessage);
 
+			// Advance timers to trigger bulk delete
+			await vi.advanceTimersByTimeAsync(2000);
+
 			expect(botHasPermissionMock).toHaveBeenCalled();
-			expect(mockMessage.delete).not.toHaveBeenCalled();
+			expect(mockChannel.bulkDelete).not.toHaveBeenCalled();
 		});
 
 		it('should handle deletion errors', async () => {
 			isUserAdminMock.mockReturnValue(false);
 			botHasPermissionMock.mockReturnValue(true);
 			const error = new Error('Delete failed');
-			mockMessage.delete = vi.fn().mockRejectedValue(error);
+			mockChannel.bulkDelete = vi.fn().mockRejectedValue(error);
 
 			setupMessageCreateHandler(
 				mockClient,
@@ -500,10 +547,74 @@ describe('discord-client', () => {
 				.calls[0][1];
 			await messageHandler(mockMessage);
 
+			// Advance timers to trigger bulk delete
+			await vi.advanceTimersByTimeAsync(2000);
+
 			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				'Error handling message deletion:',
+				'Error handling bulk message deletion:',
 				error,
 			);
+		});
+
+		it('should batch multiple messages and delete after timeout', async () => {
+			isUserAdminMock.mockReturnValue(false);
+			botHasPermissionMock.mockReturnValue(true);
+
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
+
+			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
+				.calls[0][1];
+
+			// Send multiple messages
+			const message1 = { ...mockMessage, id: 'msg-1' } as Message;
+			const message2 = { ...mockMessage, id: 'msg-2' } as Message;
+			const message3 = { ...mockMessage, id: 'msg-3' } as Message;
+
+			await messageHandler(message1);
+			await messageHandler(message2);
+			await messageHandler(message3);
+
+			// Should not have called bulkDelete yet
+			expect(mockChannel.bulkDelete).not.toHaveBeenCalled();
+
+			// Advance timers to trigger bulk delete
+			await vi.advanceTimersByTimeAsync(2000);
+
+			expect(mockChannel.bulkDelete).toHaveBeenCalledWith(
+				['msg-1', 'msg-2', 'msg-3'],
+				true,
+			);
+		});
+
+		it('should immediately delete when batch reaches 50 messages', async () => {
+			isUserAdminMock.mockReturnValue(false);
+			botHasPermissionMock.mockReturnValue(true);
+
+			setupMessageCreateHandler(
+				mockClient,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+			);
+
+			const messageHandler = (mockClient.on as ReturnType<typeof vi.fn>).mock
+				.calls[0][1];
+
+			// Send 50 messages
+			const messages: string[] = [];
+			for (let i = 1; i <= 50; i++) {
+				const msg = { ...mockMessage, id: `msg-${i}` } as Message;
+				messages.push(`msg-${i}`);
+				await messageHandler(msg);
+			}
+
+			// Should have called bulkDelete immediately without waiting for timeout
+			expect(mockChannel.bulkDelete).toHaveBeenCalledWith(messages, true);
 		});
 	});
 
