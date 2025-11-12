@@ -80,6 +80,24 @@ export function setupMessageCreateHandler(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const messageBatches = new Map();
+
+	const bulkDeleteMessages = async (channelId: string) => {
+		const batch = messageBatches.get(channelId);
+		if (!batch || batch.messages.length === 0) return;
+
+		const channel = client.channels.cache.get(channelId);
+		if (!channel?.isTextBased() || channel.isDMBased()) return;
+
+		try {
+			await channel.bulkDelete(batch.messages, true);
+		} catch (error) {
+			console.error('Error handling bulk message deletion:', error);
+		} finally {
+			messageBatches.delete(channelId);
+		}
+	};
+
 	client.on('messageCreate', async (message) => {
 		if (
 			message.channel.isDMBased() &&
@@ -106,15 +124,27 @@ export function setupMessageCreateHandler(
 		)
 			return;
 
-		try {
-			const member = message.member;
-			if (!member) return;
+		const member = message.member;
+		if (!member) return;
 
-			if (!isUserAdmin(member) && message.interactionMetadata?.type !== 2) {
-				await message.delete();
+		if (!isUserAdmin(member) && message.interactionMetadata?.type !== 2) {
+			const channelId = message.channel.id;
+
+			let batch = messageBatches.get(channelId);
+			if (!batch) {
+				batch = {
+					messages: [],
+					timeout: setTimeout(() => bulkDeleteMessages(channelId), 2000),
+				};
+				messageBatches.set(channelId, batch);
 			}
-		} catch (error) {
-			console.error('Error handling message deletion:', error);
+
+			batch.messages.push(message.id);
+
+			if (batch.messages.length >= 50) {
+				clearTimeout(batch.timeout);
+				await bulkDeleteMessages(channelId);
+			}
 		}
 	});
 }
