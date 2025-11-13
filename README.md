@@ -26,13 +26,35 @@ Now create two new roles ``Comp 8s`` and ``Casual 8s``. These are the roles the 
 
 If you want to use the bot in a channel that is in a Private Category, make sure to add the bot user to the categories permissions with the "Add members or roles" button. The bot requires this to be able to create voice channels in the category.
 
-### Using the bot
+The bot can handle automatic deletion of all new messages in a channel that aren't commands. To enable this, add the bot to the channels permissions and give it the permission "Manage Messages". Messages of administrators will not be deleted.
 
-The bot has a single command ``/create`` that can be used in the permitted channels to create a new event. The command allows two optional parameters:
+## Using the bot
+
+### Bot commands
+
+#### ``/create``
+
+Create a new 8s event.
 
 - ``time``: Time in minutes before the event starts. If not specified, event starts when 8 players sign up.
 - ``casual``: Whether to ping casual roles.
 - ``info``: Add a description to the event.
+
+#### ``/re-ping``
+
+Re-ping the roles for your event.
+
+#### ``/kick``
+
+Kick the selected user from your event.
+
+- ``user``: User to kick
+
+#### ``/status``
+
+Display bot status and statistics.
+
+### Event lifecycle
 
 Users can use the ``Sign Up`` and ``Sign Out`` buttons to enter or exit the event. The creator of the event can also cancel it anytime before it starts. If a time is specified, the creator of the event can also manually start the event before the time is up.
 
@@ -54,7 +76,6 @@ The bot requires a handful of permissions to be granted when added to a server. 
 - **Send Messages**: Required to reply to commands with a message
 - **Send Messages in Threads**: Required to send messages in threads
 - **Create Private Threads**: Required to create new private threads
-- **Manage Messages**: Required to delete messages that arent commands
 - **Manage Threads**: Required to add/remove users from a thread, pin messages in threads, and close and archive threads
 
 ## Running locally
@@ -71,7 +92,7 @@ First, install these programs if you do not have them installed already:
 
 Go to Discords [developer dashboard](https://discord.com/developers/applications) and create a new application.
 
-Under ``Installation > Default Install Settings`` select the scopes ``applications.commands`` and ``bot`` and the permissions ``Create Private Threads``, ``Manage Threads``, ``Send Messages``, and ``Send Messages in Threads``.
+Under ``Installation > Default Install Settings`` select the scopes ``applications.commands`` and ``bot`` and the permissions ``Create Private Threads``,``Manage Channels``, ``Manage Roles``,  ``Manage Threads``, ``Send Messages``, ``Send Messages in Threads``, and ``View Channels``.
 
 Under ``Bot > Privileged Gateway Intents`` enable ``Presence Intent``, ``Server Members Intent``, and ``Message Content Intent``.
 
@@ -92,6 +113,8 @@ To start testing locally you can use the following commands:
 ## Environment configuration
 
 - `BOT_TOKEN` (required): Discord bot token used to authenticate the bot.
+- `AUTHOR_ID` (optional): The Discord user ID of the bot author/maintainer
+- `NODE_ENV` (required): The environment the bot is running in (development or production)
 - `TELEMETRY_URL` and `TELEMETRY_TOKEN` (optional): enable forwarding lifecycle telemetry to an external HTTP endpoint.
 - `METRICS_PORT` (optional, defaults to `9464`): port exposing the Prometheus `/metrics` endpoint.
 - `DATABASE_URL` (optional): PostgreSQL connection string used to persist match lifecycle data to the `telemetry_events` table.
@@ -126,7 +149,7 @@ docker run --rm --env-file .env agent-8s
 ## Telemetry & Metrics
 
 - The bot exposes a Prometheus endpoint on `/metrics` bound to `0.0.0.0`. Override the port with `METRICS_PORT` (defaults to `9464`).
-- Every telemetry dispatch increments `telemetry_events_forwarded_total{event="...",guild="...",channel="..."}`; failures increment the matching `telemetry_events_failed_total` series.
+- Every telemetry dispatch increments `telemetry_events_forwarded_total{...}`; failures increment the matching `telemetry_events_failed_total` series.
 - Guild and channel labels fall back to `unknown` whenever the IDs cannot be resolved (for example, when telemetry is triggered outside a guild context).
 - The metrics endpoint is available even when remote telemetry is disabled, allowing local scraping without forwarding events.
 - Provide `DATABASE_URL` (and optional `DATABASE_SCHEMA`/`TELEMETRY_EVENTS_TABLE`) to persist lifecycle events in PostgreSQL. The bot prepares the target schema/table on startup and records match UUIDs, guild/channel IDs, user/participant identifiers, payload JSON, and timestamps for each lifecycle hook.

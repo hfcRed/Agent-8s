@@ -59,7 +59,7 @@ loginClient(appClient, botToken).then();
 const commands = [
 	new SlashCommandBuilder()
 		.setName('create')
-		.setDescription('Create a new 8s event')
+		.setDescription('Create a new 8s event.')
 		.addIntegerOption((option) =>
 			option
 				.setName('time')
