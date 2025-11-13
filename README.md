@@ -140,7 +140,7 @@ docker run --rm \
   agent-8s
 ```
 
-You can also supply environment values from a file:
+You can also supply environment values from a file: 
 
 ```bash
 docker run --rm --env-file .env agent-8s
