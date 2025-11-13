@@ -433,12 +433,11 @@ describe('helpers', () => {
 				deferred: false,
 				reply: vi.fn().mockResolvedValue(undefined),
 				followUp: vi.fn(),
-			} as never;
+			} as unknown as Parameters<typeof safeReplyToInteraction>[0];
 
 			const content = 'Test message';
 
 			await safeReplyToInteraction(interaction, content);
-
 			expect(interaction.reply).toHaveBeenCalledWith({
 				content,
 				flags: ['Ephemeral'],
@@ -452,12 +451,11 @@ describe('helpers', () => {
 				deferred: false,
 				reply: vi.fn(),
 				followUp: vi.fn().mockResolvedValue(undefined),
-			} as never;
+			} as unknown as Parameters<typeof safeReplyToInteraction>[0];
 
 			const content = 'Test message';
 
 			await safeReplyToInteraction(interaction, content);
-
 			expect(interaction.followUp).toHaveBeenCalledWith({
 				content,
 				flags: ['Ephemeral'],
@@ -471,12 +469,11 @@ describe('helpers', () => {
 				deferred: true,
 				reply: vi.fn(),
 				followUp: vi.fn().mockResolvedValue(undefined),
-			} as never;
+			} as unknown as Parameters<typeof safeReplyToInteraction>[0];
 
 			const content = 'Test message';
 
 			await safeReplyToInteraction(interaction, content);
-
 			expect(interaction.followUp).toHaveBeenCalledWith({
 				content,
 				flags: ['Ephemeral'],
@@ -490,7 +487,7 @@ describe('helpers', () => {
 				deferred: false,
 				reply: vi.fn().mockRejectedValue(new Error('Reply failed')),
 				followUp: vi.fn(),
-			} as never;
+			} as unknown as Parameters<typeof safeReplyToInteraction>[0];
 
 			const content = 'Test message';
 
@@ -499,7 +496,6 @@ describe('helpers', () => {
 				.mockImplementation(() => {});
 
 			await safeReplyToInteraction(interaction, content);
-
 			expect(interaction.reply).toHaveBeenCalled();
 			expect(consoleSpy).toHaveBeenCalled();
 			const errorOutput = consoleSpy.mock.calls[0][0] as string;
@@ -516,7 +512,7 @@ describe('helpers', () => {
 				deferred: false,
 				reply: vi.fn(),
 				followUp: vi.fn().mockRejectedValue(new Error('FollowUp failed')),
-			} as never;
+			} as unknown as Parameters<typeof safeReplyToInteraction>[0];
 
 			const content = 'Test message';
 
@@ -525,7 +521,6 @@ describe('helpers', () => {
 				.mockImplementation(() => {});
 
 			await safeReplyToInteraction(interaction, content);
-
 			expect(interaction.followUp).toHaveBeenCalled();
 			expect(consoleSpy).toHaveBeenCalled();
 			const errorOutput = consoleSpy.mock.calls[0][0] as string;

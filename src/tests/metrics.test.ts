@@ -30,18 +30,19 @@ describe('metrics', () => {
 
 			// Should not throw and should use 'unknown' for channel
 			expect(() => {
-				recordTelemetryDispatch(eventName, guildId);
+				recordTelemetryDispatch(eventName, guildId, 'unknown');
 			}).not.toThrow();
 		});
 
 		it('should handle multiple recordings', () => {
 			const eventName = faker.word.noun();
 			const guildId = faker.string.uuid();
+			const channelId = faker.string.uuid();
 
 			expect(() => {
-				recordTelemetryDispatch(eventName, guildId);
-				recordTelemetryDispatch(eventName, guildId);
-				recordTelemetryDispatch(eventName, guildId);
+				recordTelemetryDispatch(eventName, guildId, channelId);
+				recordTelemetryDispatch(eventName, guildId, channelId);
+				recordTelemetryDispatch(eventName, guildId, channelId);
 			}).not.toThrow();
 		});
 	});
@@ -64,18 +65,19 @@ describe('metrics', () => {
 
 			// Should not throw and should use 'unknown' for channel
 			expect(() => {
-				recordTelemetryFailure(eventName, guildId);
+				recordTelemetryFailure(eventName, guildId, 'unknown');
 			}).not.toThrow();
 		});
 
 		it('should handle multiple failure recordings', () => {
 			const eventName = faker.word.noun();
 			const guildId = faker.string.uuid();
+			const channelId = faker.string.uuid();
 
 			expect(() => {
-				recordTelemetryFailure(eventName, guildId);
-				recordTelemetryFailure(eventName, guildId);
-				recordTelemetryFailure(eventName, guildId);
+				recordTelemetryFailure(eventName, guildId, channelId);
+				recordTelemetryFailure(eventName, guildId, channelId);
+				recordTelemetryFailure(eventName, guildId, channelId);
 			}).not.toThrow();
 		});
 	});
@@ -101,8 +103,8 @@ describe('metrics', () => {
 			expect(() => {
 				recordTelemetryDispatch(eventName, guildId1, channelId);
 				recordTelemetryFailure(eventName, guildId2, channelId);
-				recordTelemetryDispatch(eventName, guildId1);
-				recordTelemetryFailure(eventName, guildId2);
+				recordTelemetryDispatch(eventName, guildId1, 'unknown');
+				recordTelemetryFailure(eventName, guildId2, 'unknown');
 			}).not.toThrow();
 		});
 	});
