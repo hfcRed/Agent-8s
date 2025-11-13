@@ -9,6 +9,8 @@ import { checkProcessingStates } from '../interactions/button-handlers.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import { updateParticipantFields } from '../utils/embed-utils.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import { safeReplyToInteraction } from '../utils/helpers.js';
 
 export async function handleKickCommand(
 	interaction: ChatInputCommandInteraction,
@@ -16,52 +18,52 @@ export async function handleKickCommand(
 	threadManager: ThreadManager,
 	voiceChannelManager: VoiceChannelManager,
 ) {
-	await interaction.deferReply({ flags: ['Ephemeral'] });
-
-	const userId = interaction.user.id;
-	const userEventId = eventManager.userOwnsEvent(userId);
-
-	if (!userEventId) {
-		await interaction.editReply({
-			content: ERROR_MESSAGES.NO_EVENT_OWNED,
-		});
-		return;
-	}
-
-	const processing = await checkProcessingStates(
-		userEventId,
-		eventManager,
-		interaction,
-	);
-	if (processing) return;
-
-	const targetUser = interaction.options.getUser('user', true);
-	const targetUserId = targetUser.id;
-
-	if (targetUserId === userId) {
-		await interaction.editReply({
-			content: 'You cannot kick yourself from your own event.',
-		});
-		return;
-	}
-
-	const participants = eventManager.getParticipants(userEventId);
-	if (!participants || !participants.has(targetUserId)) {
-		await interaction.editReply({
-			content: `<@${targetUserId}> is not signed up for your event.`,
-		});
-		return;
-	}
-
-	const channelId = eventManager.getChannelId(userEventId);
-	if (!channelId) {
-		await interaction.editReply({
-			content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
-		});
-		return;
-	}
-
 	try {
+		await interaction.deferReply({ flags: ['Ephemeral'] });
+
+		const userId = interaction.user.id;
+		const userEventId = eventManager.userOwnsEvent(userId);
+
+		if (!userEventId) {
+			await interaction.editReply({
+				content: ERROR_MESSAGES.NO_EVENT_OWNED,
+			});
+			return;
+		}
+
+		const processing = await checkProcessingStates(
+			userEventId,
+			eventManager,
+			interaction,
+		);
+		if (processing) return;
+
+		const targetUser = interaction.options.getUser('user', true);
+		const targetUserId = targetUser.id;
+
+		if (targetUserId === userId) {
+			await interaction.editReply({
+				content: 'You cannot kick yourself from your own event.',
+			});
+			return;
+		}
+
+		const participants = eventManager.getParticipants(userEventId);
+		if (!participants || !participants.has(targetUserId)) {
+			await interaction.editReply({
+				content: `<@${targetUserId}> is not signed up for your event.`,
+			});
+			return;
+		}
+
+		const channelId = eventManager.getChannelId(userEventId);
+		if (!channelId) {
+			await interaction.editReply({
+				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+			});
+			return;
+		}
+
 		const channel = await interaction.client.channels.fetch(channelId);
 		if (!channel || !channel.isTextBased()) {
 			await interaction.editReply({
@@ -113,10 +115,19 @@ export async function handleKickCommand(
 			content: `Successfully kicked <@${targetUserId}> from your event.`,
 		});
 	} catch (error) {
-		console.error('Error in kick command:', error);
-
-		await interaction.editReply({
-			content: 'An error occurred while trying to kick the user.',
+		handleError({
+			reason: 'Error executing kick command',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				guildId: interaction.guildId || 'unknown',
+			},
 		});
+
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while trying to kick the user.',
+		);
 	}
 }

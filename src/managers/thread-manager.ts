@@ -4,6 +4,7 @@ import {
 	type TextChannel,
 	type ThreadChannel,
 } from 'discord.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 
 /**
  * Manages Discord thread operations for events.
@@ -19,7 +20,12 @@ export class ThreadManager {
 			});
 			return thread;
 		} catch (error) {
-			console.error('Failed to create thread:', error);
+			handleError({
+				reason: 'Failed to create event thread',
+				severity: ErrorSeverity.MEDIUM,
+				error,
+				metadata: { channelId: channel.id, shortId },
+			});
 			return null;
 		}
 	}
@@ -29,7 +35,12 @@ export class ThreadManager {
 			const thread = await channel.threads.fetch(threadId);
 			return thread || null;
 		} catch (error) {
-			console.error(`Failed to fetch thread ${threadId}:`, error);
+			handleError({
+				reason: 'Failed to fetch thread',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { threadId, channelId: channel.id },
+			});
 			return null;
 		}
 	}
@@ -43,7 +54,12 @@ export class ThreadManager {
 			// await message.pin();
 			return true;
 		} catch (error) {
-			console.error('Failed to send and pin message to thread:', error);
+			handleError({
+				reason: 'Failed to send message to thread',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { threadId: thread.id },
+			});
 			return false;
 		}
 	}
@@ -53,7 +69,12 @@ export class ThreadManager {
 			await thread.send({ content });
 			return true;
 		} catch (error) {
-			console.error('Failed to send message to thread:', error);
+			handleError({
+				reason: 'Failed to send text message to thread',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { threadId: thread.id },
+			});
 			return false;
 		}
 	}
@@ -63,7 +84,12 @@ export class ThreadManager {
 			await thread.members.add(userId);
 			return true;
 		} catch (error) {
-			console.error(`Failed to add user ${userId} to thread:`, error);
+			handleError({
+				reason: 'Failed to add user to thread',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { userId, threadId: thread.id },
+			});
 			return false;
 		}
 	}
@@ -73,7 +99,12 @@ export class ThreadManager {
 			await thread.members.remove(userId);
 			return true;
 		} catch (error) {
-			console.error(`Failed to remove user ${userId} from thread:`, error);
+			handleError({
+				reason: 'Failed to remove user from thread',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { userId, threadId: thread.id },
+			});
 			return false;
 		}
 	}
@@ -90,7 +121,12 @@ export class ThreadManager {
 			await thread.setArchived(true);
 			return true;
 		} catch (error) {
-			console.error('Failed to lock and archive thread:', error);
+			handleError({
+				reason: 'Failed to lock and archive thread',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { threadId: thread.id },
+			});
 			return false;
 		}
 	}

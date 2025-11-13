@@ -365,9 +365,10 @@ describe('VoiceChannelManager', () => {
 			);
 
 			expect(result).toBe(false);
-			expect(consoleSpy).toHaveBeenCalledWith(
-				`Failed to grant voice channel access for ${userId} in ${channelId}:`,
-				expect.any(Error),
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			expect(errorOutput).toContain(
+				'[LOW] Failed to grant voice channel access',
 			);
 
 			consoleSpy.mockRestore();
@@ -460,9 +461,12 @@ describe('VoiceChannelManager', () => {
 			);
 
 			expect(result).toBe(false);
-			expect(consoleSpy).toHaveBeenCalledWith(
-				`Failed to revoke voice channel access for ${userId} in ${channelId}:`,
-				expect.any(Error),
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[
+				consoleSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain(
+				'[LOW] Failed to revoke voice channel access',
 			);
 
 			consoleSpy.mockRestore();
@@ -601,10 +605,11 @@ describe('VoiceChannelManager', () => {
 			);
 
 			expect(result).toBe(false);
-			expect(consoleSpy).toHaveBeenCalledWith(
-				`Failed to delete voice channel ${channelId}:`,
-				expect.any(Error),
-			);
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[
+				consoleSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain('[LOW] Failed to delete voice channel');
 
 			consoleSpy.mockRestore();
 		});

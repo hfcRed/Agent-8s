@@ -54,10 +54,9 @@ describe('ThreadManager', () => {
 			const result = await threadManager.createEventThread(channel, shortId);
 
 			expect(result).toBeNull();
-			expect(consoleSpy).toHaveBeenCalledWith(
-				'Failed to create thread:',
-				expect.any(Error),
-			);
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			expect(errorOutput).toContain('[MEDIUM] Failed to create event thread');
 
 			consoleSpy.mockRestore();
 		});
@@ -111,10 +110,9 @@ describe('ThreadManager', () => {
 			const result = await threadManager.fetchThread(channel, threadId);
 
 			expect(result).toBeNull();
-			expect(consoleSpy).toHaveBeenCalledWith(
-				`Failed to fetch thread ${threadId}:`,
-				expect.any(Error),
-			);
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			expect(errorOutput).toContain('[LOW] Failed to fetch thread');
 
 			consoleSpy.mockRestore();
 		});
@@ -157,10 +155,9 @@ describe('ThreadManager', () => {
 			const result = await threadManager.sendAndPinEmbed(thread, embed);
 
 			expect(result).toBe(false);
-			expect(consoleSpy).toHaveBeenCalledWith(
-				'Failed to send and pin message to thread:',
-				expect.any(Error),
-			);
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			expect(errorOutput).toContain('[LOW] Failed to send message to thread');
 
 			consoleSpy.mockRestore();
 		});
@@ -220,9 +217,12 @@ describe('ThreadManager', () => {
 			const result = await threadManager.sendMessage(thread, content);
 
 			expect(result).toBe(false);
-			expect(consoleSpy).toHaveBeenCalledWith(
-				'Failed to send message to thread:',
-				expect.any(Error),
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[
+				consoleSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain(
+				'[LOW] Failed to send text message to thread',
 			);
 
 			consoleSpy.mockRestore();
@@ -259,10 +259,11 @@ describe('ThreadManager', () => {
 			const result = await threadManager.addMember(thread, userId);
 
 			expect(result).toBe(false);
-			expect(consoleSpy).toHaveBeenCalledWith(
-				`Failed to add user ${userId} to thread:`,
-				expect.any(Error),
-			);
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[
+				consoleSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain('[LOW] Failed to add user to thread');
 
 			consoleSpy.mockRestore();
 		});
@@ -298,10 +299,11 @@ describe('ThreadManager', () => {
 			const result = await threadManager.removeMember(thread, userId);
 
 			expect(result).toBe(false);
-			expect(consoleSpy).toHaveBeenCalledWith(
-				`Failed to remove user ${userId} from thread:`,
-				expect.any(Error),
-			);
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[
+				consoleSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain('[LOW] Failed to remove user from thread');
 
 			consoleSpy.mockRestore();
 		});
@@ -384,10 +386,11 @@ describe('ThreadManager', () => {
 			const result = await threadManager.lockAndArchive(thread);
 
 			expect(result).toBe(false);
-			expect(consoleSpy).toHaveBeenCalledWith(
-				'Failed to lock and archive thread:',
-				expect.any(Error),
-			);
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[
+				consoleSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain('[LOW] Failed to lock and archive thread');
 
 			consoleSpy.mockRestore();
 		});
@@ -405,10 +408,11 @@ describe('ThreadManager', () => {
 			const result = await threadManager.lockAndArchive(thread);
 
 			expect(result).toBe(false);
-			expect(consoleSpy).toHaveBeenCalledWith(
-				'Failed to lock and archive thread:',
-				expect.any(Error),
-			);
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[
+				consoleSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain('[LOW] Failed to lock and archive thread');
 
 			consoleSpy.mockRestore();
 		});

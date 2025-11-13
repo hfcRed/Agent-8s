@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import type { EventRecorderOptions, TelemetryEventData } from '../types.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 
 export const DEFAULT_SCHEMA = 'public';
 export const DEFAULT_TABLE = 'telemetry_events';
@@ -25,7 +26,15 @@ export class EventRecorder {
 		try {
 			await this.ensureSchema();
 		} catch (error) {
-			console.error('Failed to initialize event recorder', error);
+			handleError({
+				reason: 'Failed to initialize event recorder schema',
+				severity: ErrorSeverity.MEDIUM,
+				error,
+				metadata: {
+					schema: this.schemaName,
+					table: this.tableName,
+				},
+			});
 		}
 	}
 
@@ -58,7 +67,16 @@ export class EventRecorder {
 				],
 			);
 		} catch (error) {
-			console.error('Failed to record telemetry event', error);
+			handleError({
+				reason: 'Failed to record telemetry event to database',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: {
+					eventType: event,
+					matchId: data.matchId,
+					guildId: data.guildId,
+				},
+			});
 		}
 	}
 

@@ -5,6 +5,7 @@ import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { botHasPermission, isUserAdmin } from '../utils/helpers.js';
 import { gracefulShutdown } from './shutdown.js';
 
@@ -27,7 +28,11 @@ export async function loginClient(client: Client, botToken: string) {
 		await client.login(botToken);
 		console.log('Discord client logged in');
 	} catch (error) {
-		console.error('Failed to log in Discord client:', error);
+		handleError({
+			reason: 'Failed to log in Discord client',
+			severity: ErrorSeverity.HIGH,
+			error,
+		});
 		process.exit(1);
 	}
 }
@@ -40,7 +45,11 @@ export async function registerCommands(
 	const rest = new REST({ version: '10' }).setToken(botToken);
 
 	if (!client.user) {
-		console.error('Client user not available for command registration');
+		handleError({
+			reason: 'Client user not available for command registration',
+			severity: ErrorSeverity.HIGH,
+			error: new Error('Client user is undefined'),
+		});
 		return;
 	}
 
@@ -50,26 +59,47 @@ export async function registerCommands(
 		});
 		console.log('Successfully registered application commands');
 	} catch (error) {
-		console.error('Failed to register application commands:', error);
+		handleError({
+			reason: 'Failed to register application commands',
+			severity: ErrorSeverity.HIGH,
+			error,
+		});
 		process.exit(1);
 	}
 }
 
 export function setupErrorHandlers(client: Client) {
 	client.on('error', (error) => {
-		console.error('Discord client error:', error);
+		handleError({
+			reason: 'Discord client error',
+			severity: ErrorSeverity.HIGH,
+			error,
+		});
 	});
 
 	client.on('warn', (warning) => {
-		console.warn('Discord client warning:', warning);
+		handleError({
+			reason: 'Discord client warning',
+			severity: ErrorSeverity.MEDIUM,
+			error: new Error(warning),
+		});
 	});
 
 	process.on('uncaughtException', (error) => {
-		console.error('Uncaught Exception:', error);
+		handleError({
+			reason: 'Uncaught exception in process',
+			severity: ErrorSeverity.HIGH,
+			error,
+		});
 	});
 
 	process.on('unhandledRejection', (reason, promise) => {
-		console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+		handleError({
+			reason: 'Unhandled promise rejection',
+			severity: ErrorSeverity.HIGH,
+			error: reason,
+			metadata: { promise: String(promise) },
+		});
 	});
 }
 
@@ -92,7 +122,12 @@ export function setupMessageCreateHandler(
 		try {
 			await channel.bulkDelete(batch.messages, true);
 		} catch (error) {
-			console.error('Error handling bulk message deletion:', error);
+			handleError({
+				reason: 'Failed to bulk delete messages',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { channelId, messageCount: batch.messages.length },
+			});
 		} finally {
 			messageBatches.delete(channelId);
 		}
@@ -170,10 +205,12 @@ export function setupEventMessageDeleteHandler(
 				voiceChannelManager,
 			);
 		} catch (error) {
-			console.error(
-				`Failed to cleanup event after message deletion ${message.id}:`,
+			handleError({
+				reason: 'Failed to cleanup event after message deletion',
+				severity: ErrorSeverity.MEDIUM,
 				error,
-			);
+				metadata: { messageId: message.id },
+			});
 		}
 	});
 }

@@ -7,6 +7,7 @@ import {
 	getExcaliburRankOfUser,
 	getPingsForServer,
 	isUserAdmin,
+	safeReplyToInteraction,
 } from '../utils/helpers.js';
 
 describe('helpers', () => {
@@ -422,6 +423,117 @@ describe('helpers', () => {
 
 			expect(resultManageMessages).toBe(true);
 			expect(resultAdministrator).toBe(true);
+		});
+	});
+
+	describe('safeReplyToInteraction', () => {
+		it('should call reply when interaction is not replied or deferred', async () => {
+			const interaction = {
+				replied: false,
+				deferred: false,
+				reply: vi.fn().mockResolvedValue(undefined),
+				followUp: vi.fn(),
+			} as never;
+
+			const content = 'Test message';
+
+			await safeReplyToInteraction(interaction, content);
+
+			expect(interaction.reply).toHaveBeenCalledWith({
+				content,
+				flags: ['Ephemeral'],
+			});
+			expect(interaction.followUp).not.toHaveBeenCalled();
+		});
+
+		it('should call followUp when interaction is already replied', async () => {
+			const interaction = {
+				replied: true,
+				deferred: false,
+				reply: vi.fn(),
+				followUp: vi.fn().mockResolvedValue(undefined),
+			} as never;
+
+			const content = 'Test message';
+
+			await safeReplyToInteraction(interaction, content);
+
+			expect(interaction.followUp).toHaveBeenCalledWith({
+				content,
+				flags: ['Ephemeral'],
+			});
+			expect(interaction.reply).not.toHaveBeenCalled();
+		});
+
+		it('should call followUp when interaction is already deferred', async () => {
+			const interaction = {
+				replied: false,
+				deferred: true,
+				reply: vi.fn(),
+				followUp: vi.fn().mockResolvedValue(undefined),
+			} as never;
+
+			const content = 'Test message';
+
+			await safeReplyToInteraction(interaction, content);
+
+			expect(interaction.followUp).toHaveBeenCalledWith({
+				content,
+				flags: ['Ephemeral'],
+			});
+			expect(interaction.reply).not.toHaveBeenCalled();
+		});
+
+		it('should handle errors gracefully when reply fails', async () => {
+			const interaction = {
+				replied: false,
+				deferred: false,
+				reply: vi.fn().mockRejectedValue(new Error('Reply failed')),
+				followUp: vi.fn(),
+			} as never;
+
+			const content = 'Test message';
+
+			const consoleSpy = vi
+				.spyOn(console, 'error')
+				.mockImplementation(() => {});
+
+			await safeReplyToInteraction(interaction, content);
+
+			expect(interaction.reply).toHaveBeenCalled();
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			expect(errorOutput).toContain(
+				'[LOW] Failed to send error message to user',
+			);
+
+			consoleSpy.mockRestore();
+		});
+
+		it('should handle errors gracefully when followUp fails', async () => {
+			const interaction = {
+				replied: true,
+				deferred: false,
+				reply: vi.fn(),
+				followUp: vi.fn().mockRejectedValue(new Error('FollowUp failed')),
+			} as never;
+
+			const content = 'Test message';
+
+			const consoleSpy = vi
+				.spyOn(console, 'error')
+				.mockImplementation(() => {});
+
+			await safeReplyToInteraction(interaction, content);
+
+			expect(interaction.followUp).toHaveBeenCalled();
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			expect(errorOutput).toContain(
+				'[LOW] Failed to send error message to user',
+			);
+
+			consoleSpy.mockRestore();
 		});
 	});
 });

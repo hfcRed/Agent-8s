@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import dotenv from 'dotenv';
 import type { TelemetryEventData } from '../types.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { EventRecorder } from './event-recorder.js';
 import { recordTelemetryDispatch, recordTelemetryFailure } from './metrics.js';
 
@@ -28,11 +29,13 @@ export class TelemetryService {
 				})
 			: undefined;
 
-		this.recorder
-			?.initialize()
-			.catch((error) =>
-				console.error('Failed to prepare telemetry persistence', error),
-			);
+		this.recorder?.initialize().catch((error) =>
+			handleError({
+				reason: 'Failed to initialize telemetry persistence',
+				severity: ErrorSeverity.MEDIUM,
+				error,
+			}),
+		);
 	}
 
 	private hashId(id: string) {
@@ -52,9 +55,9 @@ export class TelemetryService {
 			})),
 		};
 
-		await this.recorder?.record(event, hashedData);
-
 		try {
+			await this.recorder?.record(event, hashedData);
+
 			const headers = {
 				'Content-Type': 'application/json',
 				Authorization: `Bearer ${this.apiKey}`,
@@ -71,7 +74,13 @@ export class TelemetryService {
 
 			recordTelemetryDispatch(event, data.guildId, data.channelId);
 		} catch (error) {
-			console.error(error);
+			handleError({
+				reason: 'Failed to send telemetry event to backend',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { event, guildId: data.guildId, channelId: data.channelId },
+			});
+
 			recordTelemetryFailure(event, data.guildId, data.channelId);
 		}
 	}

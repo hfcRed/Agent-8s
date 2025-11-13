@@ -19,6 +19,10 @@ vi.mock('../utils/embed-utils.js', () => ({
 	updateParticipantFields: vi.fn(),
 }));
 
+vi.mock('../utils/helpers.js', () => ({
+	safeReplyToInteraction: vi.fn(),
+}));
+
 // biome-ignore lint: test mock type casting
 type AnyThreadChannel = any;
 
@@ -397,13 +401,14 @@ describe('handleKickCommand', () => {
 		expect(interaction.deferReply).toHaveBeenCalledWith({
 			flags: ['Ephemeral'],
 		});
-		expect(consoleSpy).toHaveBeenCalledWith(
-			'Error in kick command:',
-			expect.any(Error),
+		expect(consoleSpy).toHaveBeenCalled();
+		const errorOutput = consoleSpy.mock.calls[0][0] as string;
+		expect(errorOutput).toContain('[MEDIUM] Error executing kick command');
+		const { safeReplyToInteraction } = await import('../utils/helpers.js');
+		expect(vi.mocked(safeReplyToInteraction)).toHaveBeenCalledWith(
+			interaction,
+			'An error occurred while trying to kick the user.',
 		);
-		expect(interaction.editReply).toHaveBeenCalledWith({
-			content: 'An error occurred while trying to kick the user.',
-		});
 
 		consoleSpy.mockRestore();
 	});

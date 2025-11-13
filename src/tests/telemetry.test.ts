@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	initializeTelemetry,
 	TelemetryService,
 } from '../telemetry/telemetry.js';
 import type { TelemetryEventData } from '../types.js';
 
-vi.mock('./event-recorder.js', () => {
+vi.mock('../telemetry/event-recorder.js', () => {
 	return {
 		EventRecorder: vi.fn(function (this: {
 			initialize: typeof vi.fn;
@@ -21,6 +21,7 @@ vi.mock('./event-recorder.js', () => {
 vi.mock('../telemetry/metrics.js', () => ({
 	recordTelemetryDispatch: vi.fn(),
 	recordTelemetryFailure: vi.fn(),
+	recordErrorMetric: vi.fn(),
 }));
 
 // Helper function to hash IDs like the telemetry service does
@@ -34,6 +35,11 @@ describe('TelemetryService', () => {
 	let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
+		// Clean up environment variables to ensure clean state
+		delete process.env.DATABASE_URL;
+		delete process.env.DATABASE_SCHEMA;
+		delete process.env.TELEMETRY_EVENTS_TABLE;
+
 		fetchMock = vi.fn().mockResolvedValue({
 			ok: true,
 			json: () => Promise.resolve({}),
@@ -46,6 +52,12 @@ describe('TelemetryService', () => {
 			'https://telemetry.example.com',
 			'test-token-123',
 		);
+	});
+
+	afterEach(() => {
+		// Clear spy after each test
+		consoleErrorSpy.mockClear();
+		vi.clearAllMocks();
 	});
 
 	describe('constructor', () => {
@@ -62,6 +74,11 @@ describe('TelemetryService', () => {
 
 			// Verify the service was created successfully
 			expect(service).toBeDefined();
+
+			// Clean up environment variables
+			delete process.env.DATABASE_URL;
+			delete process.env.DATABASE_SCHEMA;
+			delete process.env.TELEMETRY_EVENTS_TABLE;
 		});
 
 		it('should not create EventRecorder if DATABASE_URL is not set', () => {
@@ -132,7 +149,11 @@ describe('TelemetryService', () => {
 
 			await telemetryService.trackUserSignOut(testData);
 
-			expect(consoleErrorSpy).toHaveBeenCalledWith(error);
+			expect(consoleErrorSpy).toHaveBeenCalled();
+			const errorOutput = consoleErrorSpy.mock.calls[0][0] as string;
+			expect(errorOutput).toContain(
+				'[LOW] Failed to send telemetry event to backend',
+			);
 			expect(vi.mocked(recordTelemetryFailure)).toHaveBeenCalledWith(
 				'user_signed_out',
 				testData.guildId,
@@ -151,6 +172,9 @@ describe('TelemetryService', () => {
 
 			// Just verify the call was made without errors
 			expect(fetchMock).toHaveBeenCalled();
+
+			// Clean up environment variable
+			delete process.env.DATABASE_URL;
 		});
 	});
 

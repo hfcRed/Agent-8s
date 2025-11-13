@@ -1,6 +1,7 @@
 import http from 'node:http';
 import process from 'node:process';
 import client from 'prom-client';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 
 const register = new client.Registry();
 
@@ -17,6 +18,13 @@ const telemetryFailureCounter = new client.Counter({
 	name: 'telemetry_events_failed_total',
 	help: 'Count of telemetry events that failed to forward to the backend',
 	labelNames: ['event', 'guild', 'channel'],
+	registers: [register],
+});
+
+const errorCounter = new client.Counter({
+	name: 'application_errors_total',
+	help: 'Count of application errors by reason and severity',
+	labelNames: ['reason', 'severity'],
 	registers: [register],
 });
 
@@ -46,7 +54,11 @@ function startMetricsServer() {
 			} catch (error) {
 				res.statusCode = 500;
 				res.end('Failed to collect metrics');
-				console.error(error);
+				handleError({
+					reason: 'Failed to collect Prometheus metrics',
+					severity: ErrorSeverity.MEDIUM,
+					error,
+				});
 			}
 			return;
 		}
@@ -60,7 +72,12 @@ function startMetricsServer() {
 	});
 
 	server.on('error', (error) => {
-		console.error('Metrics server error', error);
+		handleError({
+			reason: 'Metrics server error',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			skipMetrics: true,
+		});
 	});
 
 	serverStarted = true;
@@ -100,23 +117,30 @@ export async function stopMetricsServer() {
 export function recordTelemetryDispatch(
 	eventName: string,
 	guildId: string,
-	channelId?: string,
+	channelId: string,
 ) {
 	telemetryDispatchCounter.inc({
 		event: eventName,
 		guild: guildId,
-		channel: channelId || 'unknown',
+		channel: channelId,
 	});
 }
 
 export function recordTelemetryFailure(
 	eventName: string,
 	guildId: string,
-	channelId?: string,
+	channelId: string,
 ) {
 	telemetryFailureCounter.inc({
 		event: eventName,
 		guild: guildId,
-		channel: channelId || 'unknown',
+		channel: channelId,
+	});
+}
+
+export function recordErrorMetric(reason: string, severity: ErrorSeverity) {
+	errorCounter.inc({
+		reason: reason,
+		severity: severity,
 	});
 }

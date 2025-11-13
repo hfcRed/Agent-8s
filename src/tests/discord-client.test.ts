@@ -70,10 +70,11 @@ describe('discord-client', () => {
 
 			await loginClient(mockClient, 'test-token');
 
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				'Failed to log in Discord client:',
-				error,
-			);
+			expect(consoleErrorSpy).toHaveBeenCalled();
+			const errorOutput = consoleErrorSpy.mock.calls[
+				consoleErrorSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain('[HIGH] Failed to log in Discord client');
 			expect(processExitSpy).toHaveBeenCalledWith(1);
 		});
 	});
@@ -99,8 +100,12 @@ describe('discord-client', () => {
 
 			await registerCommands(clientWithoutUser, 'test-token', []);
 
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				'Client user not available for command registration',
+			expect(consoleErrorSpy).toHaveBeenCalled();
+			const errorOutput = consoleErrorSpy.mock.calls[
+				consoleErrorSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain(
+				'[HIGH] Client user not available for command registration',
 			);
 		});
 
@@ -114,7 +119,6 @@ describe('discord-client', () => {
 	describe('setupErrorHandlers', () => {
 		let mockClient: Client;
 		let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-		let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
 		beforeEach(() => {
 			mockClient = {
@@ -122,9 +126,7 @@ describe('discord-client', () => {
 			} as unknown as Client;
 
 			consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-			consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		});
-
 		it('should setup error handlers', () => {
 			setupErrorHandlers(mockClient);
 
@@ -141,10 +143,11 @@ describe('discord-client', () => {
 
 			errorHandler(testError);
 
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				'Discord client error:',
-				testError,
-			);
+			expect(consoleErrorSpy).toHaveBeenCalled();
+			const errorOutput = consoleErrorSpy.mock.calls[
+				consoleErrorSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain('[HIGH] Discord client error');
 		});
 
 		it('should handle client warning events', () => {
@@ -156,10 +159,11 @@ describe('discord-client', () => {
 
 			warnHandler(testWarning);
 
-			expect(consoleWarnSpy).toHaveBeenCalledWith(
-				'Discord client warning:',
-				testWarning,
-			);
+			expect(consoleErrorSpy).toHaveBeenCalled();
+			const errorOutput = consoleErrorSpy.mock.calls[
+				consoleErrorSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain('[MEDIUM] Discord client warning');
 		});
 	});
 
@@ -550,10 +554,11 @@ describe('discord-client', () => {
 			// Advance timers to trigger bulk delete
 			await vi.advanceTimersByTimeAsync(2000);
 
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				'Error handling bulk message deletion:',
-				error,
-			);
+			expect(consoleErrorSpy).toHaveBeenCalled();
+			const errorOutput = consoleErrorSpy.mock.calls[
+				consoleErrorSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain('[LOW] Failed to bulk delete messages');
 		});
 
 		it('should batch multiple messages and delete after timeout', async () => {
@@ -779,9 +784,12 @@ describe('discord-client', () => {
 				.calls[0][1];
 			await deleteHandler(mockMessage);
 
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				`Failed to cleanup event after message deletion ${mockMessage.id}:`,
-				error,
+			expect(consoleErrorSpy).toHaveBeenCalled();
+			const errorOutput = consoleErrorSpy.mock.calls[
+				consoleErrorSpy.mock.calls.length - 1
+			][0] as string;
+			expect(errorOutput).toContain(
+				'[MEDIUM] Failed to cleanup event after message deletion',
 			);
 		});
 	});

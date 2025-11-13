@@ -51,6 +51,7 @@ vi.mock('../utils/embed-utils.js', () => ({
 vi.mock('../utils/helpers.js', () => ({
 	getExcaliburRankOfUser: vi.fn(() => '5'),
 	isUserAdmin: vi.fn(() => false),
+	safeReplyToInteraction: vi.fn(),
 }));
 
 describe('Button Handlers', () => {
@@ -639,7 +640,8 @@ describe('Button Handlers', () => {
 			);
 
 			expect(result).toBe(true);
-			expect(interaction.reply).toHaveBeenCalled();
+			const { safeReplyToInteraction } = await import('../utils/helpers.js');
+			expect(vi.mocked(safeReplyToInteraction)).toHaveBeenCalled();
 		});
 
 		it('should detect finishing state', async () => {

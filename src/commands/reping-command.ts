@@ -1,33 +1,33 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { ERROR_MESSAGES, MAX_PARTICIPANTS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
-import { getPingsForServer } from '../utils/helpers.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import { getPingsForServer, safeReplyToInteraction } from '../utils/helpers.js';
 
 export async function handleRepingCommand(
 	interaction: ChatInputCommandInteraction,
 	eventManager: EventManager,
 ) {
-	const userId = interaction.user.id;
-	const userEventId = eventManager.userOwnsEvent(userId);
-
-	if (!userEventId) {
-		await interaction.reply({
-			content: ERROR_MESSAGES.NO_EVENT_OWNED,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
-
-	const channelId = eventManager.getChannelId(userEventId);
-	if (!channelId) {
-		await interaction.reply({
-			content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
-
 	try {
+		const userId = interaction.user.id;
+		const userEventId = eventManager.userOwnsEvent(userId);
+
+		if (!userEventId) {
+			await interaction.reply({
+				content: ERROR_MESSAGES.NO_EVENT_OWNED,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		const channelId = eventManager.getChannelId(userEventId);
+		if (!channelId) {
+			await interaction.reply({
+				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
 		const channel = await interaction.client.channels.fetch(channelId);
 		if (!channel || !channel.isTextBased()) {
 			await interaction.reply({
@@ -77,11 +77,19 @@ export async function handleRepingCommand(
 			content: `${rolePing}\nLooking for **+${missingPlayers}** for ${messageUrl}`,
 		});
 	} catch (error) {
-		console.error('Error in re-ping command:', error);
-
-		await interaction.reply({
-			content: 'An error occurred while trying to re-ping roles.',
-			flags: ['Ephemeral'],
+		handleError({
+			reason: 'Error executing reping command',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				guildId: interaction.guildId || 'unknown',
+			},
 		});
+
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while trying to re-ping roles.',
+		);
 	}
 }

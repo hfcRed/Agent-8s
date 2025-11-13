@@ -30,13 +30,18 @@ import { handleRoleSelection } from './interactions/menu-handlers.js';
 import { ThreadManager } from './managers/thread-manager.js';
 import { VoiceChannelManager } from './managers/voice-channel-manager.js';
 import { initializeTelemetry } from './telemetry/telemetry.js';
-import { botHasPermission } from './utils/helpers.js';
+import { ErrorSeverity, handleError } from './utils/error-handler.js';
+import { botHasPermission, safeReplyToInteraction } from './utils/helpers.js';
 
 dotenv.config({ quiet: true });
 const botToken = process.env.BOT_TOKEN;
 
 if (!botToken) {
-	console.error('BOT_TOKEN not found in .env file');
+	handleError({
+		reason: 'BOT_TOKEN not found in .env file',
+		severity: ErrorSeverity.HIGH,
+		error: new Error('BOT_TOKEN is undefined'),
+	});
 	process.exit(1);
 }
 
@@ -281,29 +286,22 @@ appClient.on('interactionCreate', async (interaction) => {
 			await handleRoleSelection(interaction, eventManager);
 		}
 	} catch (error) {
-		console.error(error);
+		handleError({
+			reason: 'Error processing interaction',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				interactionType: interaction.type,
+				userId: interaction.user.id,
+				guildId: interaction.guildId || 'unknown',
+			},
+		});
 
-		try {
-			if (
-				interaction.isRepliable() &&
-				!interaction.replied &&
-				!interaction.deferred
-			) {
-				await interaction.reply({
-					content: 'An error occurred while processing your request.',
-					flags: ['Ephemeral'],
-				});
-			} else if (
-				interaction.isRepliable() &&
-				(interaction.replied || interaction.deferred)
-			) {
-				await interaction.followUp({
-					content: 'An error occurred while processing your request.',
-					flags: ['Ephemeral'],
-				});
-			}
-		} catch (replyError) {
-			console.error('Failed to send error message to user:', replyError);
+		if (interaction.isRepliable()) {
+			await safeReplyToInteraction(
+				interaction,
+				'An error occurred while processing your request.',
+			);
 		}
 	}
 });

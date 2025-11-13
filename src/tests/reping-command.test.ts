@@ -15,6 +15,7 @@ vi.mock('../utils/helpers.js', () => ({
 	getPingsForServer: vi.fn((_interaction, casual) =>
 		casual ? '||<@&casual-role-id>||' : '||<@&comp-role-id>||',
 	),
+	safeReplyToInteraction: vi.fn(),
 }));
 
 describe('handleRepingCommand', () => {
@@ -207,10 +208,11 @@ describe('handleRepingCommand', () => {
 
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: 'An error occurred while trying to re-ping roles.',
-			flags: ['Ephemeral'],
-		});
+		const { safeReplyToInteraction } = await import('../utils/helpers.js');
+		expect(vi.mocked(safeReplyToInteraction)).toHaveBeenCalledWith(
+			interaction,
+			'An error occurred while trying to re-ping roles.',
+		);
 	});
 
 	it('should handle when no role ping is available', async () => {

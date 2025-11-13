@@ -8,6 +8,7 @@ import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import { stopMetricsServer } from '../telemetry/metrics.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import { updateEmbedField } from '../utils/embed-utils.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 
 let isShuttingDown = false;
 let hasRetried = false;
@@ -139,7 +140,11 @@ export async function gracefulShutdown(
 
 		console.log('Graceful shutdown complete');
 	} catch (error) {
-		console.error('Error during graceful shutdown:', error);
+		handleError({
+			reason: 'Error during graceful shutdown',
+			severity: ErrorSeverity.HIGH,
+			error,
+		});
 
 		if (AUTHOR_ID) {
 			const author = await client.users.fetch(AUTHOR_ID);
@@ -207,7 +212,13 @@ export function setupShutdownHandlers(
 			event.code === 4011 ||
 			event.code === 4014
 		) {
-			console.error(`Fatal WebSocket error on shard ${shardId}:`, event);
+			handleError({
+				reason: `Fatal WebSocket error on shard ${shardId}`,
+				severity: ErrorSeverity.HIGH,
+				error: new Error(`WebSocket closed with code ${event.code}`),
+				metadata: { shardId, code: event.code },
+			});
+
 			await gracefulShutdown(
 				'shardDisconnect',
 				client,

@@ -93,9 +93,10 @@ describe('EventRecorder', () => {
 			eventRecorder = new EventRecorder(connectionString);
 			await eventRecorder.initialize();
 
-			expect(consoleSpy).toHaveBeenCalledWith(
-				'Failed to initialize event recorder',
-				expect.any(Error),
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			expect(errorOutput).toContain(
+				'[MEDIUM] Failed to initialize event recorder schema',
 			);
 
 			consoleSpy.mockRestore();
@@ -195,9 +196,10 @@ describe('EventRecorder', () => {
 
 			await eventRecorder.record('event.test', eventData);
 
-			expect(consoleSpy).toHaveBeenCalledWith(
-				'Failed to record telemetry event',
-				expect.any(Error),
+			expect(consoleSpy).toHaveBeenCalled();
+			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			expect(errorOutput).toContain(
+				'[LOW] Failed to record telemetry event to database',
 			);
 
 			consoleSpy.mockRestore();

@@ -5,6 +5,7 @@ import type {
 	GuildMember,
 	GuildTextBasedChannel,
 	PermissionResolvable,
+	RepliableInteraction,
 	StringSelectMenuInteraction,
 	TextBasedChannel,
 } from 'discord.js';
@@ -15,6 +16,7 @@ import {
 	EXCALIBUR_RANKS,
 	PING_ROLE_NAMES,
 } from '../constants.js';
+import { ErrorSeverity, handleError } from './error-handler.js';
 
 export function isUserAdmin(member: GuildMember) {
 	return ADMIN_PERMISSIONS.some((permission) =>
@@ -81,4 +83,29 @@ export function getExcaliburRankOfUser(
 	}
 
 	return null;
+}
+
+export async function safeReplyToInteraction(
+	interaction: RepliableInteraction,
+	content: string,
+) {
+	try {
+		if (interaction.replied || interaction.deferred) {
+			await interaction.followUp({
+				content,
+				flags: ['Ephemeral'],
+			});
+		} else {
+			await interaction.reply({
+				content,
+				flags: ['Ephemeral'],
+			});
+		}
+	} catch (error) {
+		handleError({
+			reason: 'Failed to send error message to user',
+			severity: ErrorSeverity.LOW,
+			error,
+		});
+	}
 }

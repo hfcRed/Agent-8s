@@ -6,6 +6,7 @@ import {
 	PermissionFlagsBits,
 	type TextChannel,
 } from 'discord.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 
 /**
  * Manages Discord voice channel operations for events.
@@ -60,10 +61,16 @@ export class VoiceChannelManager {
 
 				voiceChannels.push(voiceChannel.id);
 			} catch (error) {
-				console.error(
-					`Failed to create voice channel ${voiceNames[i - 1]}:`,
+				handleError({
+					reason: 'Failed to create event voice channel',
+					severity: ErrorSeverity.MEDIUM,
 					error,
-				);
+					metadata: {
+						channelName: voiceNames[i - 1],
+						guildId: guild.id,
+						shortId,
+					},
+				});
 			}
 		}
 
@@ -83,10 +90,12 @@ export class VoiceChannelManager {
 			}
 			return false;
 		} catch (error) {
-			console.error(
-				`Failed to grant voice channel access for ${userId} in ${channelId}:`,
+			handleError({
+				reason: 'Failed to grant voice channel access',
+				severity: ErrorSeverity.LOW,
 				error,
-			);
+				metadata: { userId, channelId },
+			});
 			return false;
 		}
 	}
@@ -104,10 +113,12 @@ export class VoiceChannelManager {
 			}
 			return false;
 		} catch (error) {
-			console.error(
-				`Failed to revoke voice channel access for ${userId} in ${channelId}:`,
+			handleError({
+				reason: 'Failed to revoke voice channel access',
+				severity: ErrorSeverity.LOW,
 				error,
-			);
+				metadata: { userId, channelId },
+			});
 			return false;
 		}
 	}
@@ -145,7 +156,12 @@ export class VoiceChannelManager {
 			}
 			return false;
 		} catch (error) {
-			console.error(`Failed to delete voice channel ${channelId}:`, error);
+			handleError({
+				reason: 'Failed to delete voice channel',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { channelId },
+			});
 			return false;
 		}
 	}

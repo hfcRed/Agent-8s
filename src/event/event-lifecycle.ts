@@ -21,6 +21,7 @@ import {
 	createRoleSelectMenu,
 	updateEmbedField,
 } from '../utils/embed-utils.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import type { EventManager } from './event-manager.js';
 
 export async function startEvent(
@@ -129,10 +130,12 @@ export async function cleanupEvent(
 					}
 				}
 			} catch (error) {
-				console.error(
-					`Failed to fetch thread ${threadId} from channel ${channelId}:`,
+				handleError({
+					reason: 'Failed to fetch and archive thread during cleanup',
+					severity: ErrorSeverity.LOW,
 					error,
-				);
+					metadata: { threadId, channelId, eventId },
+				});
 			}
 		}
 
@@ -142,6 +145,13 @@ export async function cleanupEvent(
 		}
 
 		eventManager.clearAllEventData(eventId);
+	} catch (error) {
+		handleError({
+			reason: 'Failed to cleanup event',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: { eventId },
+		});
 	} finally {
 		eventManager.clearProcessing(eventId, 'cleanup');
 		eventManager.deleteProcessingStates(eventId);
@@ -174,13 +184,14 @@ export async function cleanupStaleEvents(
 						message = await channel.messages.fetch(messageId);
 					}
 				} catch (error) {
-					console.error(
-						`Failed to fetch message ${messageId} from channel ${channelId}:`,
+					handleError({
+						reason: 'Failed to fetch stale event message',
+						severity: ErrorSeverity.LOW,
 						error,
-					);
+						metadata: { messageId, channelId },
+					});
 				}
 			}
-
 			if (message) {
 				const embed = EmbedBuilder.from(message.embeds[0]).setColor(
 					COLORS.CANCELLED,
@@ -202,7 +213,12 @@ export async function cleanupStaleEvents(
 				});
 			}
 		} catch (error) {
-			console.error(`Failed to clean up stale event ${messageId}:`, error);
+			handleError({
+				reason: `Failed to process stale event ${messageId}`,
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { messageId },
+			});
 		} finally {
 			await cleanupEvent(
 				messageId,
@@ -262,6 +278,13 @@ export async function createEventStartTimeout(
 						voiceChannelManager,
 						telemetry,
 					);
+				} catch (error) {
+					handleError({
+						reason: 'Failed to start event from timeout',
+						severity: ErrorSeverity.MEDIUM,
+						error,
+						metadata: { messageId: message.id },
+					});
 				} finally {
 					eventManager.clearProcessing(message.id, 'starting');
 				}
@@ -275,10 +298,12 @@ export async function createEventStartTimeout(
 				await message.edit({ embeds: [embed] });
 			}
 		} catch (error) {
-			console.error(
-				`Error in timeout callback for event ${message.id}:`,
+			handleError({
+				reason: 'Failed to process event start timeout',
+				severity: ErrorSeverity.MEDIUM,
 				error,
-			);
+				metadata: { messageId: message.id },
+			});
 		} finally {
 			eventManager.deleteTimeout(message.id);
 		}

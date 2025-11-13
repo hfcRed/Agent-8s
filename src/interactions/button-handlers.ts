@@ -29,7 +29,12 @@ import {
 	updateEmbedField,
 	updateParticipantFields,
 } from '../utils/embed-utils.js';
-import { getExcaliburRankOfUser, isUserAdmin } from '../utils/helpers.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import {
+	getExcaliburRankOfUser,
+	isUserAdmin,
+	safeReplyToInteraction,
+} from '../utils/helpers.js';
 
 export async function handleSignUpButton(
 	interaction: ButtonInteraction,
@@ -38,56 +43,76 @@ export async function handleSignUpButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const messageId = interaction.message.id;
-	const userId = interaction.user.id;
-	const participantMap = eventManager.getParticipants(messageId);
-	const timerData = eventManager.getTimer(messageId);
+	try {
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const timerData = eventManager.getTimer(messageId);
 
-	if (!participantMap || !timerData) return;
+		if (!participantMap || !timerData) return;
 
-	await interaction.deferUpdate();
+		await interaction.deferUpdate();
 
-	if (participantMap.size >= MAX_PARTICIPANTS && !participantMap.has(userId)) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.EVENT_FULL,
-			flags: ['Ephemeral'],
+		if (
+			participantMap.size >= MAX_PARTICIPANTS &&
+			!participantMap.has(userId)
+		) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.EVENT_FULL,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		if (eventManager.isUserInAnyEvent(userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		eventManager.addParticipant(messageId, userId, {
+			userId: userId,
+			role: WEAPON_ROLES[0],
+			rank: getExcaliburRankOfUser(interaction),
 		});
-		return;
-	}
 
-	if (eventManager.isUserInAnyEvent(userId)) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
-			flags: ['Ephemeral'],
+		const matchId = eventManager.getMatchId(messageId);
+		telemetry?.trackUserSignUp({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
 		});
-		return;
+
+		await updateParticipantEmbed(
+			interaction,
+			participantMap,
+			timerData,
+			eventManager,
+			threadManager,
+			voiceChannelManager,
+			telemetry,
+		);
+	} catch (error) {
+		handleError({
+			reason: 'Error handling sign up button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
+		});
+
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while processing your sign-up.',
+		);
 	}
-
-	eventManager.addParticipant(messageId, userId, {
-		userId: userId,
-		role: WEAPON_ROLES[0],
-		rank: getExcaliburRankOfUser(interaction),
-	});
-
-	const matchId = eventManager.getMatchId(messageId);
-	telemetry?.trackUserSignUp({
-		guildId: interaction.guild?.id || 'unknown',
-		eventId: messageId,
-		userId: userId,
-		participants: Array.from(participantMap.values()),
-		channelId: interaction.channelId,
-		matchId: matchId || 'unknown',
-	});
-
-	await updateParticipantEmbed(
-		interaction,
-		participantMap,
-		timerData,
-		eventManager,
-		threadManager,
-		voiceChannelManager,
-		telemetry,
-	);
 }
 
 export async function handleSignOutButton(
@@ -97,45 +122,62 @@ export async function handleSignOutButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const messageId = interaction.message.id;
-	const userId = interaction.user.id;
-	const participantMap = eventManager.getParticipants(messageId);
-	const creatorId = eventManager.getCreator(messageId);
-	const timerData = eventManager.getTimer(messageId);
+	try {
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const creatorId = eventManager.getCreator(messageId);
+		const timerData = eventManager.getTimer(messageId);
 
-	if (!participantMap || !creatorId || !timerData) return;
+		if (!participantMap || !creatorId || !timerData) return;
 
-	await interaction.deferUpdate();
+		await interaction.deferUpdate();
 
-	if (userId === creatorId) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
-			flags: ['Ephemeral'],
+		if (userId === creatorId) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		eventManager.removeParticipant(messageId, userId);
+
+		const matchId = eventManager.getMatchId(messageId);
+		telemetry?.trackUserSignOut({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
 		});
-		return;
+
+		await updateParticipantEmbed(
+			interaction,
+			participantMap,
+			timerData,
+			eventManager,
+			threadManager,
+			voiceChannelManager,
+			telemetry,
+		);
+	} catch (error) {
+		handleError({
+			reason: 'Error handling sign out button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
+		});
+
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while processing your sign-out.',
+		);
 	}
-
-	eventManager.removeParticipant(messageId, userId);
-
-	const matchId = eventManager.getMatchId(messageId);
-	telemetry?.trackUserSignOut({
-		guildId: interaction.guild?.id || 'unknown',
-		eventId: messageId,
-		userId: userId,
-		participants: Array.from(participantMap.values()),
-		channelId: interaction.channelId,
-		matchId: matchId || 'unknown',
-	});
-
-	await updateParticipantEmbed(
-		interaction,
-		participantMap,
-		timerData,
-		eventManager,
-		threadManager,
-		voiceChannelManager,
-		telemetry,
-	);
 }
 
 export async function handleCancelButton(
@@ -146,55 +188,79 @@ export async function handleCancelButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const messageId = interaction.message.id;
-	const userId = interaction.user.id;
-	const participantMap = eventManager.getParticipants(messageId);
-	const creatorId = eventManager.getCreator(messageId);
-
-	if (!participantMap || !creatorId) return;
-
-	await interaction.deferUpdate();
-
-	const isCreator = userId === creatorId;
-	const isAdmin = isUserAdmin(interaction.member as GuildMember);
-
-	if (!isCreator && !isAdmin) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.CREATOR_ONLY_CANCEL,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
-
-	eventManager.setProcessing(messageId, 'cancelling');
 	try {
-		const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
-			COLORS.CANCELLED,
-		);
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const creatorId = eventManager.getCreator(messageId);
 
-		updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
+		if (!participantMap || !creatorId) return;
 
-		await interaction.editReply({ embeds: [embed], components: [] });
+		await interaction.deferUpdate();
 
-		const matchId = eventManager.getMatchId(messageId);
-		telemetry?.trackEventCancelled({
-			guildId: interaction.guild?.id || 'unknown',
-			eventId: messageId,
-			userId: userId,
-			participants: Array.from(participantMap.values()),
-			channelId: interaction.channelId,
-			matchId: matchId || 'unknown',
+		const isCreator = userId === creatorId;
+		const isAdmin = isUserAdmin(interaction.member as GuildMember);
+
+		if (!isCreator && !isAdmin) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.CREATOR_ONLY_CANCEL,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		eventManager.setProcessing(messageId, 'cancelling');
+		try {
+			const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+				COLORS.CANCELLED,
+			);
+
+			updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
+
+			await interaction.editReply({ embeds: [embed], components: [] });
+
+			const matchId = eventManager.getMatchId(messageId);
+			telemetry?.trackEventCancelled({
+				guildId: interaction.guild?.id || 'unknown',
+				eventId: messageId,
+				userId: userId,
+				participants: Array.from(participantMap.values()),
+				channelId: interaction.channelId,
+				matchId: matchId || 'unknown',
+			});
+
+			await cleanupEvent(
+				messageId,
+				eventManager,
+				appClient,
+				threadManager,
+				voiceChannelManager,
+			);
+		} catch (error) {
+			handleError({
+				reason: 'Failed to cancel event',
+				severity: ErrorSeverity.MEDIUM,
+				error,
+				metadata: { messageId },
+			});
+		} finally {
+			eventManager.clearProcessing(messageId, 'cancelling');
+		}
+	} catch (error) {
+		handleError({
+			reason: 'Error handling cancel button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
 		});
 
-		await cleanupEvent(
-			messageId,
-			eventManager,
-			appClient,
-			threadManager,
-			voiceChannelManager,
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while cancelling the event.',
 		);
-	} finally {
-		eventManager.clearProcessing(messageId, 'cancelling');
 	}
 }
 
@@ -206,44 +272,68 @@ export async function handleStartNowButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const messageId = interaction.message.id;
-	const userId = interaction.user.id;
-	const participantMap = eventManager.getParticipants(messageId);
-	const creatorId = eventManager.getCreator(messageId);
-
-	if (!participantMap || !creatorId) return;
-
-	await interaction.deferUpdate();
-
-	if (userId !== creatorId) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.CREATOR_ONLY_START,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
-
-	if (participantMap.size !== MAX_PARTICIPANTS) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.NOT_ENOUGH_PARTICIPANTS,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
-
-	eventManager.setProcessing(messageId, 'starting');
 	try {
-		await startEvent(
-			interaction.message,
-			participantMap,
-			eventManager,
-			appClient,
-			threadManager,
-			voiceChannelManager,
-			telemetry,
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const creatorId = eventManager.getCreator(messageId);
+
+		if (!participantMap || !creatorId) return;
+
+		await interaction.deferUpdate();
+
+		if (userId !== creatorId) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.CREATOR_ONLY_START,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		if (participantMap.size !== MAX_PARTICIPANTS) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.NOT_ENOUGH_PARTICIPANTS,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		eventManager.setProcessing(messageId, 'starting');
+		try {
+			await startEvent(
+				interaction.message,
+				participantMap,
+				eventManager,
+				appClient,
+				threadManager,
+				voiceChannelManager,
+				telemetry,
+			);
+		} catch (error) {
+			handleError({
+				reason: 'Failed to start event',
+				severity: ErrorSeverity.MEDIUM,
+				error,
+				metadata: { messageId },
+			});
+		} finally {
+			eventManager.clearProcessing(messageId, 'starting');
+		}
+	} catch (error) {
+		handleError({
+			reason: 'Error handling start now button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
+		});
+
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while starting the event.',
 		);
-	} finally {
-		eventManager.clearProcessing(messageId, 'starting');
 	}
 }
 
@@ -255,55 +345,79 @@ export async function handleFinishButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const messageId = interaction.message.id;
-	const userId = interaction.user.id;
-	const participantMap = eventManager.getParticipants(messageId);
-	const creatorId = eventManager.getCreator(messageId);
-
-	if (!participantMap || !creatorId) return;
-
-	await interaction.deferUpdate();
-
-	const isCreator = userId === creatorId;
-	const isAdmin = isUserAdmin(interaction.member as GuildMember);
-
-	if (!isCreator && !isAdmin) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.CREATOR_ONLY_FINISH,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
-
-	eventManager.setProcessing(messageId, 'finishing');
 	try {
-		const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
-			COLORS.FINISHED,
-		);
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const creatorId = eventManager.getCreator(messageId);
 
-		updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
+		if (!participantMap || !creatorId) return;
 
-		await interaction.editReply({ embeds: [embed], components: [] });
+		await interaction.deferUpdate();
 
-		const matchId = eventManager.getMatchId(messageId);
-		telemetry?.trackEventFinished({
-			guildId: interaction.guild?.id || 'unknown',
-			eventId: messageId,
-			userId: userId,
-			participants: Array.from(participantMap.values()),
-			channelId: interaction.channelId,
-			matchId: matchId || 'unknown',
+		const isCreator = userId === creatorId;
+		const isAdmin = isUserAdmin(interaction.member as GuildMember);
+
+		if (!isCreator && !isAdmin) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.CREATOR_ONLY_FINISH,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		eventManager.setProcessing(messageId, 'finishing');
+		try {
+			const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
+				COLORS.FINISHED,
+			);
+
+			updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
+
+			await interaction.editReply({ embeds: [embed], components: [] });
+
+			const matchId = eventManager.getMatchId(messageId);
+			telemetry?.trackEventFinished({
+				guildId: interaction.guild?.id || 'unknown',
+				eventId: messageId,
+				userId: userId,
+				participants: Array.from(participantMap.values()),
+				channelId: interaction.channelId,
+				matchId: matchId || 'unknown',
+			});
+
+			await cleanupEvent(
+				messageId,
+				eventManager,
+				appClient,
+				threadManager,
+				voiceChannelManager,
+			);
+		} catch (error) {
+			handleError({
+				reason: 'Failed to finish event',
+				severity: ErrorSeverity.MEDIUM,
+				error,
+				metadata: { messageId },
+			});
+		} finally {
+			eventManager.clearProcessing(messageId, 'finishing');
+		}
+	} catch (error) {
+		handleError({
+			reason: 'Error handling finish button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
 		});
 
-		await cleanupEvent(
-			messageId,
-			eventManager,
-			appClient,
-			threadManager,
-			voiceChannelManager,
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while finishing the event.',
 		);
-	} finally {
-		eventManager.clearProcessing(messageId, 'finishing');
 	}
 }
 
@@ -315,67 +429,84 @@ export async function handleDropOutButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const messageId = interaction.message.id;
-	const userId = interaction.user.id;
-	const participantMap = eventManager.getParticipants(messageId);
-	const creatorId = eventManager.getCreator(messageId);
-	const timerData = eventManager.getTimer(messageId);
+	try {
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const creatorId = eventManager.getCreator(messageId);
+		const timerData = eventManager.getTimer(messageId);
 
-	if (!participantMap || !creatorId || !timerData) return;
+		if (!participantMap || !creatorId || !timerData) return;
 
-	await interaction.deferUpdate();
+		await interaction.deferUpdate();
 
-	if (userId === creatorId) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
+		if (userId === creatorId) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
 
-	if (!participantMap.has(userId)) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.NOT_SIGNED_UP,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
+		if (!participantMap.has(userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.NOT_SIGNED_UP,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
 
-	eventManager.removeParticipant(messageId, userId);
+		eventManager.removeParticipant(messageId, userId);
 
-	const threadId = eventManager.getThread(messageId);
-	if (threadId) {
-		const channel = interaction.channel as TextChannel | null;
-		if (channel) {
-			const thread = await threadManager.fetchThread(channel, threadId);
-			if (thread) {
-				await threadManager.removeMember(thread, userId);
+		const threadId = eventManager.getThread(messageId);
+		if (threadId) {
+			const channel = interaction.channel as TextChannel | null;
+			if (channel) {
+				const thread = await threadManager.fetchThread(channel, threadId);
+				if (thread) {
+					await threadManager.removeMember(thread, userId);
+				}
 			}
 		}
-	}
 
-	const voiceChannelIds = eventManager.getVoiceChannels(messageId);
-	if (voiceChannelIds) {
-		await voiceChannelManager.revokeAccessFromChannels(
-			appClient,
-			voiceChannelIds,
-			userId,
+		const voiceChannelIds = eventManager.getVoiceChannels(messageId);
+		if (voiceChannelIds) {
+			await voiceChannelManager.revokeAccessFromChannels(
+				appClient,
+				voiceChannelIds,
+				userId,
+			);
+		}
+
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+		updateParticipantFields(embed, participantMap, timerData, false);
+		await interaction.editReply({ embeds: [embed] });
+
+		const matchId = eventManager.getMatchId(messageId);
+		telemetry?.trackUserDropOut({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+	} catch (error) {
+		handleError({
+			reason: 'Error handling drop out button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
+		});
+
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while dropping out of the event.',
 		);
 	}
-
-	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-	updateParticipantFields(embed, participantMap, timerData, false);
-	await interaction.editReply({ embeds: [embed] });
-
-	const matchId = eventManager.getMatchId(messageId);
-	telemetry?.trackUserDropOut({
-		guildId: interaction.guild?.id || 'unknown',
-		eventId: messageId,
-		userId: userId,
-		participants: Array.from(participantMap.values()),
-		channelId: interaction.channelId,
-		matchId: matchId || 'unknown',
-	});
 }
 
 export async function handleDropInButton(
@@ -386,70 +517,87 @@ export async function handleDropInButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const messageId = interaction.message.id;
-	const userId = interaction.user.id;
-	const participantMap = eventManager.getParticipants(messageId);
-	const timerData = eventManager.getTimer(messageId);
+	try {
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const timerData = eventManager.getTimer(messageId);
 
-	if (!participantMap || !timerData) return;
+		if (!participantMap || !timerData) return;
 
-	await interaction.deferUpdate();
+		await interaction.deferUpdate();
 
-	if (participantMap.has(userId)) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
-			flags: ['Ephemeral'],
+		if (participantMap.has(userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		if (participantMap.size >= MAX_PARTICIPANTS) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.EVENT_FULL,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		eventManager.addParticipant(messageId, userId, {
+			userId: userId,
+			role: WEAPON_ROLES[0],
+			rank: getExcaliburRankOfUser(interaction),
 		});
-		return;
-	}
 
-	if (participantMap.size >= MAX_PARTICIPANTS) {
-		await interaction.followUp({
-			content: ERROR_MESSAGES.EVENT_FULL,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
-
-	eventManager.addParticipant(messageId, userId, {
-		userId: userId,
-		role: WEAPON_ROLES[0],
-		rank: getExcaliburRankOfUser(interaction),
-	});
-
-	const threadId = eventManager.getThread(messageId);
-	if (threadId) {
-		const channel = interaction.channel as TextChannel | null;
-		if (channel) {
-			const thread = await threadManager.fetchThread(channel, threadId);
-			if (thread) {
-				await threadManager.addMember(thread, userId);
+		const threadId = eventManager.getThread(messageId);
+		if (threadId) {
+			const channel = interaction.channel as TextChannel | null;
+			if (channel) {
+				const thread = await threadManager.fetchThread(channel, threadId);
+				if (thread) {
+					await threadManager.addMember(thread, userId);
+				}
 			}
 		}
-	}
 
-	const voiceChannelIds = eventManager.getVoiceChannels(messageId);
-	if (voiceChannelIds) {
-		await voiceChannelManager.grantAccessToChannels(
-			appClient,
-			voiceChannelIds,
-			userId,
+		const voiceChannelIds = eventManager.getVoiceChannels(messageId);
+		if (voiceChannelIds) {
+			await voiceChannelManager.grantAccessToChannels(
+				appClient,
+				voiceChannelIds,
+				userId,
+			);
+		}
+
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+		updateParticipantFields(embed, participantMap, timerData, false);
+		await interaction.editReply({ embeds: [embed] });
+
+		const matchId = eventManager.getMatchId(messageId);
+		telemetry?.trackUserDropIn({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+	} catch (error) {
+		handleError({
+			reason: 'Error handling drop in button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
+		});
+
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while dropping in to the event.',
 		);
 	}
-
-	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-	updateParticipantFields(embed, participantMap, timerData, false);
-	await interaction.editReply({ embeds: [embed] });
-
-	const matchId = eventManager.getMatchId(messageId);
-	telemetry?.trackUserDropIn({
-		guildId: interaction.guild?.id || 'unknown',
-		eventId: messageId,
-		userId: userId,
-		participants: Array.from(participantMap.values()),
-		channelId: interaction.channelId,
-		matchId: matchId || 'unknown',
-	});
 }
 
 async function updateParticipantEmbed(
@@ -501,33 +649,41 @@ export async function checkProcessingStates(
 	interaction?: ButtonInteraction | ChatInputCommandInteraction,
 ) {
 	if (eventManager.isProcessing(messageId, 'starting')) {
-		await interaction?.reply({
-			content: PROCESSING_MESSAGES.STILL_STARTING,
-			flags: ['Ephemeral'],
-		});
+		if (interaction) {
+			await safeReplyToInteraction(
+				interaction,
+				PROCESSING_MESSAGES.STILL_STARTING,
+			);
+		}
 		return true;
 	}
 	if (eventManager.isProcessing(messageId, 'finishing')) {
-		await interaction?.reply({
-			content: PROCESSING_MESSAGES.ALREADY_FINISHING,
-			flags: ['Ephemeral'],
-		});
+		if (interaction) {
+			await safeReplyToInteraction(
+				interaction,
+				PROCESSING_MESSAGES.ALREADY_FINISHING,
+			);
+		}
 		return true;
 	}
 
 	if (eventManager.isProcessing(messageId, 'cancelling')) {
-		await interaction?.reply({
-			content: PROCESSING_MESSAGES.ALREADY_CANCELLING,
-			flags: ['Ephemeral'],
-		});
+		if (interaction) {
+			await safeReplyToInteraction(
+				interaction,
+				PROCESSING_MESSAGES.ALREADY_CANCELLING,
+			);
+		}
 		return true;
 	}
 
 	if (eventManager.isProcessing(messageId, 'cleanup')) {
-		await interaction?.reply({
-			content: PROCESSING_MESSAGES.CLEANING_UP,
-			flags: ['Ephemeral'],
-		});
+		if (interaction) {
+			await safeReplyToInteraction(
+				interaction,
+				PROCESSING_MESSAGES.CLEANING_UP,
+			);
+		}
 		return true;
 	}
 
@@ -536,10 +692,7 @@ export async function checkProcessingStates(
 		'message' in interaction &&
 		eventManager.isEventFinalizing(interaction.message)
 	) {
-		await interaction.reply({
-			content: ERROR_MESSAGES.EVENT_FINALIZING,
-			flags: ['Ephemeral'],
-		});
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.EVENT_FINALIZING);
 		return true;
 	}
 

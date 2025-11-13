@@ -11,7 +11,12 @@ import {
 	createEventEmbed,
 	createRoleSelectMenu,
 } from '../utils/embed-utils.js';
-import { getExcaliburRankOfUser, getPingsForServer } from '../utils/helpers.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import {
+	getExcaliburRankOfUser,
+	getPingsForServer,
+	safeReplyToInteraction,
+} from '../utils/helpers.js';
 
 export async function handleCreateCommand(
 	interaction: ChatInputCommandInteraction,
@@ -20,86 +25,105 @@ export async function handleCreateCommand(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	if (eventManager.isUserInAnyEvent(interaction.user.id)) {
-		await interaction.reply({
-			content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
+	try {
+		if (eventManager.isUserInAnyEvent(interaction.user.id)) {
+			await interaction.reply({
+				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
 
-	const casual = !!interaction.options.getBoolean('casual', false);
-	const info = interaction.options.getString('info', false) ?? undefined;
-	const timeInMinutes =
-		interaction.options.getInteger('time', false) ?? undefined;
-	const startTime = Date.now();
+		const casual = !!interaction.options.getBoolean('casual', false);
+		const info = interaction.options.getString('info', false) ?? undefined;
+		const timeInMinutes =
+			interaction.options.getInteger('time', false) ?? undefined;
+		const startTime = Date.now();
 
-	const buttonRow = createEventButtons(timeInMinutes);
-	const selectRow = createRoleSelectMenu();
+		const buttonRow = createEventButtons(timeInMinutes);
+		const selectRow = createRoleSelectMenu();
 
-	const embed = createEventEmbed(
-		interaction.user.username,
-		interaction.user.displayAvatarURL(),
-		interaction.user.id,
-		casual,
-		timeInMinutes,
-		info,
-	);
-
-	const rolePing = getPingsForServer(interaction, casual);
-
-	const reply = await interaction.reply({
-		content: rolePing || undefined,
-		embeds: [embed],
-		components: [buttonRow, selectRow],
-	});
-	const message = await reply.fetch();
-	const matchId = randomUUID();
-
-	eventManager.setParticipants(
-		message.id,
-		new Map([
-			[
-				interaction.user.id,
-				{
-					userId: interaction.user.id,
-					role: WEAPON_ROLES[0],
-					rank: getExcaliburRankOfUser(interaction),
-				},
-			],
-		]),
-	);
-	eventManager.setCreator(message.id, interaction.user.id);
-	eventManager.setTimer(message.id, {
-		startTime,
-		duration: timeInMinutes ? timeInMinutes * TIMINGS.MINUTE_IN_MS : undefined,
-		hasStarted: false,
-	});
-	eventManager.setMatchId(message.id, matchId);
-	eventManager.setChannelId(message.id, message.channelId);
-	if (interaction.guildId) {
-		eventManager.setGuildId(message.id, interaction.guildId);
-	}
-
-	const participants = eventManager.getParticipants(message.id);
-	telemetry?.trackEventCreated({
-		guildId: interaction.guild?.id || 'unknown',
-		eventId: message.id,
-		userId: interaction.user.id,
-		participants: Array.from((participants || new Map()).values()),
-		channelId: interaction.channelId,
-		matchId,
-		timeToStart: timeInMinutes,
-	});
-
-	if (timeInMinutes) {
-		createEventStartTimeout(
-			message,
+		const embed = createEventEmbed(
+			interaction.user.username,
+			interaction.user.displayAvatarURL(),
+			interaction.user.id,
+			casual,
 			timeInMinutes,
-			eventManager,
-			threadManager,
-			voiceChannelManager,
-			telemetry,
+			info,
+		);
+
+		const rolePing = getPingsForServer(interaction, casual);
+
+		const reply = await interaction.reply({
+			content: rolePing || undefined,
+			embeds: [embed],
+			components: [buttonRow, selectRow],
+		});
+		const message = await reply.fetch();
+		const matchId = randomUUID();
+
+		eventManager.setParticipants(
+			message.id,
+			new Map([
+				[
+					interaction.user.id,
+					{
+						userId: interaction.user.id,
+						role: WEAPON_ROLES[0],
+						rank: getExcaliburRankOfUser(interaction),
+					},
+				],
+			]),
+		);
+		eventManager.setCreator(message.id, interaction.user.id);
+		eventManager.setTimer(message.id, {
+			startTime,
+			duration: timeInMinutes
+				? timeInMinutes * TIMINGS.MINUTE_IN_MS
+				: undefined,
+			hasStarted: false,
+		});
+		eventManager.setMatchId(message.id, matchId);
+		eventManager.setChannelId(message.id, message.channelId);
+		if (interaction.guildId) {
+			eventManager.setGuildId(message.id, interaction.guildId);
+		}
+
+		const participants = eventManager.getParticipants(message.id);
+		telemetry?.trackEventCreated({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: message.id,
+			userId: interaction.user.id,
+			participants: Array.from((participants || new Map()).values()),
+			channelId: interaction.channelId,
+			matchId,
+			timeToStart: timeInMinutes,
+		});
+
+		if (timeInMinutes) {
+			createEventStartTimeout(
+				message,
+				timeInMinutes,
+				eventManager,
+				threadManager,
+				voiceChannelManager,
+				telemetry,
+			);
+		}
+	} catch (error) {
+		handleError({
+			reason: 'Error executing create command',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				guildId: interaction.guildId || 'unknown',
+			},
+		});
+
+		await safeReplyToInteraction(
+			interaction,
+			'An error occurred while creating the event. Please try again.',
 		);
 	}
 }
