@@ -26,6 +26,14 @@ vi.mock('../client/shutdown.js', () => ({
 	gracefulShutdown: vi.fn(),
 }));
 
+vi.mock('../constants.js', async () => {
+	const actual = await vi.importActual('../constants.js');
+	return {
+		...actual,
+		AUTHOR_ID: process.env.AUTHOR_ID || 'author-123',
+	};
+});
+
 describe('discord-client', () => {
 	describe('createDiscordClient', () => {
 		it('should create a Discord client with correct intents', () => {
@@ -258,7 +266,8 @@ describe('discord-client', () => {
 				.spyOn(process, 'exit')
 				.mockImplementation(() => undefined as never);
 
-			const authorId = process.env.AUTHOR_ID || 'author-123';
+			const constantsModule = await import('../constants.js');
+			const authorId = constantsModule.AUTHOR_ID;
 			const dmMessage = {
 				author: { id: authorId, bot: false },
 				channel: {
@@ -325,7 +334,8 @@ describe('discord-client', () => {
 				shutdownModule.gracefulShutdown as ReturnType<typeof vi.fn>;
 			gracefulShutdownMock.mockClear();
 
-			const authorId = process.env.AUTHOR_ID || 'author-123';
+			const constantsModule = await import('../constants.js');
+			const authorId = constantsModule.AUTHOR_ID;
 			const dmMessage = {
 				author: { id: authorId, bot: false },
 				channel: {
@@ -354,7 +364,8 @@ describe('discord-client', () => {
 				shutdownModule.gracefulShutdown as ReturnType<typeof vi.fn>;
 			gracefulShutdownMock.mockClear();
 
-			const authorId = process.env.AUTHOR_ID || 'author-123';
+			const constantsModule = await import('../constants.js');
+			const authorId = constantsModule.AUTHOR_ID;
 			const guildMessage = {
 				author: { id: authorId, bot: false },
 				guild: {},
