@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import dotenv from 'dotenv';
 import type { TelemetryEventData } from '../types.js';
 import { EventRecorder } from './event-recorder.js';
@@ -34,8 +35,24 @@ export class TelemetryService {
 			);
 	}
 
+	private hashId(id: string) {
+		return createHash('sha256').update(id).digest('hex');
+	}
+
 	private async sendEvent(event: string, data: TelemetryEventData) {
-		await this.recorder?.record(event, data);
+		const hashedData = {
+			...data,
+			guildId: this.hashId(data.guildId),
+			eventId: this.hashId(data.eventId),
+			userId: this.hashId(data.userId),
+			channelId: this.hashId(data.channelId),
+			participants: data.participants.map((p) => ({
+				...p,
+				userId: this.hashId(p.userId),
+			})),
+		};
+
+		await this.recorder?.record(event, hashedData);
 
 		try {
 			const headers = {
@@ -48,7 +65,7 @@ export class TelemetryService {
 				headers,
 				body: JSON.stringify({
 					event,
-					...data,
+					...hashedData,
 				}),
 			});
 

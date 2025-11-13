@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	initializeTelemetry,
@@ -21,6 +22,11 @@ vi.mock('../telemetry/metrics.js', () => ({
 	recordTelemetryDispatch: vi.fn(),
 	recordTelemetryFailure: vi.fn(),
 }));
+
+// Helper function to hash IDs like the telemetry service does
+function hashId(id: string) {
+	return createHash('sha256').update(id).digest('hex');
+}
 
 describe('TelemetryService', () => {
 	let telemetryService: TelemetryService;
@@ -78,7 +84,7 @@ describe('TelemetryService', () => {
 			matchId: 'match-123',
 		};
 
-		it('should send event to backend', async () => {
+		it('should send event to backend with hashed IDs', async () => {
 			await telemetryService.trackEventCreated(testData);
 
 			expect(fetchMock).toHaveBeenCalledWith(
@@ -91,7 +97,12 @@ describe('TelemetryService', () => {
 					},
 					body: JSON.stringify({
 						event: 'event_created',
-						...testData,
+						eventId: hashId(testData.eventId),
+						guildId: hashId(testData.guildId),
+						channelId: hashId(testData.channelId),
+						userId: hashId(testData.userId),
+						participants: [],
+						matchId: testData.matchId,
 					}),
 				},
 			);
@@ -158,9 +169,15 @@ describe('TelemetryService', () => {
 
 			expect(fetchMock).toHaveBeenCalled();
 			const call = fetchMock.mock.calls[0];
-			expect(JSON.parse(call[1].body)).toMatchObject({
+			const body = JSON.parse(call[1].body);
+			expect(body).toMatchObject({
 				event: 'event_created',
-				...testData,
+				eventId: hashId(testData.eventId),
+				guildId: hashId(testData.guildId),
+				channelId: hashId(testData.channelId),
+				userId: hashId(testData.userId),
+				participants: [],
+				matchId: testData.matchId,
 			});
 		});
 
@@ -169,9 +186,15 @@ describe('TelemetryService', () => {
 
 			expect(fetchMock).toHaveBeenCalled();
 			const call = fetchMock.mock.calls[0];
-			expect(JSON.parse(call[1].body)).toMatchObject({
+			const body = JSON.parse(call[1].body);
+			expect(body).toMatchObject({
 				event: 'user_signed_up',
-				...testData,
+				eventId: hashId(testData.eventId),
+				guildId: hashId(testData.guildId),
+				channelId: hashId(testData.channelId),
+				userId: hashId(testData.userId),
+				participants: [],
+				matchId: testData.matchId,
 			});
 		});
 
@@ -180,9 +203,15 @@ describe('TelemetryService', () => {
 
 			expect(fetchMock).toHaveBeenCalled();
 			const call = fetchMock.mock.calls[0];
-			expect(JSON.parse(call[1].body)).toMatchObject({
+			const body = JSON.parse(call[1].body);
+			expect(body).toMatchObject({
 				event: 'user_signed_out',
-				...testData,
+				eventId: hashId(testData.eventId),
+				guildId: hashId(testData.guildId),
+				channelId: hashId(testData.channelId),
+				userId: hashId(testData.userId),
+				participants: [],
+				matchId: testData.matchId,
 			});
 		});
 
@@ -191,9 +220,15 @@ describe('TelemetryService', () => {
 
 			expect(fetchMock).toHaveBeenCalled();
 			const call = fetchMock.mock.calls[0];
-			expect(JSON.parse(call[1].body)).toMatchObject({
+			const body = JSON.parse(call[1].body);
+			expect(body).toMatchObject({
 				event: 'user_dropped_out',
-				...testData,
+				eventId: hashId(testData.eventId),
+				guildId: hashId(testData.guildId),
+				channelId: hashId(testData.channelId),
+				userId: hashId(testData.userId),
+				participants: [],
+				matchId: testData.matchId,
 			});
 		});
 
@@ -202,9 +237,15 @@ describe('TelemetryService', () => {
 
 			expect(fetchMock).toHaveBeenCalled();
 			const call = fetchMock.mock.calls[0];
-			expect(JSON.parse(call[1].body)).toMatchObject({
+			const body = JSON.parse(call[1].body);
+			expect(body).toMatchObject({
 				event: 'user_dropped_in',
-				...testData,
+				eventId: hashId(testData.eventId),
+				guildId: hashId(testData.guildId),
+				channelId: hashId(testData.channelId),
+				userId: hashId(testData.userId),
+				participants: [],
+				matchId: testData.matchId,
 			});
 		});
 
@@ -213,9 +254,15 @@ describe('TelemetryService', () => {
 
 			expect(fetchMock).toHaveBeenCalled();
 			const call = fetchMock.mock.calls[0];
-			expect(JSON.parse(call[1].body)).toMatchObject({
+			const body = JSON.parse(call[1].body);
+			expect(body).toMatchObject({
 				event: 'event_cancelled',
-				...testData,
+				eventId: hashId(testData.eventId),
+				guildId: hashId(testData.guildId),
+				channelId: hashId(testData.channelId),
+				userId: hashId(testData.userId),
+				participants: [],
+				matchId: testData.matchId,
 			});
 		});
 
@@ -224,9 +271,15 @@ describe('TelemetryService', () => {
 
 			expect(fetchMock).toHaveBeenCalled();
 			const call = fetchMock.mock.calls[0];
-			expect(JSON.parse(call[1].body)).toMatchObject({
+			const body = JSON.parse(call[1].body);
+			expect(body).toMatchObject({
 				event: 'event_started',
-				...testData,
+				eventId: hashId(testData.eventId),
+				guildId: hashId(testData.guildId),
+				channelId: hashId(testData.channelId),
+				userId: hashId(testData.userId),
+				participants: [],
+				matchId: testData.matchId,
 			});
 		});
 
@@ -235,9 +288,15 @@ describe('TelemetryService', () => {
 
 			expect(fetchMock).toHaveBeenCalled();
 			const call = fetchMock.mock.calls[0];
-			expect(JSON.parse(call[1].body)).toMatchObject({
+			const body = JSON.parse(call[1].body);
+			expect(body).toMatchObject({
 				event: 'event_finished',
-				...testData,
+				eventId: hashId(testData.eventId),
+				guildId: hashId(testData.guildId),
+				channelId: hashId(testData.channelId),
+				userId: hashId(testData.userId),
+				participants: [],
+				matchId: testData.matchId,
 			});
 		});
 
@@ -246,10 +305,36 @@ describe('TelemetryService', () => {
 
 			expect(fetchMock).toHaveBeenCalled();
 			const call = fetchMock.mock.calls[0];
-			expect(JSON.parse(call[1].body)).toMatchObject({
+			const body = JSON.parse(call[1].body);
+			expect(body).toMatchObject({
 				event: 'event_expired',
-				...testData,
+				eventId: hashId(testData.eventId),
+				guildId: hashId(testData.guildId),
+				channelId: hashId(testData.channelId),
+				userId: hashId(testData.userId),
+				participants: [],
+				matchId: testData.matchId,
 			});
+		});
+
+		it('should hash participant user IDs', async () => {
+			const dataWithParticipants: TelemetryEventData = {
+				...testData,
+				participants: [
+					{ userId: 'user-001', role: 'Tank', rank: 'Gold' },
+					{ userId: 'user-002', role: 'Support', rank: 'Silver' },
+				],
+			};
+
+			await telemetryService.trackEventCreated(dataWithParticipants);
+
+			expect(fetchMock).toHaveBeenCalled();
+			const call = fetchMock.mock.calls[0];
+			const body = JSON.parse(call[1].body);
+			expect(body.participants).toEqual([
+				{ userId: hashId('user-001'), role: 'Tank', rank: 'Gold' },
+				{ userId: hashId('user-002'), role: 'Support', rank: 'Silver' },
+			]);
 		});
 	});
 });
