@@ -1,5 +1,5 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
-import { ERROR_MESSAGES, MAX_PARTICIPANTS } from '../constants.js';
+import { ERROR_MESSAGES, MAX_PARTICIPANTS, TIMINGS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { getPingsForServer, safeReplyToInteraction } from '../utils/helpers.js';
@@ -20,6 +20,24 @@ export async function handleRepingCommand(
 			return;
 		}
 
+		const lastUsed = eventManager.getRepingCooldown(userEventId);
+		const now = Date.now();
+
+		if (lastUsed) {
+			const timeSinceLastUse = now - lastUsed;
+
+			if (timeSinceLastUse < TIMINGS.REPING_COOLDOWN_MS) {
+				const remainingMs = TIMINGS.REPING_COOLDOWN_MS - timeSinceLastUse;
+				const remainingMinutes = Math.ceil(remainingMs / 60000);
+
+				await interaction.reply({
+					content: `Please wait ${remainingMinutes} more minute${remainingMinutes !== 1 ? 's' : ''} before re-pinging again.`,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+		}
+
 		const channelId = eventManager.getChannelId(userEventId);
 		if (!channelId) {
 			await interaction.reply({
@@ -28,6 +46,7 @@ export async function handleRepingCommand(
 			});
 			return;
 		}
+
 		const channel = await interaction.client.channels.fetch(channelId);
 		if (!channel || !channel.isTextBased()) {
 			await interaction.reply({
@@ -76,6 +95,9 @@ export async function handleRepingCommand(
 		await interaction.reply({
 			content: `${rolePing}\nLooking for **+${missingPlayers}** for ${messageUrl}`,
 		});
+
+		// Update cooldown timestamp after successful re-ping
+		eventManager.setRepingCooldown(userEventId, now);
 	} catch (error) {
 		handleError({
 			reason: 'Error executing reping command',

@@ -234,4 +234,148 @@ describe('handleRepingCommand', () => {
 			flags: ['Ephemeral'],
 		});
 	});
+
+	it('should enforce cooldown when re-ping is used again within 15 minutes', async () => {
+		const eventId = faker.string.uuid();
+		const channelId = faker.string.uuid();
+		const guildId = faker.string.uuid();
+
+		mockMessage.id = eventId;
+		eventManager.setCreator(eventId, mockUser.id);
+		eventManager.setChannelId(eventId, channelId);
+		eventManager.setParticipants(
+			eventId,
+			new Map([
+				[mockUser.id, { userId: mockUser.id, role: '⚫ None', rank: null }],
+			]),
+		);
+
+		interaction.guildId = guildId;
+
+		// First re-ping should succeed
+		await handleRepingCommand(interaction, eventManager);
+
+		expect(interaction.reply).toHaveBeenCalledWith({
+			content: `||<@&comp-role-id>||\nLooking for **+7** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
+		});
+
+		// Reset the mock
+		vi.mocked(interaction.reply).mockClear();
+
+		// Second re-ping immediately should fail with cooldown message
+		await handleRepingCommand(interaction, eventManager);
+
+		expect(interaction.reply).toHaveBeenCalledWith({
+			content: 'Please wait 15 more minutes before re-pinging again.',
+			flags: ['Ephemeral'],
+		});
+	});
+
+	it('should allow re-ping after cooldown period has passed', async () => {
+		const eventId = faker.string.uuid();
+		const channelId = faker.string.uuid();
+		const guildId = faker.string.uuid();
+
+		mockMessage.id = eventId;
+		eventManager.setCreator(eventId, mockUser.id);
+		eventManager.setChannelId(eventId, channelId);
+		eventManager.setParticipants(
+			eventId,
+			new Map([
+				[mockUser.id, { userId: mockUser.id, role: '⚫ None', rank: null }],
+			]),
+		);
+
+		interaction.guildId = guildId;
+
+		// Set cooldown to 16 minutes ago (past the 15 minute cooldown)
+		const sixteenMinutesAgo = Date.now() - 16 * 60 * 1000;
+		eventManager.setRepingCooldown(eventId, sixteenMinutesAgo);
+
+		// Re-ping should succeed
+		await handleRepingCommand(interaction, eventManager);
+
+		expect(interaction.reply).toHaveBeenCalledWith({
+			content: `||<@&comp-role-id>||\nLooking for **+7** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
+		});
+	});
+
+	it('should show correct remaining time in cooldown message', async () => {
+		const eventId = faker.string.uuid();
+		const channelId = faker.string.uuid();
+
+		mockMessage.id = eventId;
+		eventManager.setCreator(eventId, mockUser.id);
+		eventManager.setChannelId(eventId, channelId);
+		eventManager.setParticipants(
+			eventId,
+			new Map([
+				[mockUser.id, { userId: mockUser.id, role: '⚫ None', rank: null }],
+			]),
+		);
+
+		// Set cooldown to 10 minutes ago (5 minutes remaining)
+		const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+		eventManager.setRepingCooldown(eventId, tenMinutesAgo);
+
+		await handleRepingCommand(interaction, eventManager);
+
+		expect(interaction.reply).toHaveBeenCalledWith({
+			content: 'Please wait 5 more minutes before re-pinging again.',
+			flags: ['Ephemeral'],
+		});
+	});
+
+	it('should use singular "minute" when 1 minute remains', async () => {
+		const eventId = faker.string.uuid();
+		const channelId = faker.string.uuid();
+
+		mockMessage.id = eventId;
+		eventManager.setCreator(eventId, mockUser.id);
+		eventManager.setChannelId(eventId, channelId);
+		eventManager.setParticipants(
+			eventId,
+			new Map([
+				[mockUser.id, { userId: mockUser.id, role: '⚫ None', rank: null }],
+			]),
+		);
+
+		// Set cooldown to 14.5 minutes ago (30 seconds remaining, rounds up to 1 minute)
+		const fourteenAndHalfMinutesAgo = Date.now() - 14.5 * 60 * 1000;
+		eventManager.setRepingCooldown(eventId, fourteenAndHalfMinutesAgo);
+
+		await handleRepingCommand(interaction, eventManager);
+
+		expect(interaction.reply).toHaveBeenCalledWith({
+			content: 'Please wait 1 more minute before re-pinging again.',
+			flags: ['Ephemeral'],
+		});
+	});
+
+	it('should update cooldown timestamp after successful re-ping', async () => {
+		const eventId = faker.string.uuid();
+		const channelId = faker.string.uuid();
+		const guildId = faker.string.uuid();
+
+		mockMessage.id = eventId;
+		eventManager.setCreator(eventId, mockUser.id);
+		eventManager.setChannelId(eventId, channelId);
+		eventManager.setParticipants(
+			eventId,
+			new Map([
+				[mockUser.id, { userId: mockUser.id, role: '⚫ None', rank: null }],
+			]),
+		);
+
+		interaction.guildId = guildId;
+
+		const beforeTimestamp = Date.now();
+
+		await handleRepingCommand(interaction, eventManager);
+
+		const afterTimestamp = eventManager.getRepingCooldown(eventId);
+
+		expect(afterTimestamp).toBeDefined();
+		expect(afterTimestamp).toBeGreaterThanOrEqual(beforeTimestamp);
+	});
 });

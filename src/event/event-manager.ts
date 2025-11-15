@@ -18,6 +18,7 @@ export class EventManager {
 	private userToEventIndex = new Map<string, string>();
 	private channelIds = new Map<string, string>();
 	private guildIds = new Map<string, string>();
+	private repingCooldowns = new Map<string, number>();
 
 	getParticipants(eventId: string) {
 		return this.participants.get(eventId);
@@ -213,6 +214,18 @@ export class EventManager {
 		this.processingStates.delete(eventId);
 	}
 
+	getRepingCooldown(eventId: string) {
+		return this.repingCooldowns.get(eventId);
+	}
+
+	setRepingCooldown(eventId: string, timestamp: number) {
+		this.repingCooldowns.set(eventId, timestamp);
+	}
+
+	deleteRepingCooldown(eventId: string) {
+		this.repingCooldowns.delete(eventId);
+	}
+
 	isUserInAnyEvent(userId: string) {
 		return this.userToEventIndex.has(userId);
 	}
@@ -235,6 +248,7 @@ export class EventManager {
 		this.deleteProcessingStates(eventId);
 		this.deleteChannelId(eventId);
 		this.deleteGuildId(eventId);
+		this.deleteRepingCooldown(eventId);
 
 		const timeout = this.getTimeout(eventId);
 		if (timeout) {
