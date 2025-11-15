@@ -89,14 +89,36 @@ export async function handleRepingCommand(
 			return;
 		}
 
+		const previousRepingMessageId = eventManager.getRepingMessage(userEventId);
+		if (previousRepingMessageId) {
+			try {
+				const previousMessage = await channel.messages.fetch(
+					previousRepingMessageId,
+				);
+				await previousMessage.delete();
+			} catch (error) {
+				handleError({
+					reason: 'Failed to delete previous reping message',
+					severity: ErrorSeverity.LOW,
+					error,
+					metadata: {
+						userId: interaction.user.id,
+						guildId: interaction.guildId || 'unknown',
+						messageId: previousRepingMessageId,
+					},
+				});
+			}
+		}
+
 		const guildId = interaction.guildId;
 		const messageUrl = `https://discord.com/channels/${guildId}/${channelId}/${userEventId}`;
 
-		await interaction.reply({
+		const reply = await interaction.reply({
 			content: `${rolePing}\nLooking for **+${missingPlayers}** for ${messageUrl}`,
 		});
+		const repingMessage = await reply.fetch();
 
-		// Update cooldown timestamp after successful re-ping
+		eventManager.setRepingMessage(userEventId, repingMessage.id);
 		eventManager.setRepingCooldown(userEventId, now);
 	} catch (error) {
 		handleError({
