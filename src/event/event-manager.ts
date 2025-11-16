@@ -1,6 +1,7 @@
-import type { Message } from 'discord.js';
+import type { Client, Message } from 'discord.js';
 import { STATUS_MESSAGES, TIMINGS } from '../constants.js';
 import type { EventOperation, EventTimer, ParticipantMap } from '../types.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 
 /**
  * Manages all in-memory state for active events.
@@ -18,6 +19,8 @@ export class EventManager {
 	private userToEventIndex = new Map<string, string>();
 	private channelIds = new Map<string, string>();
 	private guildIds = new Map<string, string>();
+	private repingCooldowns = new Map<string, number>();
+	private repingMessages = new Map<string, string>();
 
 	getParticipants(eventId: string) {
 		return this.participants.get(eventId);
@@ -213,6 +216,56 @@ export class EventManager {
 		this.processingStates.delete(eventId);
 	}
 
+	getRepingCooldown(eventId: string) {
+		return this.repingCooldowns.get(eventId);
+	}
+
+	setRepingCooldown(eventId: string, timestamp: number) {
+		this.repingCooldowns.set(eventId, timestamp);
+	}
+
+	deleteRepingCooldown(eventId: string) {
+		this.repingCooldowns.delete(eventId);
+	}
+
+	getRepingMessage(eventId: string) {
+		return this.repingMessages.get(eventId);
+	}
+
+	setRepingMessage(eventId: string, messageId: string) {
+		this.repingMessages.set(eventId, messageId);
+	}
+
+	deleteRepingMessage(eventId: string) {
+		this.repingMessages.delete(eventId);
+	}
+
+	async deleteRepingMessageIfExists(eventId: string, client: Client) {
+		const repingMessageId = this.getRepingMessage(eventId);
+		const channelId = this.getChannelId(eventId);
+		if (!channelId || !repingMessageId) return;
+
+		try {
+			const channel = await client.channels.fetch(channelId);
+			if (!channel || !channel.isTextBased()) return;
+
+			const message = await channel.messages.fetch(repingMessageId);
+			await message.delete();
+
+			this.deleteRepingMessage(eventId);
+		} catch (error) {
+			handleError({
+				reason: 'Failed to delete previous reping message',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: {
+					messageId: repingMessageId,
+					eventId,
+				},
+			});
+		}
+	}
+
 	isUserInAnyEvent(userId: string) {
 		return this.userToEventIndex.has(userId);
 	}
@@ -235,6 +288,8 @@ export class EventManager {
 		this.deleteProcessingStates(eventId);
 		this.deleteChannelId(eventId);
 		this.deleteGuildId(eventId);
+		this.deleteRepingCooldown(eventId);
+		this.deleteRepingMessage(eventId);
 
 		const timeout = this.getTimeout(eventId);
 		if (timeout) {

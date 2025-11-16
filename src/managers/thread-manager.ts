@@ -17,6 +17,7 @@ export class ThreadManager {
 				name: `8s Event - ${shortId}`,
 				autoArchiveDuration: 60,
 				type: ChannelType.PrivateThread,
+				invitable: false,
 			});
 			return thread;
 		} catch (error) {

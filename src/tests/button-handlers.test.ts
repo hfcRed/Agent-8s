@@ -627,6 +627,36 @@ describe('Button Handlers', () => {
 
 			expect(telemetry.trackUserDropIn).toHaveBeenCalled();
 		});
+
+		it('should delete reping message when 8th person drops in', async () => {
+			const repingMessageId = faker.string.uuid();
+			eventManager.setRepingMessage(mockMessage.id, repingMessageId);
+
+			// Add 7 participants
+			const participantsMap = new Map();
+			for (let i = 0; i < MAX_PARTICIPANTS - 1; i++) {
+				participantsMap.set(`user${i}`, {
+					userId: `user${i}`,
+					role: WEAPON_ROLES[0],
+					rank: null,
+				});
+			}
+			eventManager.setParticipants(mockMessage.id, participantsMap);
+
+			const deleteSpy = vi.spyOn(eventManager, 'deleteRepingMessageIfExists');
+
+			// 8th person drops in
+			await handleDropInButton(
+				interaction,
+				eventManager,
+				appClient,
+				threadManager,
+				voiceChannelManager,
+				telemetry,
+			);
+
+			expect(deleteSpy).toHaveBeenCalled();
+		});
 	});
 
 	describe('checkProcessingStates', () => {
