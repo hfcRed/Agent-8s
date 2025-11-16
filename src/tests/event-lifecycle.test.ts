@@ -336,6 +336,25 @@ describe('Event Lifecycle', () => {
 			expect(timer?.hasStarted).toBe(true);
 		});
 
+		it('should delete reping message when event starts', async () => {
+			const repingMessageId = faker.string.uuid();
+			eventManager.setRepingMessage(mockMessage.id, repingMessageId);
+
+			const deleteSpy = vi.spyOn(eventManager, 'deleteRepingMessageIfExists');
+
+			await startEvent(
+				mockMessage,
+				participantMap,
+				eventManager,
+				appClient,
+				threadManager,
+				voiceChannelManager,
+				telemetry,
+			);
+
+			expect(deleteSpy).toHaveBeenCalled();
+		});
+
 		it('should send voice channel links to thread', async () => {
 			await startEvent(
 				mockMessage,
@@ -463,6 +482,24 @@ describe('Event Lifecycle', () => {
 			);
 
 			expect(eventManager.isProcessing(mockMessage.id, 'cleanup')).toBe(false);
+		});
+
+		it('should delete reping message during cleanup', async () => {
+			const repingMessageId = faker.string.uuid();
+			eventManager.setRepingMessage(mockMessage.id, repingMessageId);
+			eventManager.setGuildId(mockMessage.id, mockGuild.id);
+
+			const deleteSpy = vi.spyOn(eventManager, 'deleteRepingMessageIfExists');
+
+			await cleanupEvent(
+				mockMessage.id,
+				eventManager,
+				appClient,
+				threadManager,
+				voiceChannelManager,
+			);
+
+			expect(deleteSpy).toHaveBeenCalled();
 		});
 	});
 

@@ -439,9 +439,13 @@ describe('handleRepingCommand', () => {
 
 		interaction.guildId = guildId;
 
+		// Spy on the deleteRepingMessageIfExists method
+		const deleteSpy = vi.spyOn(eventManager, 'deleteRepingMessageIfExists');
+
 		// No cooldown set, so this is the first re-ping (or cooldown expired)
 		await handleRepingCommand(interaction, eventManager);
 
+		expect(deleteSpy).toHaveBeenCalled();
 		expect(mockChannel.messages.fetch).toHaveBeenCalledWith(previousMessageId);
 		expect(mockPreviousMessage.delete).toHaveBeenCalled();
 	});
@@ -473,9 +477,13 @@ describe('handleRepingCommand', () => {
 
 		interaction.guildId = guildId;
 
+		// Spy on the deleteRepingMessageIfExists method
+		const deleteSpy = vi.spyOn(eventManager, 'deleteRepingMessageIfExists');
+
 		// No cooldown set, so re-ping is allowed
 		await handleRepingCommand(interaction, eventManager);
 
+		expect(deleteSpy).toHaveBeenCalled();
 		// Should still send the new re-ping despite failure to delete old one
 		expect(interaction.reply).toHaveBeenCalledWith({
 			content: `||<@&comp-role-id>||\nLooking for **+7** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,

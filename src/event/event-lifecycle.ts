@@ -40,6 +40,8 @@ export async function startEvent(
 	const matchId = eventManager.getMatchId(message.id);
 	const shortId = matchId?.slice(0, 5);
 
+	await eventManager.deleteRepingMessageIfExists(message.id, appClient);
+
 	const timeout = eventManager.getTimeout(message.id);
 	if (timeout) {
 		clearTimeout(timeout);
@@ -112,6 +114,8 @@ export async function cleanupEvent(
 
 	eventManager.setProcessing(eventId, 'cleanup');
 	try {
+		await eventManager.deleteRepingMessageIfExists(eventId, appClient);
+
 		const threadId = eventManager.getThread(eventId);
 		const channelId = eventManager.getChannelId(eventId);
 

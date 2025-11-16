@@ -549,6 +549,10 @@ export async function handleDropInButton(
 			rank: getExcaliburRankOfUser(interaction),
 		});
 
+		if (participantMap.size === MAX_PARTICIPANTS) {
+			await eventManager.deleteRepingMessageIfExists(messageId, appClient);
+		}
+
 		const threadId = eventManager.getThread(messageId);
 		if (threadId) {
 			const channel = interaction.channel as TextChannel | null;

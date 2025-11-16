@@ -1,6 +1,7 @@
-import type { Message } from 'discord.js';
+import type { Client, Message } from 'discord.js';
 import { STATUS_MESSAGES, TIMINGS } from '../constants.js';
 import type { EventOperation, EventTimer, ParticipantMap } from '../types.js';
+import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 
 /**
  * Manages all in-memory state for active events.
@@ -223,6 +224,10 @@ export class EventManager {
 		this.repingCooldowns.set(eventId, timestamp);
 	}
 
+	deleteRepingCooldown(eventId: string) {
+		this.repingCooldowns.delete(eventId);
+	}
+
 	getRepingMessage(eventId: string) {
 		return this.repingMessages.get(eventId);
 	}
@@ -235,8 +240,30 @@ export class EventManager {
 		this.repingMessages.delete(eventId);
 	}
 
-	deleteRepingCooldown(eventId: string) {
-		this.repingCooldowns.delete(eventId);
+	async deleteRepingMessageIfExists(eventId: string, client: Client) {
+		const repingMessageId = this.getRepingMessage(eventId);
+		const channelId = this.getChannelId(eventId);
+		if (!channelId || !repingMessageId) return;
+
+		try {
+			const channel = await client.channels.fetch(channelId);
+			if (!channel || !channel.isTextBased()) return;
+
+			const message = await channel.messages.fetch(repingMessageId);
+			await message.delete();
+
+			this.deleteRepingMessage(eventId);
+		} catch (error) {
+			handleError({
+				reason: 'Failed to delete previous reping message',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: {
+					messageId: repingMessageId,
+					eventId,
+				},
+			});
+		}
 	}
 
 	isUserInAnyEvent(userId: string) {
