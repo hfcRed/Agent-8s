@@ -58,13 +58,18 @@ describe('handleStatusCommand', () => {
 			} as Client,
 			guild: { id: faker.string.uuid() },
 			reply: vi.fn(),
+			deferReply: vi.fn(async () => undefined),
+			editReply: vi.fn(),
 		} as unknown as ChatInputCommandInteraction;
 	});
 
 	it('should reply with status embed', async () => {
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.deferReply).toHaveBeenCalledWith({
+			flags: ['Ephemeral'],
+		});
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			embeds: [
 				expect.objectContaining({
 					data: expect.objectContaining({
@@ -73,14 +78,13 @@ describe('handleStatusCommand', () => {
 					}),
 				}),
 			],
-			flags: ['Ephemeral'],
 		});
 	});
 
 	it('should show correct ping', async () => {
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const pingField = fields?.find((f: APIEmbedField) => f.name === '🏓 Ping');
 
@@ -90,7 +94,7 @@ describe('handleStatusCommand', () => {
 	it('should show telemetry as disabled when not provided', async () => {
 		await handleStatusCommand(interaction, eventManager, undefined);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const telemetryField = fields?.find(
 			(f: APIEmbedField) => f.name === '🔔 Telemetry',
@@ -104,7 +108,7 @@ describe('handleStatusCommand', () => {
 
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const telemetryField = fields?.find(
 			(f: APIEmbedField) => f.name === '🔔 Telemetry',
@@ -131,7 +135,7 @@ describe('handleStatusCommand', () => {
 
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const activeEventsField = fields?.find(
 			(f: APIEmbedField) => f.name === '📊 Active Events',
@@ -158,7 +162,7 @@ describe('handleStatusCommand', () => {
 
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const participantsField = fields?.find(
 			(f: APIEmbedField) => f.name === '👥 Total Participants',
@@ -170,7 +174,7 @@ describe('handleStatusCommand', () => {
 	it('should show uptime', async () => {
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const uptimeField = fields?.find(
 			(f: APIEmbedField) => f.name === '⏱️ Uptime',
@@ -183,7 +187,7 @@ describe('handleStatusCommand', () => {
 	it('should show memory usage', async () => {
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const memoryField = fields?.find(
 			(f: APIEmbedField) => f.name === '💾 Memory Usage',
@@ -198,7 +202,7 @@ describe('handleStatusCommand', () => {
 	it('should handle no active events', async () => {
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const activeEventsField = fields?.find(
 			(f: APIEmbedField) => f.name === '📊 Active Events',
@@ -214,7 +218,7 @@ describe('handleStatusCommand', () => {
 	it('should show guild count', async () => {
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const guildField = fields?.find(
 			(f: APIEmbedField) => f.name === '🌐 Guilds',
@@ -226,7 +230,7 @@ describe('handleStatusCommand', () => {
 	it('should show bot version', async () => {
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const versionField = fields?.find(
 			(f: APIEmbedField) => f.name === '📦 Version',
@@ -239,7 +243,7 @@ describe('handleStatusCommand', () => {
 	it('should show Node.js version', async () => {
 		await handleStatusCommand(interaction, eventManager, telemetry);
 
-		const call = vi.mocked(interaction.reply).mock.calls[0][0];
+		const call = vi.mocked(interaction.editReply).mock.calls[0][0];
 		const fields = getEmbedFields(call);
 		const nodeField = fields?.find(
 			(f: APIEmbedField) => f.name === '🟢 Node.js',

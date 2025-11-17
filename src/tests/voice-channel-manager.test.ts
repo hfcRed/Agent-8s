@@ -10,6 +10,18 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 
+vi.mock('../utils/retry.js', async () => {
+	const actual =
+		await vi.importActual<typeof import('../utils/retry.js')>(
+			'../utils/retry.js',
+		);
+	return {
+		...actual,
+		MEDIUM_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+		LOW_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+	};
+});
+
 describe('VoiceChannelManager', () => {
 	let voiceChannelManager: VoiceChannelManager;
 
