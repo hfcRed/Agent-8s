@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import type { EventRecorderOptions, TelemetryEventData } from '../types.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import { DATABASE_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
 
 export const DEFAULT_SCHEMA = 'public';
 export const DEFAULT_TABLE = 'telemetry_events';
@@ -42,29 +43,33 @@ export class EventRecorder {
 		try {
 			await this.ensureSchema();
 
-			await this.pool.query(
-				`INSERT INTO ${this.tableReference} (
-					match_uuid,
-					event_type,
-					guild_id,
-					channel_id,
-					event_message_id,
-					event_time_to_start,
-					actor_user_id,
-					participants,
-					occurred_at
-				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, to_timestamp($9 / 1000.0))`,
-				[
-					data.matchId,
-					event,
-					data.guildId,
-					data.channelId,
-					data.eventId,
-					data.timeToStart || null,
-					data.userId,
-					JSON.stringify(data.participants),
-					Date.now(),
-				],
+			await withRetry(
+				() =>
+					this.pool.query(
+						`INSERT INTO ${this.tableReference} (
+						match_uuid,
+						event_type,
+						guild_id,
+						channel_id,
+						event_message_id,
+						event_time_to_start,
+						actor_user_id,
+						participants,
+						occurred_at
+					) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, to_timestamp($9 / 1000.0))`,
+						[
+							data.matchId,
+							event,
+							data.guildId,
+							data.channelId,
+							data.eventId,
+							data.timeToStart || null,
+							data.userId,
+							JSON.stringify(data.participants),
+							Date.now(),
+						],
+					),
+				DATABASE_RETRY_OPTIONS,
 			);
 		} catch (error) {
 			handleError({
@@ -87,25 +92,33 @@ export class EventRecorder {
 	private async ensureSchema() {
 		if (this.initialized) return;
 
-		await this.pool.query(
-			`CREATE SCHEMA IF NOT EXISTS ${this.quoteIdentifier(this.schemaName)}`,
+		await withRetry(
+			() =>
+				this.pool.query(
+					`CREATE SCHEMA IF NOT EXISTS ${this.quoteIdentifier(this.schemaName)}`,
+				),
+			DATABASE_RETRY_OPTIONS,
 		);
 
-		await this.pool.query(`
-			CREATE TABLE IF NOT EXISTS ${this.tableReference} (
-				id BIGSERIAL PRIMARY KEY,
-				match_uuid UUID,
-				event_type TEXT NOT NULL,
-				guild_id TEXT,
-				channel_id TEXT,
-				event_message_id TEXT,
-				actor_user_id TEXT,
-				participant_ids JSONB,
-				payload JSONB NOT NULL,
-				occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-				recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-			);
-		`);
+		await withRetry(
+			() =>
+				this.pool.query(`
+				CREATE TABLE IF NOT EXISTS ${this.tableReference} (
+					id BIGSERIAL PRIMARY KEY,
+					match_uuid UUID,
+					event_type TEXT NOT NULL,
+					guild_id TEXT,
+					channel_id TEXT,
+					event_message_id TEXT,
+					actor_user_id TEXT,
+					participant_ids JSONB,
+					payload JSONB NOT NULL,
+					occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+					recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+				);
+			`),
+			DATABASE_RETRY_OPTIONS,
+		);
 
 		this.initialized = true;
 	}

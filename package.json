@@ -17,6 +17,7 @@
 	"dependencies": {
 		"discord.js": "^14.24.2",
 		"dotenv": "^17.2.3",
+		"p-retry": "^7.1.0",
 		"pg": "^8.16.3",
 		"prom-client": "^15.1.3"
 	},

@@ -11,6 +11,18 @@ import { handleRepingCommand } from '../commands/reping-command.js';
 import { ERROR_MESSAGES } from '../constants.js';
 import { EventManager } from '../event/event-manager.js';
 
+vi.mock('../utils/retry.js', async () => {
+	const actual =
+		await vi.importActual<typeof import('../utils/retry.js')>(
+			'../utils/retry.js',
+		);
+	return {
+		...actual,
+		MEDIUM_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+		LOW_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+	};
+});
+
 vi.mock('../utils/helpers.js', () => ({
 	getPingsForServer: vi.fn((_interaction, casual) =>
 		casual ? '||<@&casual-role-id>||' : '||<@&comp-role-id>||',

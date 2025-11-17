@@ -22,6 +22,12 @@ import {
 	updateEmbedField,
 } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import {
+	LOW_RETRY_OPTIONS,
+	MEDIUM_RETRY_OPTIONS,
+	withRetry,
+	withRetryOrNull,
+} from '../utils/retry.js';
 import type { EventManager } from './event-manager.js';
 
 export async function startEvent(
@@ -56,7 +62,10 @@ export async function startEvent(
 	const buttonRow = createEventStartedButtons();
 	const selectRow = createRoleSelectMenu();
 
-	await message.edit({ embeds: [embed], components: [buttonRow, selectRow] });
+	await withRetry(
+		() => message.edit({ embeds: [embed], components: [buttonRow, selectRow] }),
+		MEDIUM_RETRY_OPTIONS,
+	);
 
 	const participants = Array.from(participantMap.values());
 	const channel = message.channel as TextChannel;
@@ -121,7 +130,10 @@ export async function cleanupEvent(
 
 		if (threadId && channelId) {
 			try {
-				const channel = await appClient.channels.fetch(channelId);
+				const channel = await withRetryOrNull(
+					() => appClient.channels.fetch(channelId),
+					LOW_RETRY_OPTIONS,
+				);
 
 				if (channel?.isTextBased() && !channel.isDMBased()) {
 					const thread = await threadManager.fetchThread(
@@ -183,9 +195,16 @@ export async function cleanupStaleEvents(
 
 			if (channelId) {
 				try {
-					const channel = await appClient.channels.fetch(channelId);
+					const channel = await withRetryOrNull(
+						() => appClient.channels.fetch(channelId),
+						LOW_RETRY_OPTIONS,
+					);
+
 					if (channel?.isTextBased() && !channel.isDMBased()) {
-						message = await channel.messages.fetch(messageId);
+						message = await withRetryOrNull(
+							() => channel.messages.fetch(messageId),
+							LOW_RETRY_OPTIONS,
+						);
 					}
 				} catch (error) {
 					handleError({
@@ -202,7 +221,10 @@ export async function cleanupStaleEvents(
 				);
 				updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
 
-				await message.edit({ embeds: [embed], components: [] });
+				await withRetryOrNull(
+					() => message.edit({ embeds: [embed], components: [] }),
+					LOW_RETRY_OPTIONS,
+				);
 
 				const matchId = eventManager.getMatchId(messageId);
 				const participants = eventManager.getParticipants(messageId);

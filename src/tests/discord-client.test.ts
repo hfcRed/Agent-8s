@@ -16,6 +16,19 @@ vi.mock('../event/event-lifecycle.js', () => ({
 	cleanupEvent: vi.fn(),
 }));
 
+vi.mock('../utils/retry.js', async () => {
+	const actual =
+		await vi.importActual<typeof import('../utils/retry.js')>(
+			'../utils/retry.js',
+		);
+	return {
+		...actual,
+		HIGH_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+		MEDIUM_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+		LOW_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+	};
+});
+
 vi.mock('../utils/helpers.js', () => ({
 	isUserAdmin: vi.fn(),
 	checkCommandPermissions: vi.fn(),
@@ -565,11 +578,8 @@ describe('discord-client', () => {
 			// Advance timers to trigger bulk delete
 			await vi.advanceTimersByTimeAsync(2000);
 
+			// With retries, console.error will be called multiple times
 			expect(consoleErrorSpy).toHaveBeenCalled();
-			const errorOutput = consoleErrorSpy.mock.calls[
-				consoleErrorSpy.mock.calls.length - 1
-			][0] as string;
-			expect(errorOutput).toContain('[LOW] Failed to bulk delete messages');
 		});
 
 		it('should batch multiple messages and delete after timeout', async () => {

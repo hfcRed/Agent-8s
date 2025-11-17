@@ -7,6 +7,11 @@ import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { botHasPermission, isUserAdmin } from '../utils/helpers.js';
+import {
+	HIGH_RETRY_OPTIONS,
+	LOW_RETRY_OPTIONS,
+	withRetry,
+} from '../utils/retry.js';
 import { gracefulShutdown } from './shutdown.js';
 
 export function createDiscordClient() {
@@ -25,7 +30,7 @@ export function createDiscordClient() {
 
 export async function loginClient(client: Client, botToken: string) {
 	try {
-		await client.login(botToken);
+		await withRetry(() => client.login(botToken), HIGH_RETRY_OPTIONS);
 		console.log('Discord client logged in');
 	} catch (error) {
 		handleError({
@@ -53,10 +58,16 @@ export async function registerCommands(
 		return;
 	}
 
+	const clientUserId = client.user.id;
+
 	try {
-		await rest.put(Routes.applicationCommands(client.user.id), {
-			body: commands,
-		});
+		await withRetry(
+			() =>
+				rest.put(Routes.applicationCommands(clientUserId), {
+					body: commands,
+				}),
+			HIGH_RETRY_OPTIONS,
+		);
 		console.log('Successfully registered application commands');
 	} catch (error) {
 		handleError({
@@ -120,7 +131,10 @@ export function setupMessageCreateHandler(
 		if (!channel?.isTextBased() || channel.isDMBased()) return;
 
 		try {
-			await channel.bulkDelete(batch.messages, true);
+			await withRetry(
+				() => channel.bulkDelete(batch.messages, true),
+				LOW_RETRY_OPTIONS,
+			);
 		} catch (error) {
 			handleError({
 				reason: 'Failed to bulk delete messages',

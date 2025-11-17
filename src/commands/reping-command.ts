@@ -3,6 +3,7 @@ import { ERROR_MESSAGES, MAX_PARTICIPANTS, TIMINGS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { getPingsForServer, safeReplyToInteraction } from '../utils/helpers.js';
+import { MEDIUM_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
 
 export async function handleRepingCommand(
 	interaction: ChatInputCommandInteraction,
@@ -47,7 +48,11 @@ export async function handleRepingCommand(
 			return;
 		}
 
-		const channel = await interaction.client.channels.fetch(channelId);
+		const channel = await withRetry(
+			() => interaction.client.channels.fetch(channelId),
+			MEDIUM_RETRY_OPTIONS,
+		);
+
 		if (!channel || !channel.isTextBased()) {
 			await interaction.reply({
 				content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
@@ -56,7 +61,11 @@ export async function handleRepingCommand(
 			return;
 		}
 
-		const message = await channel.messages.fetch(userEventId);
+		const message = await withRetry(
+			() => channel.messages.fetch(userEventId),
+			MEDIUM_RETRY_OPTIONS,
+		);
+
 		if (!message || !message.embeds[0]) {
 			await interaction.reply({
 				content: ERROR_MESSAGES.MESSAGE_NOT_FOUND,
@@ -100,7 +109,11 @@ export async function handleRepingCommand(
 		const reply = await interaction.reply({
 			content: `${rolePing}\nLooking for **+${missingPlayers}** for ${messageUrl}`,
 		});
-		const repingMessage = await reply.fetch();
+
+		const repingMessage = await withRetry(
+			() => reply.fetch(),
+			MEDIUM_RETRY_OPTIONS,
+		);
 
 		eventManager.setRepingMessage(userEventId, repingMessage.id);
 		eventManager.setRepingCooldown(userEventId, now);
