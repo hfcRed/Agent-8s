@@ -13,6 +13,8 @@ export async function handleStatusCommand(
 	telemetry?: TelemetryService,
 ) {
 	try {
+		await interaction.deferReply({ flags: ['Ephemeral'] });
+
 		const uptime = Date.now() - BOT_START_TIME;
 		const memoryUsage = process.memoryUsage();
 		const guildCount = interaction.client.guilds.cache.size;
@@ -79,9 +81,8 @@ export async function handleStatusCommand(
 				},
 			);
 
-		await interaction.reply({
+		await interaction.editReply({
 			embeds: [embed],
-			flags: ['Ephemeral'],
 		});
 	} catch (error) {
 		handleError({

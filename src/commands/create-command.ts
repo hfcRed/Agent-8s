@@ -34,6 +34,8 @@ export async function handleCreateCommand(
 			return;
 		}
 
+		await interaction.deferReply();
+
 		const casual = !!interaction.options.getBoolean('casual', false);
 		const info = interaction.options.getString('info', false) ?? undefined;
 		const timeInMinutes =
@@ -54,7 +56,7 @@ export async function handleCreateCommand(
 
 		const rolePing = getPingsForServer(interaction, casual);
 
-		const reply = await interaction.reply({
+		const reply = await interaction.editReply({
 			content: rolePing || undefined,
 			embeds: [embed],
 			components: [buttonRow, selectRow],
