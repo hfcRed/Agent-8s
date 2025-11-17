@@ -5,6 +5,11 @@ import {
 	type ThreadChannel,
 } from 'discord.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import {
+	LOW_RETRY_OPTIONS,
+	MEDIUM_RETRY_OPTIONS,
+	withRetry,
+} from '../utils/retry.js';
 
 /**
  * Manages Discord thread operations for events.
@@ -13,12 +18,16 @@ import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 export class ThreadManager {
 	async createEventThread(channel: TextChannel, shortId: string) {
 		try {
-			const thread = await channel.threads.create({
-				name: `8s Event - ${shortId}`,
-				autoArchiveDuration: 60,
-				type: ChannelType.PrivateThread,
-				invitable: false,
-			});
+			const thread = await withRetry(
+				() =>
+					channel.threads.create({
+						name: `8s Event - ${shortId}`,
+						autoArchiveDuration: 60,
+						type: ChannelType.PrivateThread,
+						invitable: false,
+					}),
+				MEDIUM_RETRY_OPTIONS,
+			);
 			return thread;
 		} catch (error) {
 			handleError({
@@ -33,7 +42,10 @@ export class ThreadManager {
 
 	async fetchThread(channel: TextChannel, threadId: string) {
 		try {
-			const thread = await channel.threads.fetch(threadId);
+			const thread = await withRetry(
+				() => channel.threads.fetch(threadId),
+				MEDIUM_RETRY_OPTIONS,
+			);
 			return thread || null;
 		} catch (error) {
 			handleError({
@@ -48,7 +60,10 @@ export class ThreadManager {
 
 	async sendAndPinEmbed(thread: ThreadChannel, embed: EmbedBuilder) {
 		try {
-			await thread.send({ embeds: [embed] });
+			await withRetry(
+				() => thread.send({ embeds: [embed] }),
+				MEDIUM_RETRY_OPTIONS,
+			);
 			// Pinning requires the Manage Messages permission, which may not be granted.
 			// Wait until Discord has updated their permissions system for pinning to be separate.
 			// Make sure to update test if this is enabled.
@@ -67,7 +82,7 @@ export class ThreadManager {
 
 	async sendMessage(thread: ThreadChannel, content: string) {
 		try {
-			await thread.send({ content });
+			await withRetry(() => thread.send({ content }), MEDIUM_RETRY_OPTIONS);
 			return true;
 		} catch (error) {
 			handleError({
@@ -82,7 +97,7 @@ export class ThreadManager {
 
 	async addMember(thread: ThreadChannel, userId: string) {
 		try {
-			await thread.members.add(userId);
+			await withRetry(() => thread.members.add(userId), MEDIUM_RETRY_OPTIONS);
 			return true;
 		} catch (error) {
 			handleError({
@@ -97,7 +112,10 @@ export class ThreadManager {
 
 	async removeMember(thread: ThreadChannel, userId: string) {
 		try {
-			await thread.members.remove(userId);
+			await withRetry(
+				() => thread.members.remove(userId),
+				MEDIUM_RETRY_OPTIONS,
+			);
 			return true;
 		} catch (error) {
 			handleError({
@@ -118,8 +136,10 @@ export class ThreadManager {
 
 	async lockAndArchive(thread: ThreadChannel) {
 		try {
-			await thread.setLocked(true);
-			await thread.setArchived(true);
+			await withRetry(async () => {
+				await thread.setLocked(true);
+				await thread.setArchived(true);
+			}, LOW_RETRY_OPTIONS);
 			return true;
 		} catch (error) {
 			handleError({

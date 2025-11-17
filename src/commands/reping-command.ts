@@ -3,19 +3,21 @@ import { ERROR_MESSAGES, MAX_PARTICIPANTS, TIMINGS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { getPingsForServer, safeReplyToInteraction } from '../utils/helpers.js';
+import { MEDIUM_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
 
 export async function handleRepingCommand(
 	interaction: ChatInputCommandInteraction,
 	eventManager: EventManager,
 ) {
 	try {
+		await interaction.deferReply();
+
 		const userId = interaction.user.id;
 		const userEventId = eventManager.userOwnsEvent(userId);
 
 		if (!userEventId) {
-			await interaction.reply({
+			await interaction.editReply({
 				content: ERROR_MESSAGES.NO_EVENT_OWNED,
-				flags: ['Ephemeral'],
 			});
 			return;
 		}
@@ -30,9 +32,8 @@ export async function handleRepingCommand(
 				const remainingMs = TIMINGS.REPING_COOLDOWN_MS - timeSinceLastUse;
 				const remainingMinutes = Math.ceil(remainingMs / 60000);
 
-				await interaction.reply({
+				await interaction.editReply({
 					content: `Please wait ${remainingMinutes} more minute${remainingMinutes !== 1 ? 's' : ''} before re-pinging again.`,
-					flags: ['Ephemeral'],
 				});
 				return;
 			}
@@ -40,27 +41,32 @@ export async function handleRepingCommand(
 
 		const channelId = eventManager.getChannelId(userEventId);
 		if (!channelId) {
-			await interaction.reply({
+			await interaction.editReply({
 				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
-				flags: ['Ephemeral'],
 			});
 			return;
 		}
 
-		const channel = await interaction.client.channels.fetch(channelId);
+		const channel = await withRetry(
+			() => interaction.client.channels.fetch(channelId),
+			MEDIUM_RETRY_OPTIONS,
+		);
+
 		if (!channel || !channel.isTextBased()) {
-			await interaction.reply({
+			await interaction.editReply({
 				content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
-				flags: ['Ephemeral'],
 			});
 			return;
 		}
 
-		const message = await channel.messages.fetch(userEventId);
+		const message = await withRetry(
+			() => channel.messages.fetch(userEventId),
+			MEDIUM_RETRY_OPTIONS,
+		);
+
 		if (!message || !message.embeds[0]) {
-			await interaction.reply({
+			await interaction.editReply({
 				content: ERROR_MESSAGES.MESSAGE_NOT_FOUND,
-				flags: ['Ephemeral'],
 			});
 			return;
 		}
@@ -73,18 +79,16 @@ export async function handleRepingCommand(
 		const missingPlayers = MAX_PARTICIPANTS - currentCount;
 
 		if (currentCount === MAX_PARTICIPANTS) {
-			await interaction.reply({
+			await interaction.editReply({
 				content: ERROR_MESSAGES.REPING_EVENT_FULL,
-				flags: ['Ephemeral'],
 			});
 			return;
 		}
 
 		const rolePing = getPingsForServer(interaction, isCasual);
 		if (!rolePing) {
-			await interaction.reply({
+			await interaction.editReply({
 				content: ERROR_MESSAGES.ROLE_NOT_FOUND,
-				flags: ['Ephemeral'],
 			});
 			return;
 		}
@@ -97,10 +101,14 @@ export async function handleRepingCommand(
 		const guildId = interaction.guildId;
 		const messageUrl = `https://discord.com/channels/${guildId}/${channelId}/${userEventId}`;
 
-		const reply = await interaction.reply({
+		const reply = await interaction.editReply({
 			content: `${rolePing}\nLooking for **+${missingPlayers}** for ${messageUrl}`,
 		});
-		const repingMessage = await reply.fetch();
+
+		const repingMessage = await withRetry(
+			() => reply.fetch(),
+			MEDIUM_RETRY_OPTIONS,
+		);
 
 		eventManager.setRepingMessage(userEventId, repingMessage.id);
 		eventManager.setRepingCooldown(userEventId, now);

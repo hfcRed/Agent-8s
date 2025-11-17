@@ -3,6 +3,17 @@ import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { EventRecorder } from '../telemetry/event-recorder.js';
 import type { TelemetryEventData } from '../types.js';
 
+vi.mock('../utils/retry.js', async () => {
+	const actual =
+		await vi.importActual<typeof import('../utils/retry.js')>(
+			'../utils/retry.js',
+		);
+	return {
+		...actual,
+		DATABASE_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+	};
+});
+
 // Mock pg module
 vi.mock('pg', () => {
 	const MockedPool = vi.fn(function (this: never) {
@@ -94,7 +105,9 @@ describe('EventRecorder', () => {
 			await eventRecorder.initialize();
 
 			expect(consoleSpy).toHaveBeenCalled();
-			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			const errorOutput = consoleSpy.mock.calls[
+				consoleSpy.mock.calls.length - 1
+			][0] as string;
 			expect(errorOutput).toContain(
 				'[MEDIUM] Failed to initialize event recorder schema',
 			);
@@ -194,10 +207,12 @@ describe('EventRecorder', () => {
 				participants: [],
 			};
 
-			await eventRecorder.record('event.test', eventData);
+			await eventRecorder.record('test-event', eventData);
 
 			expect(consoleSpy).toHaveBeenCalled();
-			const errorOutput = consoleSpy.mock.calls[0][0] as string;
+			const errorOutput = consoleSpy.mock.calls[
+				consoleSpy.mock.calls.length - 1
+			][0] as string;
 			expect(errorOutput).toContain(
 				'[LOW] Failed to record telemetry event to database',
 			);

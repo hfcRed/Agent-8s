@@ -22,6 +22,12 @@ import {
 	updateEmbedField,
 } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import {
+	LOW_RETRY_OPTIONS,
+	MEDIUM_RETRY_OPTIONS,
+	withRetry,
+	withRetryOrNull,
+} from '../utils/retry.js';
 import type { EventManager } from './event-manager.js';
 
 export async function startEvent(
@@ -36,71 +42,91 @@ export async function startEvent(
 	const timerData = eventManager.getTimer(message.id);
 	if (!timerData || timerData.hasStarted) return;
 
-	timerData.hasStarted = true;
-	const matchId = eventManager.getMatchId(message.id);
-	const shortId = matchId?.slice(0, 5);
+	eventManager.setProcessing(message.id, 'starting');
+	try {
+		timerData.hasStarted = true;
+		const matchId = eventManager.getMatchId(message.id);
+		const shortId = matchId?.slice(0, 5);
 
-	await eventManager.deleteRepingMessageIfExists(message.id, appClient);
+		await eventManager.deleteRepingMessageIfExists(message.id, appClient);
 
-	const timeout = eventManager.getTimeout(message.id);
-	if (timeout) {
-		clearTimeout(timeout);
-		eventManager.deleteTimeout(message.id);
-	}
+		const timeout = eventManager.getTimeout(message.id);
+		if (timeout) {
+			clearTimeout(timeout);
+			eventManager.deleteTimeout(message.id);
+		}
 
-	const embed = EmbedBuilder.from(message.embeds[0]).setColor(COLORS.STARTED);
+		const embed = EmbedBuilder.from(message.embeds[0]).setColor(COLORS.STARTED);
 
-	updateEmbedField(embed, 'Status', STATUS_MESSAGES.STARTED);
-	updateEmbedField(embed, 'Start', `⏳ <t:${Math.floor(Date.now() / 1000)}:R>`);
-
-	const buttonRow = createEventStartedButtons();
-	const selectRow = createRoleSelectMenu();
-
-	await message.edit({ embeds: [embed], components: [buttonRow, selectRow] });
-
-	const participants = Array.from(participantMap.values());
-	const channel = message.channel as TextChannel;
-	const thread = await threadManager.createEventThread(
-		channel,
-		shortId || 'unknown',
-	);
-
-	const voiceChannels = await voiceChannelManager.createEventVoiceChannels(
-		message.guild as Guild,
-		channel,
-		participants.map((p) => p.userId),
-		shortId || 'unknown',
-		appClient,
-	);
-	eventManager.setVoiceChannels(message.id, voiceChannels);
-
-	if (thread) {
-		eventManager.setThread(message.id, thread.id);
-
-		await threadManager.sendAndPinEmbed(
-			thread,
-			EmbedBuilder.from(message.embeds[0]),
+		updateEmbedField(embed, 'Status', STATUS_MESSAGES.STARTED);
+		updateEmbedField(
+			embed,
+			'Start',
+			`⏳ <t:${Math.floor(Date.now() / 1000)}:R>`,
 		);
 
-		await threadManager.sendMessage(
-			thread,
-			`**Voice Channels Created**\n\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+		const buttonRow = createEventStartedButtons();
+		const selectRow = createRoleSelectMenu();
+
+		await withRetry(
+			() =>
+				message.edit({ embeds: [embed], components: [buttonRow, selectRow] }),
+			MEDIUM_RETRY_OPTIONS,
 		);
 
-		await threadManager.addMembers(
-			thread,
+		const participants = Array.from(participantMap.values());
+		const channel = message.channel as TextChannel;
+		const thread = await threadManager.createEventThread(
+			channel,
+			shortId || 'unknown',
+		);
+
+		const voiceChannels = await voiceChannelManager.createEventVoiceChannels(
+			message.guild as Guild,
+			channel,
 			participants.map((p) => p.userId),
+			shortId || 'unknown',
+			appClient,
 		);
-	}
+		eventManager.setVoiceChannels(message.id, voiceChannels);
 
-	telemetry?.trackEventStarted({
-		guildId: message.guild?.id || 'unknown',
-		eventId: message.id,
-		userId: eventManager.getCreator(message.id) || 'unknown',
-		participants: participants,
-		channelId: message.channelId,
-		matchId: matchId || 'unknown',
-	});
+		if (thread) {
+			eventManager.setThread(message.id, thread.id);
+
+			await threadManager.sendAndPinEmbed(
+				thread,
+				EmbedBuilder.from(message.embeds[0]),
+			);
+
+			await threadManager.sendMessage(
+				thread,
+				`**Voice Channels Created**\n\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+			);
+
+			await threadManager.addMembers(
+				thread,
+				participants.map((p) => p.userId),
+			);
+		}
+
+		telemetry?.trackEventStarted({
+			guildId: message.guild?.id || 'unknown',
+			eventId: message.id,
+			userId: eventManager.getCreator(message.id) || 'unknown',
+			participants: participants,
+			channelId: message.channelId,
+			matchId: matchId || 'unknown',
+		});
+	} catch (error) {
+		handleError({
+			reason: 'Failed to start event from timeout',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: { messageId: message.id },
+		});
+	} finally {
+		eventManager.clearProcessing(message.id, 'starting');
+	}
 }
 
 export async function cleanupEvent(
@@ -121,7 +147,10 @@ export async function cleanupEvent(
 
 		if (threadId && channelId) {
 			try {
-				const channel = await appClient.channels.fetch(channelId);
+				const channel = await withRetryOrNull(
+					() => appClient.channels.fetch(channelId),
+					LOW_RETRY_OPTIONS,
+				);
 
 				if (channel?.isTextBased() && !channel.isDMBased()) {
 					const thread = await threadManager.fetchThread(
@@ -183,9 +212,16 @@ export async function cleanupStaleEvents(
 
 			if (channelId) {
 				try {
-					const channel = await appClient.channels.fetch(channelId);
+					const channel = await withRetryOrNull(
+						() => appClient.channels.fetch(channelId),
+						LOW_RETRY_OPTIONS,
+					);
+
 					if (channel?.isTextBased() && !channel.isDMBased()) {
-						message = await channel.messages.fetch(messageId);
+						message = await withRetryOrNull(
+							() => channel.messages.fetch(messageId),
+							LOW_RETRY_OPTIONS,
+						);
 					}
 				} catch (error) {
 					handleError({
@@ -202,7 +238,10 @@ export async function cleanupStaleEvents(
 				);
 				updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
 
-				await message.edit({ embeds: [embed], components: [] });
+				await withRetryOrNull(
+					() => message.edit({ embeds: [embed], components: [] }),
+					LOW_RETRY_OPTIONS,
+				);
 
 				const matchId = eventManager.getMatchId(messageId);
 				const participants = eventManager.getParticipants(messageId);
@@ -271,27 +310,15 @@ export async function createEventStartTimeout(
 				currentParticipantMap.size === MAX_PARTICIPANTS &&
 				!(await checkProcessingStates(message.id, eventManager))
 			) {
-				eventManager.setProcessing(message.id, 'starting');
-				try {
-					await startEvent(
-						message,
-						currentParticipantMap,
-						eventManager,
-						message.client,
-						threadManager,
-						voiceChannelManager,
-						telemetry,
-					);
-				} catch (error) {
-					handleError({
-						reason: 'Failed to start event from timeout',
-						severity: ErrorSeverity.MEDIUM,
-						error,
-						metadata: { messageId: message.id },
-					});
-				} finally {
-					eventManager.clearProcessing(message.id, 'starting');
-				}
+				await startEvent(
+					message,
+					currentParticipantMap,
+					eventManager,
+					message.client,
+					threadManager,
+					voiceChannelManager,
+					telemetry,
+				);
 			} else {
 				const embed = EmbedBuilder.from(message.embeds[0]);
 				embed.setColor(COLORS.OPEN);

@@ -29,6 +29,7 @@ vi.mock('../utils/embed-utils.js', () => ({
 vi.mock('../utils/helpers.js', () => ({
 	getExcaliburRankOfUser: vi.fn(() => '5'),
 	getPingsForServer: vi.fn(() => '@everyone'),
+	safeReplyToInteraction: vi.fn(),
 }));
 
 describe('handleCreateCommand', () => {
@@ -74,6 +75,8 @@ describe('handleCreateCommand', () => {
 				getInteger: vi.fn(() => null),
 			} as unknown as CommandInteractionOptionResolver,
 			reply: vi.fn(async () => mockReply),
+			deferReply: vi.fn(async () => undefined),
+			editReply: vi.fn(async () => mockReply),
 		} as unknown as ChatInputCommandInteraction;
 	});
 
@@ -115,7 +118,8 @@ describe('handleCreateCommand', () => {
 			telemetry,
 		);
 
-		expect(interaction.reply).toHaveBeenCalled();
+		expect(interaction.deferReply).toHaveBeenCalled();
+		expect(interaction.editReply).toHaveBeenCalled();
 		const participants = eventManager.getParticipants(mockMessage.id);
 		expect(participants?.size).toBe(1);
 		expect(participants?.has(mockUser.id)).toBe(true);
@@ -151,7 +155,8 @@ describe('handleCreateCommand', () => {
 			telemetry,
 		);
 
-		expect(interaction.reply).toHaveBeenCalled();
+		expect(interaction.deferReply).toHaveBeenCalled();
+		expect(interaction.editReply).toHaveBeenCalled();
 		const participants = eventManager.getParticipants(mockMessage.id);
 		expect(participants).toBeDefined();
 	});
@@ -171,7 +176,8 @@ describe('handleCreateCommand', () => {
 			telemetry,
 		);
 
-		expect(interaction.reply).toHaveBeenCalled();
+		expect(interaction.deferReply).toHaveBeenCalled();
+		expect(interaction.editReply).toHaveBeenCalled();
 	});
 
 	it('should set creator correctly', async () => {
@@ -258,7 +264,8 @@ describe('handleCreateCommand', () => {
 			undefined,
 		);
 
-		expect(interaction.reply).toHaveBeenCalled();
+		expect(interaction.deferReply).toHaveBeenCalled();
+		expect(interaction.editReply).toHaveBeenCalled();
 		const participants = eventManager.getParticipants(mockMessage.id);
 		expect(participants?.size).toBe(1);
 	});

@@ -298,27 +298,15 @@ export async function handleStartNowButton(
 			return;
 		}
 
-		eventManager.setProcessing(messageId, 'starting');
-		try {
-			await startEvent(
-				interaction.message,
-				participantMap,
-				eventManager,
-				appClient,
-				threadManager,
-				voiceChannelManager,
-				telemetry,
-			);
-		} catch (error) {
-			handleError({
-				reason: 'Failed to start event',
-				severity: ErrorSeverity.MEDIUM,
-				error,
-				metadata: { messageId },
-			});
-		} finally {
-			eventManager.clearProcessing(messageId, 'starting');
-		}
+		await startEvent(
+			interaction.message,
+			participantMap,
+			eventManager,
+			appClient,
+			threadManager,
+			voiceChannelManager,
+			telemetry,
+		);
 	} catch (error) {
 		handleError({
 			reason: 'Error handling start now button',

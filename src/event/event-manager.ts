@@ -2,6 +2,7 @@ import type { Client, Message } from 'discord.js';
 import { STATUS_MESSAGES, TIMINGS } from '../constants.js';
 import type { EventOperation, EventTimer, ParticipantMap } from '../types.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import { LOW_RETRY_OPTIONS, withRetryOrNull } from '../utils/retry.js';
 
 /**
  * Manages all in-memory state for active events.
@@ -246,11 +247,21 @@ export class EventManager {
 		if (!channelId || !repingMessageId) return;
 
 		try {
-			const channel = await client.channels.fetch(channelId);
+			const channel = await withRetryOrNull(
+				() => client.channels.fetch(channelId),
+				LOW_RETRY_OPTIONS,
+			);
+
 			if (!channel || !channel.isTextBased()) return;
 
-			const message = await channel.messages.fetch(repingMessageId);
-			await message.delete();
+			const message = await withRetryOrNull(
+				() => channel.messages.fetch(repingMessageId),
+				LOW_RETRY_OPTIONS,
+			);
+
+			if (message) {
+				await withRetryOrNull(() => message.delete(), LOW_RETRY_OPTIONS);
+			}
 
 			this.deleteRepingMessage(eventId);
 		} catch (error) {

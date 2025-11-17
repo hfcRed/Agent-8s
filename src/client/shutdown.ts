@@ -9,6 +9,7 @@ import { stopMetricsServer } from '../telemetry/metrics.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import { updateEmbedField } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import { MEDIUM_RETRY_OPTIONS, withRetryOrNull } from '../utils/retry.js';
 
 let isShuttingDown = false;
 let hasRetried = false;
@@ -38,13 +39,27 @@ export async function gracefulShutdown(
 		console.log(`Found ${allTimers.length} active event(s) to clean up`);
 
 		if (AUTHOR_ID) {
-			const author = await client.users.fetch(AUTHOR_ID);
-			await author.send(
-				`----------------------------------\n⚠️ Bot shutdown initiated!\n\n**Reason:** ${signal}\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+			const author = await withRetryOrNull(
+				() => client.users.fetch(AUTHOR_ID as string),
+				MEDIUM_RETRY_OPTIONS,
 			);
-			await author.send(
-				`⚠️ Found ${allTimers.length} active event(s) to clean up before shutdown`,
-			);
+
+			if (author) {
+				await withRetryOrNull(
+					() =>
+						author.send(
+							`----------------------------------\n⚠️ Bot shutdown initiated!\n\n**Reason:** ${signal}\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+						),
+					MEDIUM_RETRY_OPTIONS,
+				);
+				await withRetryOrNull(
+					() =>
+						author.send(
+							`⚠️ Found ${allTimers.length} active event(s) to clean up before shutdown`,
+						),
+					MEDIUM_RETRY_OPTIONS,
+				);
+			}
 		}
 
 		for (let i = 0; i < allTimers.length; i++) {
@@ -54,11 +69,20 @@ export async function gracefulShutdown(
 			let isFinalizing = false;
 
 			if (channelId) {
-				const channel = await client.channels.fetch(channelId);
+				const channel = await withRetryOrNull(
+					() => client.channels.fetch(channelId),
+					MEDIUM_RETRY_OPTIONS,
+				);
 
 				if (channel?.isTextBased() && !channel.isDMBased()) {
-					const message = await channel.messages.fetch(eventId);
-					isFinalizing = eventManager.isEventFinalizing(message);
+					const message = await withRetryOrNull(
+						() => channel.messages.fetch(eventId),
+						MEDIUM_RETRY_OPTIONS,
+					);
+
+					if (message) {
+						isFinalizing = eventManager.isEventFinalizing(message);
+					}
 				}
 			}
 
@@ -76,16 +100,28 @@ export async function gracefulShutdown(
 				`Updating event message ${i + 1}/${allTimers.length}: ${eventId}`,
 			);
 			if (channelId) {
-				const channel = await client.channels.fetch(channelId);
+				const channel = await withRetryOrNull(
+					() => client.channels.fetch(channelId),
+					MEDIUM_RETRY_OPTIONS,
+				);
 
 				if (channel?.isTextBased() && !channel.isDMBased()) {
-					const message = await channel.messages.fetch(eventId);
-					const embed = EmbedBuilder.from(message.embeds[0]).setColor(
-						COLORS.CANCELLED,
+					const message = await withRetryOrNull(
+						() => channel.messages.fetch(eventId),
+						MEDIUM_RETRY_OPTIONS,
 					);
 
-					updateEmbedField(embed, 'Status', STATUS_MESSAGES.SHUTDOWN);
-					await message.edit({ embeds: [embed], components: [] });
+					if (message) {
+						const embed = EmbedBuilder.from(message.embeds[0]).setColor(
+							COLORS.CANCELLED,
+						);
+
+						updateEmbedField(embed, 'Status', STATUS_MESSAGES.SHUTDOWN);
+						await withRetryOrNull(
+							() => message.edit({ embeds: [embed], components: [] }),
+							MEDIUM_RETRY_OPTIONS,
+						);
+					}
 				}
 			}
 
@@ -99,10 +135,20 @@ export async function gracefulShutdown(
 			);
 
 			if (AUTHOR_ID) {
-				const author = await client.users.fetch(AUTHOR_ID);
-				await author.send(
-					`✅ Cleaned up event ${i + 1}/${allTimers.length}: ${eventId}`,
+				const author = await withRetryOrNull(
+					() => client.users.fetch(AUTHOR_ID as string),
+					MEDIUM_RETRY_OPTIONS,
 				);
+
+				if (author) {
+					await withRetryOrNull(
+						() =>
+							author.send(
+								`✅ Cleaned up event ${i + 1}/${allTimers.length}: ${eventId}`,
+							),
+						MEDIUM_RETRY_OPTIONS,
+					);
+				}
 			}
 
 			// Timeout to avoid Discord rate limits
@@ -128,10 +174,20 @@ export async function gracefulShutdown(
 		console.log('Metrics server stopped');
 
 		if (AUTHOR_ID) {
-			const author = await client.users.fetch(AUTHOR_ID);
-			await author.send(
-				`----------------------------------\n✅ Bot shutdown complete - disconnecting\n\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+			const author = await withRetryOrNull(
+				() => client.users.fetch(AUTHOR_ID as string),
+				MEDIUM_RETRY_OPTIONS,
 			);
+
+			if (author) {
+				await withRetryOrNull(
+					() =>
+						author.send(
+							`----------------------------------\n✅ Bot shutdown complete - disconnecting\n\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+						),
+					MEDIUM_RETRY_OPTIONS,
+				);
+			}
 		}
 
 		console.log('Destroying Discord client...');
@@ -147,12 +203,22 @@ export async function gracefulShutdown(
 		});
 
 		if (AUTHOR_ID) {
-			const author = await client.users.fetch(AUTHOR_ID);
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			await author.send(
-				`----------------------------------\n❌ Error during bot shutdown\n\n**Error:** ${errorMessage}\n\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+			const author = await withRetryOrNull(
+				() => client.users.fetch(AUTHOR_ID as string),
+				MEDIUM_RETRY_OPTIONS,
 			);
+
+			if (author) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				await withRetryOrNull(
+					() =>
+						author.send(
+							`----------------------------------\n❌ Error during bot shutdown\n\n**Error:** ${errorMessage}\n\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+						),
+					MEDIUM_RETRY_OPTIONS,
+				);
+			}
 		}
 
 		if (!hasRetried) {

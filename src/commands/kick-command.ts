@@ -11,6 +11,7 @@ import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import { updateParticipantFields } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { safeReplyToInteraction } from '../utils/helpers.js';
+import { MEDIUM_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
 
 export async function handleKickCommand(
 	interaction: ChatInputCommandInteraction,
@@ -64,7 +65,11 @@ export async function handleKickCommand(
 			return;
 		}
 
-		const channel = await interaction.client.channels.fetch(channelId);
+		const channel = await withRetry(
+			() => interaction.client.channels.fetch(channelId),
+			MEDIUM_RETRY_OPTIONS,
+		);
+
 		if (!channel || !channel.isTextBased()) {
 			await interaction.editReply({
 				content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
@@ -72,7 +77,11 @@ export async function handleKickCommand(
 			return;
 		}
 
-		const message = await channel.messages.fetch(userEventId);
+		const message = await withRetry(
+			() => channel.messages.fetch(userEventId),
+			MEDIUM_RETRY_OPTIONS,
+		);
+
 		if (!message) {
 			await interaction.editReply({
 				content: ERROR_MESSAGES.MESSAGE_NOT_FOUND,

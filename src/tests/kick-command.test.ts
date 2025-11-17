@@ -15,6 +15,18 @@ import { EventManager } from '../event/event-manager.js';
 import { ThreadManager } from '../managers/thread-manager.js';
 import { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 
+vi.mock('../utils/retry.js', async () => {
+	const actual =
+		await vi.importActual<typeof import('../utils/retry.js')>(
+			'../utils/retry.js',
+		);
+	return {
+		...actual,
+		MEDIUM_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+		LOW_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+	};
+});
+
 vi.mock('../utils/embed-utils.js', () => ({
 	updateParticipantFields: vi.fn(),
 }));
@@ -402,7 +414,9 @@ describe('handleKickCommand', () => {
 			flags: ['Ephemeral'],
 		});
 		expect(consoleSpy).toHaveBeenCalled();
-		const errorOutput = consoleSpy.mock.calls[0][0] as string;
+		const errorOutput = consoleSpy.mock.calls[
+			consoleSpy.mock.calls.length - 1
+		][0] as string;
 		expect(errorOutput).toContain('[MEDIUM] Error executing kick command');
 		const { safeReplyToInteraction } = await import('../utils/helpers.js');
 		expect(vi.mocked(safeReplyToInteraction)).toHaveBeenCalledWith(

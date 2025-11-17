@@ -8,8 +8,20 @@ import type {
 } from 'discord.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleRepingCommand } from '../commands/reping-command.js';
-import { ERROR_MESSAGES } from '../constants.js';
+import { ERROR_MESSAGES, MAX_PARTICIPANTS } from '../constants.js';
 import { EventManager } from '../event/event-manager.js';
+
+vi.mock('../utils/retry.js', async () => {
+	const actual =
+		await vi.importActual<typeof import('../utils/retry.js')>(
+			'../utils/retry.js',
+		);
+	return {
+		...actual,
+		MEDIUM_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+		LOW_RETRY_OPTIONS: actual.TEST_RETRY_OPTIONS,
+	};
+});
 
 vi.mock('../utils/helpers.js', () => ({
 	getPingsForServer: vi.fn((_interaction, casual) =>
@@ -67,15 +79,17 @@ describe('handleRepingCommand', () => {
 			client: mockClient,
 			guildId: faker.string.uuid(),
 			reply: vi.fn(async () => mockReplyMessage),
+			deferReply: vi.fn(async () => undefined),
+			editReply: vi.fn(async () => mockReplyMessage),
 		} as unknown as ChatInputCommandInteraction;
 	});
 
 	it('should reply when user does not own any events', async () => {
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.deferReply).toHaveBeenCalled();
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: ERROR_MESSAGES.NO_EVENT_OWNED,
-			flags: ['Ephemeral'],
 		});
 	});
 
@@ -100,8 +114,8 @@ describe('handleRepingCommand', () => {
 
 		expect(mockClient.channels.fetch).toHaveBeenCalledWith(channelId);
 		expect(mockChannel.messages.fetch).toHaveBeenCalledWith(eventId);
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: `||<@&comp-role-id>||\nLooking for **+7** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: `||<@&comp-role-id>||\nLooking for **+${MAX_PARTICIPANTS - 1}** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
 		});
 	});
 
@@ -140,8 +154,8 @@ describe('handleRepingCommand', () => {
 
 		expect(mockClient.channels.fetch).toHaveBeenCalledWith(channelId);
 		expect(mockChannel.messages.fetch).toHaveBeenCalledWith(eventId);
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: `||<@&casual-role-id>||\nLooking for **+5** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: `||<@&casual-role-id>||\nLooking for **+${MAX_PARTICIPANTS - 3}** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
 		});
 	});
 
@@ -154,9 +168,9 @@ describe('handleRepingCommand', () => {
 		eventManager.setCreator(eventId, mockUser.id);
 		eventManager.setChannelId(eventId, channelId);
 
-		// Create 7 participants (need 1 more)
+		// Create MAX_PARTICIPANTS - 1 participants (need 1 more)
 		const participants = new Map();
-		for (let i = 0; i < 7; i++) {
+		for (let i = 0; i < MAX_PARTICIPANTS - 1; i++) {
 			const id = faker.string.uuid();
 			participants.set(id, { userId: id, role: '⚫ None', rank: null });
 		}
@@ -166,7 +180,7 @@ describe('handleRepingCommand', () => {
 
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: `||<@&comp-role-id>||\nLooking for **+1** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
 		});
 	});
@@ -178,9 +192,8 @@ describe('handleRepingCommand', () => {
 
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
-			flags: ['Ephemeral'],
 		});
 	});
 
@@ -195,9 +208,8 @@ describe('handleRepingCommand', () => {
 
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
-			flags: ['Ephemeral'],
 		});
 	});
 
@@ -235,9 +247,8 @@ describe('handleRepingCommand', () => {
 
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: ERROR_MESSAGES.ROLE_NOT_FOUND,
-			flags: ['Ephemeral'],
 		});
 	});
 
@@ -261,19 +272,18 @@ describe('handleRepingCommand', () => {
 		// First re-ping should succeed
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: `||<@&comp-role-id>||\nLooking for **+7** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: `||<@&comp-role-id>||\nLooking for **+${MAX_PARTICIPANTS - 1}** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
 		});
 
 		// Reset the mock
-		vi.mocked(interaction.reply).mockClear();
+		vi.mocked(interaction.editReply).mockClear();
 
 		// Second re-ping immediately should fail with cooldown message
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: 'Please wait 15 more minutes before re-pinging again.',
-			flags: ['Ephemeral'],
 		});
 	});
 
@@ -301,8 +311,8 @@ describe('handleRepingCommand', () => {
 		// Re-ping should succeed
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: `||<@&comp-role-id>||\nLooking for **+7** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: `||<@&comp-role-id>||\nLooking for **+${MAX_PARTICIPANTS - 1}** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
 		});
 	});
 
@@ -326,9 +336,8 @@ describe('handleRepingCommand', () => {
 
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: 'Please wait 5 more minutes before re-pinging again.',
-			flags: ['Ephemeral'],
 		});
 	});
 
@@ -352,9 +361,8 @@ describe('handleRepingCommand', () => {
 
 		await handleRepingCommand(interaction, eventManager);
 
-		expect(interaction.reply).toHaveBeenCalledWith({
+		expect(interaction.editReply).toHaveBeenCalledWith({
 			content: 'Please wait 1 more minute before re-pinging again.',
-			flags: ['Ephemeral'],
 		});
 	});
 
@@ -485,8 +493,8 @@ describe('handleRepingCommand', () => {
 
 		expect(deleteSpy).toHaveBeenCalled();
 		// Should still send the new re-ping despite failure to delete old one
-		expect(interaction.reply).toHaveBeenCalledWith({
-			content: `||<@&comp-role-id>||\nLooking for **+7** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
+		expect(interaction.editReply).toHaveBeenCalledWith({
+			content: `||<@&comp-role-id>||\nLooking for **+${MAX_PARTICIPANTS - 1}** for https://discord.com/channels/${guildId}/${channelId}/${eventId}`,
 		});
 	});
 });

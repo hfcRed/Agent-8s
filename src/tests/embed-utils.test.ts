@@ -1,6 +1,11 @@
 import { faker } from '@faker-js/faker';
 import { describe, expect, it } from 'vitest';
-import { COLORS, STATUS_MESSAGES, WEAPON_ROLES } from '../constants.js';
+import {
+	COLORS,
+	MAX_PARTICIPANTS,
+	STATUS_MESSAGES,
+	WEAPON_ROLES,
+} from '../constants.js';
 import {
 	createEventButtons,
 	createEventEmbed,
@@ -324,7 +329,7 @@ describe('embed-utils', () => {
 			);
 
 			const participantMap = new Map();
-			for (let i = 0; i < 8; i++) {
+			for (let i = 0; i < MAX_PARTICIPANTS; i++) {
 				participantMap.set(faker.string.uuid(), {
 					userId: `${i}`,
 					role: WEAPON_ROLES[0],
@@ -353,7 +358,7 @@ describe('embed-utils', () => {
 			);
 
 			const participantMap = new Map();
-			for (let i = 0; i < 8; i++) {
+			for (let i = 0; i < MAX_PARTICIPANTS; i++) {
 				participantMap.set(faker.string.uuid(), {
 					userId: `${i}`,
 					role: WEAPON_ROLES[0],
