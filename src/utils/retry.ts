@@ -199,15 +199,3 @@ export async function withRetryOrNull<T>(
 		return null;
 	}
 }
-
-export async function withRetryBoolean(
-	operation: () => Promise<void>,
-	options: RetryOptions = MEDIUM_RETRY_OPTIONS,
-) {
-	try {
-		await pRetry(operation, options);
-		return true;
-	} catch {
-		return false;
-	}
-}
