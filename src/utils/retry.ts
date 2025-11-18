@@ -74,7 +74,7 @@ export const LOW_RETRY_OPTIONS: RetryOptions = {
 	maxTimeout: 5000,
 	randomize: true,
 	onFailedAttempt: (error) => {
-		if (!shouldRetryError(error)) {
+		if (!shouldRetryError(error.error)) {
 			abortRetry(error);
 		}
 
@@ -97,7 +97,7 @@ export const MEDIUM_RETRY_OPTIONS: RetryOptions = {
 	maxTimeout: 10000,
 	randomize: true,
 	onFailedAttempt: (error) => {
-		if (!shouldRetryError(error)) {
+		if (!shouldRetryError(error.error)) {
 			abortRetry(error);
 		}
 
@@ -120,7 +120,7 @@ export const HIGH_RETRY_OPTIONS: RetryOptions = {
 	maxTimeout: 30000,
 	randomize: true,
 	onFailedAttempt: (error) => {
-		if (!shouldRetryError(error)) {
+		if (!shouldRetryError(error.error)) {
 			abortRetry(error);
 		}
 
@@ -143,7 +143,7 @@ export const DATABASE_RETRY_OPTIONS: RetryOptions = {
 	maxTimeout: 15000,
 	randomize: true,
 	onFailedAttempt: (error) => {
-		if (!shouldRetryError(error)) {
+		if (!shouldRetryError(error.error)) {
 			abortRetry(error);
 		}
 
@@ -166,7 +166,7 @@ export const TEST_RETRY_OPTIONS: RetryOptions = {
 	maxTimeout: 1,
 	randomize: false,
 	onFailedAttempt: (error) => {
-		if (!shouldRetryError(error)) {
+		if (!shouldRetryError(error.error)) {
 			abortRetry(error);
 		}
 
