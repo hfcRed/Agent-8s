@@ -2,7 +2,11 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import { ERROR_MESSAGES, MAX_PARTICIPANTS, TIMINGS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
-import { getPingsForServer, safeReplyToInteraction } from '../utils/helpers.js';
+import {
+	checkProcessingStates,
+	getPingsForServer,
+	safeReplyToInteraction,
+} from '../utils/helpers.js';
 import { MEDIUM_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
 
 export async function handleRepingCommand(
@@ -21,6 +25,13 @@ export async function handleRepingCommand(
 			});
 			return;
 		}
+
+		const processing = await checkProcessingStates(
+			userEventId,
+			eventManager,
+			interaction,
+		);
+		if (processing) return;
 
 		const lastUsed = eventManager.getRepingCooldown(userEventId);
 		const now = Date.now();
