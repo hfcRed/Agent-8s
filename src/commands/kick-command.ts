@@ -107,11 +107,12 @@ export async function handleKickCommand(
 		}
 
 		const voiceChannelIds = eventManager.getVoiceChannels(userEventId);
-		if (voiceChannelIds) {
+		if (voiceChannelIds && interaction.guild) {
 			await voiceChannelManager.revokeAccessFromChannels(
 				interaction.client,
 				voiceChannelIds,
 				targetUserId,
+				interaction.guild,
 			);
 		}
 

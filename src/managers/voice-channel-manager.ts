@@ -163,12 +163,35 @@ export class VoiceChannelManager {
 		appClient: Client,
 		channelIds: string[],
 		userId: string,
+		guild: Guild,
 	) {
 		await Promise.allSettled(
 			channelIds.map((channelId) =>
 				this.revokeAccess(appClient, channelId, userId),
 			),
 		);
+
+		await this.disconnectUser(userId, guild);
+	}
+
+	async disconnectUser(userId: string, guild: Guild) {
+		try {
+			const member = await withRetry(
+				() => guild.members.fetch(userId),
+				MEDIUM_RETRY_OPTIONS,
+			);
+
+			if (member.voice.channelId) {
+				await withRetry(() => member.voice.disconnect(), MEDIUM_RETRY_OPTIONS);
+			}
+		} catch (error) {
+			handleError({
+				reason: 'Failed to disconnect user from voice channel',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { userId },
+			});
+		}
 	}
 
 	async deleteChannel(appClient: Client, channelId: string) {

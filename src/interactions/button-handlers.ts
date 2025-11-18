@@ -456,11 +456,12 @@ export async function handleDropOutButton(
 		}
 
 		const voiceChannelIds = eventManager.getVoiceChannels(messageId);
-		if (voiceChannelIds) {
+		if (voiceChannelIds && interaction.guild) {
 			await voiceChannelManager.revokeAccessFromChannels(
 				appClient,
 				voiceChannelIds,
 				userId,
+				interaction.guild,
 			);
 		}
 

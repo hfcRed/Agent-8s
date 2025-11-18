@@ -77,6 +77,7 @@ The bot requires a handful of permissions to be granted when added to a server. 
 - **Send Messages in Threads**: Required to send messages in threads
 - **Create Private Threads**: Required to create new private threads
 - **Manage Threads**: Required to add/remove users from a thread, pin messages in threads, and close and archive threads
+- **Move Members**: Required to disconnect users from voice channels if kicked or dropped out
 
 ## Running locally
 
