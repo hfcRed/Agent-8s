@@ -12,10 +12,13 @@ import type {
 import { PermissionFlagsBits } from 'discord.js';
 import {
 	ADMIN_PERMISSIONS,
+	ERROR_MESSAGES,
 	EXCALIBUR_GUILD_ID,
 	EXCALIBUR_RANKS,
 	PING_ROLE_NAMES,
+	PROCESSING_MESSAGES,
 } from '../constants.js';
+import type { EventManager } from '../event/event-manager.js';
 import { ErrorSeverity, handleError } from './error-handler.js';
 
 export function isUserAdmin(member: GuildMember) {
@@ -108,4 +111,60 @@ export async function safeReplyToInteraction(
 			error,
 		});
 	}
+}
+
+export async function checkProcessingStates(
+	messageId: string,
+	eventManager: EventManager,
+	interaction?: ButtonInteraction | ChatInputCommandInteraction,
+) {
+	if (eventManager.isProcessing(messageId, 'starting')) {
+		if (interaction) {
+			await safeReplyToInteraction(
+				interaction,
+				PROCESSING_MESSAGES.STILL_STARTING,
+			);
+		}
+		return true;
+	}
+	if (eventManager.isProcessing(messageId, 'finishing')) {
+		if (interaction) {
+			await safeReplyToInteraction(
+				interaction,
+				PROCESSING_MESSAGES.ALREADY_FINISHING,
+			);
+		}
+		return true;
+	}
+
+	if (eventManager.isProcessing(messageId, 'cancelling')) {
+		if (interaction) {
+			await safeReplyToInteraction(
+				interaction,
+				PROCESSING_MESSAGES.ALREADY_CANCELLING,
+			);
+		}
+		return true;
+	}
+
+	if (eventManager.isProcessing(messageId, 'cleanup')) {
+		if (interaction) {
+			await safeReplyToInteraction(
+				interaction,
+				PROCESSING_MESSAGES.CLEANING_UP,
+			);
+		}
+		return true;
+	}
+
+	if (
+		interaction &&
+		'message' in interaction &&
+		eventManager.isEventFinalizing(interaction.message)
+	) {
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.EVENT_FINALIZING);
+		return true;
+	}
+
+	return false;
 }

@@ -5,12 +5,14 @@ import {
 } from 'discord.js';
 import { ERROR_MESSAGES } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
-import { checkProcessingStates } from '../interactions/button-handlers.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import { updateParticipantFields } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
-import { safeReplyToInteraction } from '../utils/helpers.js';
+import {
+	checkProcessingStates,
+	safeReplyToInteraction,
+} from '../utils/helpers.js';
 import { MEDIUM_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
 
 export async function handleKickCommand(

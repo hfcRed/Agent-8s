@@ -17,7 +17,6 @@ import { ERROR_MESSAGES, TIMINGS } from './constants.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
 import { EventManager } from './event/event-manager.js';
 import {
-	checkProcessingStates,
 	handleCancelButton,
 	handleDropInButton,
 	handleDropOutButton,
@@ -31,7 +30,11 @@ import { ThreadManager } from './managers/thread-manager.js';
 import { VoiceChannelManager } from './managers/voice-channel-manager.js';
 import { initializeTelemetry } from './telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from './utils/error-handler.js';
-import { botHasPermission, safeReplyToInteraction } from './utils/helpers.js';
+import {
+	botHasPermission,
+	checkProcessingStates,
+	safeReplyToInteraction,
+} from './utils/helpers.js';
 
 dotenv.config({ quiet: true });
 const botToken = process.env.BOT_TOKEN;

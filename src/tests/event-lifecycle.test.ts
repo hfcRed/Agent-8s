@@ -33,7 +33,7 @@ vi.mock('../utils/retry.js', async () => {
 	};
 });
 
-vi.mock('../interactions/button-handlers.js', () => ({
+vi.mock('../utils/helpers.js', () => ({
 	checkProcessingStates: vi.fn(() => false),
 }));
 

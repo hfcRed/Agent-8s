@@ -11,7 +11,6 @@ import {
 	STATUS_MESSAGES,
 	TIMINGS,
 } from '../constants.js';
-import { checkProcessingStates } from '../interactions/button-handlers.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -22,6 +21,7 @@ import {
 	updateEmbedField,
 } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import { checkProcessingStates } from '../utils/helpers.js';
 import {
 	LOW_RETRY_OPTIONS,
 	MEDIUM_RETRY_OPTIONS,

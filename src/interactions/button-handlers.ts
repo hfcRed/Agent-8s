@@ -1,6 +1,5 @@
 import {
 	type ButtonInteraction,
-	type ChatInputCommandInteraction,
 	type Client,
 	EmbedBuilder,
 	type GuildMember,
@@ -10,7 +9,6 @@ import {
 	COLORS,
 	ERROR_MESSAGES,
 	MAX_PARTICIPANTS,
-	PROCESSING_MESSAGES,
 	STATUS_MESSAGES,
 	TIMINGS,
 	WEAPON_ROLES,
@@ -633,60 +631,4 @@ async function updateParticipantEmbed(
 	}
 
 	await interaction.editReply({ embeds: [embed] });
-}
-
-export async function checkProcessingStates(
-	messageId: string,
-	eventManager: EventManager,
-	interaction?: ButtonInteraction | ChatInputCommandInteraction,
-) {
-	if (eventManager.isProcessing(messageId, 'starting')) {
-		if (interaction) {
-			await safeReplyToInteraction(
-				interaction,
-				PROCESSING_MESSAGES.STILL_STARTING,
-			);
-		}
-		return true;
-	}
-	if (eventManager.isProcessing(messageId, 'finishing')) {
-		if (interaction) {
-			await safeReplyToInteraction(
-				interaction,
-				PROCESSING_MESSAGES.ALREADY_FINISHING,
-			);
-		}
-		return true;
-	}
-
-	if (eventManager.isProcessing(messageId, 'cancelling')) {
-		if (interaction) {
-			await safeReplyToInteraction(
-				interaction,
-				PROCESSING_MESSAGES.ALREADY_CANCELLING,
-			);
-		}
-		return true;
-	}
-
-	if (eventManager.isProcessing(messageId, 'cleanup')) {
-		if (interaction) {
-			await safeReplyToInteraction(
-				interaction,
-				PROCESSING_MESSAGES.CLEANING_UP,
-			);
-		}
-		return true;
-	}
-
-	if (
-		interaction &&
-		'message' in interaction &&
-		eventManager.isEventFinalizing(interaction.message)
-	) {
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.EVENT_FINALIZING);
-		return true;
-	}
-
-	return false;
 }

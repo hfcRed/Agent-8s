@@ -18,7 +18,6 @@ import {
 } from '../constants.js';
 import { EventManager } from '../event/event-manager.js';
 import {
-	checkProcessingStates,
 	handleCancelButton,
 	handleDropInButton,
 	handleDropOutButton,
@@ -30,6 +29,7 @@ import {
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
+import { checkProcessingStates } from '../utils/helpers.js';
 
 vi.mock('../event/event-lifecycle.js', () => ({
 	createEventStartTimeout: vi.fn(),
