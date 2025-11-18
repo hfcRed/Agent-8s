@@ -89,6 +89,10 @@ export class TelemetryService {
 		await this.sendEvent('event_created', data);
 	}
 
+	async trackEventCancelled(data: TelemetryEventData) {
+		await this.sendEvent('event_cancelled', data);
+	}
+
 	async trackUserSignUp(data: TelemetryEventData) {
 		await this.sendEvent('user_signed_up', data);
 	}
@@ -97,20 +101,16 @@ export class TelemetryService {
 		await this.sendEvent('user_signed_out', data);
 	}
 
-	async trackUserDropOut(data: TelemetryEventData) {
-		await this.sendEvent('user_dropped_out', data);
+	async trackEventStarted(data: TelemetryEventData) {
+		await this.sendEvent('event_started', data);
 	}
 
 	async trackUserDropIn(data: TelemetryEventData) {
 		await this.sendEvent('user_dropped_in', data);
 	}
 
-	async trackEventCancelled(data: TelemetryEventData) {
-		await this.sendEvent('event_cancelled', data);
-	}
-
-	async trackEventStarted(data: TelemetryEventData) {
-		await this.sendEvent('event_started', data);
+	async trackUserDropOut(data: TelemetryEventData) {
+		await this.sendEvent('user_dropped_out', data);
 	}
 
 	async trackEventFinished(data: TelemetryEventData) {
@@ -119,6 +119,14 @@ export class TelemetryService {
 
 	async trackEventExpired(data: TelemetryEventData) {
 		await this.sendEvent('event_expired', data);
+	}
+
+	async trackUserKicked(data: TelemetryEventData) {
+		await this.sendEvent('user_kicked', data);
+	}
+
+	async trackEventRepinged(data: TelemetryEventData) {
+		await this.sendEvent('event_repinged', data);
 	}
 
 	async dispose() {

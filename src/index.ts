@@ -35,6 +35,7 @@ import {
 	checkProcessingStates,
 	safeReplyToInteraction,
 } from './utils/helpers.js';
+import { recordInteraction } from './telemetry/metrics.js';
 
 dotenv.config({ quiet: true });
 const botToken = process.env.BOT_TOKEN;
@@ -134,9 +135,11 @@ appClient.on('interactionCreate', async (interaction) => {
 			return;
 		}
 
+		recordInteraction(interaction.type.toString());
+
 		if (interaction.isChatInputCommand()) {
 			const commandHandlers: Record<string, () => Promise<void>> = {
-				reping: () => handleRepingCommand(interaction, eventManager),
+				reping: () => handleRepingCommand(interaction, eventManager, telemetry),
 				status: () => handleStatusCommand(interaction, eventManager, telemetry),
 				create: () =>
 					handleCreateCommand(
@@ -152,6 +155,7 @@ appClient.on('interactionCreate', async (interaction) => {
 						eventManager,
 						threadManager,
 						voiceChannelManager,
+						telemetry,
 					),
 			};
 

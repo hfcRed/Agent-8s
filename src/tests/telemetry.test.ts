@@ -21,7 +21,7 @@ vi.mock('../telemetry/event-recorder.js', () => {
 vi.mock('../telemetry/metrics.js', () => ({
 	recordTelemetryDispatch: vi.fn(),
 	recordTelemetryFailure: vi.fn(),
-	recordErrorMetric: vi.fn(),
+	recordError: vi.fn(),
 }));
 
 // Helper function to hash IDs like the telemetry service does

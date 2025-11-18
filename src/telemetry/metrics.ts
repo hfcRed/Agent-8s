@@ -7,6 +7,20 @@ const register = new client.Registry();
 
 client.collectDefaultMetrics({ register });
 
+const interactionCounter = new client.Counter({
+	name: 'application_interactions_total',
+	help: 'Count of interactions received by the application',
+	labelNames: ['type'],
+	registers: [register],
+});
+
+const errorCounter = new client.Counter({
+	name: 'application_errors_total',
+	help: 'Count of application errors by reason and severity',
+	labelNames: ['reason', 'severity'],
+	registers: [register],
+});
+
 const telemetryDispatchCounter = new client.Counter({
 	name: 'telemetry_events_forwarded_total',
 	help: 'Count of telemetry events successfully forwarded to the backend',
@@ -18,13 +32,6 @@ const telemetryFailureCounter = new client.Counter({
 	name: 'telemetry_events_failed_total',
 	help: 'Count of telemetry events that failed to forward to the backend',
 	labelNames: ['event', 'guild', 'channel'],
-	registers: [register],
-});
-
-const errorCounter = new client.Counter({
-	name: 'application_errors_total',
-	help: 'Count of application errors by reason and severity',
-	labelNames: ['reason', 'severity'],
 	registers: [register],
 });
 
@@ -114,6 +121,17 @@ export async function stopMetricsServer() {
 	});
 }
 
+export function recordInteraction(type: string) {
+	interactionCounter.inc({ type });
+}
+
+export function recordError(reason: string, severity: ErrorSeverity) {
+	errorCounter.inc({
+		reason: reason,
+		severity: severity,
+	});
+}
+
 export function recordTelemetryDispatch(
 	eventName: string,
 	guildId: string,
@@ -135,12 +153,5 @@ export function recordTelemetryFailure(
 		event: eventName,
 		guild: guildId,
 		channel: channelId,
-	});
-}
-
-export function recordErrorMetric(reason: string, severity: ErrorSeverity) {
-	errorCounter.inc({
-		reason: reason,
-		severity: severity,
 	});
 }

@@ -8,10 +8,12 @@ import {
 	safeReplyToInteraction,
 } from '../utils/helpers.js';
 import { MEDIUM_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
+import type { TelemetryService } from '../telemetry/telemetry.js';
 
 export async function handleRepingCommand(
 	interaction: ChatInputCommandInteraction,
 	eventManager: EventManager,
+	telemetry?: TelemetryService,
 ) {
 	try {
 		await interaction.deferReply();
@@ -123,6 +125,15 @@ export async function handleRepingCommand(
 
 		eventManager.setRepingMessage(userEventId, repingMessage.id);
 		eventManager.setRepingCooldown(userEventId, now);
+
+		telemetry?.trackEventRepinged({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: message.id,
+			userId: interaction.user.id,
+			participants: Array.from(participants?.values() || []),
+			channelId: interaction.channelId,
+			matchId: eventManager.getMatchId(userEventId) || 'unknown',
+		});
 	} catch (error) {
 		handleError({
 			reason: 'Error executing reping command',

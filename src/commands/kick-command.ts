@@ -7,6 +7,7 @@ import { ERROR_MESSAGES } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
+import type { TelemetryService } from '../telemetry/telemetry.js';
 import { updateParticipantFields } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
@@ -20,6 +21,7 @@ export async function handleKickCommand(
 	eventManager: EventManager,
 	threadManager: ThreadManager,
 	voiceChannelManager: VoiceChannelManager,
+	telemetry?: TelemetryService,
 ) {
 	try {
 		await interaction.deferReply({ flags: ['Ephemeral'] });
@@ -121,6 +123,16 @@ export async function handleKickCommand(
 			updateParticipantFields(embed, participants, timerData, isFinalizing);
 			await message.edit({ embeds: [embed] });
 		}
+
+		telemetry?.trackUserKicked({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: message.id,
+			userId: interaction.user.id,
+			participants: Array.from(participants.values()),
+			channelId: interaction.channelId,
+			matchId: eventManager.getMatchId(userEventId) || 'unknown',
+			targetUserId: targetUserId,
+		});
 
 		await interaction.editReply({
 			content: `Successfully kicked <@${targetUserId}> from your event.`,

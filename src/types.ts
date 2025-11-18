@@ -26,6 +26,7 @@ export interface TelemetryEventData {
 	channelId: string;
 	matchId: string;
 	timeToStart?: number;
+	targetUserId?: string;
 }
 
 export interface EventRecorderOptions {
