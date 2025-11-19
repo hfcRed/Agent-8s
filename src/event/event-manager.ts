@@ -1,8 +1,23 @@
 import type { Client, Message } from 'discord.js';
 import { STATUS_MESSAGES, TIMINGS } from '../constants.js';
-import type { EventOperation, EventTimer, ParticipantMap } from '../types.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { LOW_RETRY_OPTIONS, withRetryOrNull } from '../utils/retry.js';
+
+type EventOperation = 'starting' | 'finishing' | 'cancelling' | 'cleanup';
+
+export interface EventTimer {
+	startTime: number;
+	duration?: number;
+	hasStarted: boolean;
+}
+
+export interface ParticipantData {
+	userId: string;
+	role: string;
+	rank: string | null;
+}
+
+export type ParticipantMap = Map<string, ParticipantData>;
 
 /**
  * Manages all in-memory state for active events.

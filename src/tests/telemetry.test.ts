@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TelemetryEventData } from '../telemetry/telemetry.js';
 import {
 	initializeTelemetry,
 	TelemetryService,
 } from '../telemetry/telemetry.js';
-import type { TelemetryEventData } from '../types.js';
 
 vi.mock('../telemetry/event-recorder.js', () => {
 	return {

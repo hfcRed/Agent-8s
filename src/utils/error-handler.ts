@@ -6,7 +6,7 @@ export enum ErrorSeverity {
 	HIGH = 'HIGH',
 }
 
-export interface ErrorContext {
+interface ErrorContext {
 	reason: string;
 	severity: ErrorSeverity;
 	error: unknown;

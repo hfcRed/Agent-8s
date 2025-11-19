@@ -13,7 +13,7 @@ import {
 	TIMINGS,
 	WEAPON_ROLES,
 } from '../constants.js';
-import type { EventTimer, ParticipantMap } from '../types.js';
+import type { EventTimer, ParticipantMap } from '../event/event-manager.js';
 
 export function updateEmbedField(
 	embed: EmbedBuilder,

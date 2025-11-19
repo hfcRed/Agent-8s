@@ -1,6 +1,7 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { ERROR_MESSAGES, MAX_PARTICIPANTS, TIMINGS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
+import type { TelemetryService } from '../telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	checkProcessingStates,
@@ -8,7 +9,6 @@ import {
 	safeReplyToInteraction,
 } from '../utils/helpers.js';
 import { MEDIUM_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
-import type { TelemetryService } from '../telemetry/telemetry.js';
 
 export async function handleRepingCommand(
 	interaction: ChatInputCommandInteraction,

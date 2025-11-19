@@ -1,9 +1,20 @@
 import { createHash } from 'node:crypto';
 import dotenv from 'dotenv';
-import type { TelemetryEventData } from '../types.js';
+import type { ParticipantData } from '../event/event-manager.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { EventRecorder } from './event-recorder.js';
 import { recordTelemetryDispatch, recordTelemetryFailure } from './metrics.js';
+
+export interface TelemetryEventData {
+	guildId: string;
+	eventId: string;
+	userId: string;
+	participants: ParticipantData[];
+	channelId: string;
+	matchId: string;
+	timeToStart?: number;
+	targetUserId?: string;
+}
 
 /**
  * Class for forwarding events to a telemetry backend.

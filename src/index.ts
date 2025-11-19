@@ -28,6 +28,7 @@ import {
 import { handleRoleSelection } from './interactions/menu-handlers.js';
 import { ThreadManager } from './managers/thread-manager.js';
 import { VoiceChannelManager } from './managers/voice-channel-manager.js';
+import { recordInteraction } from './telemetry/metrics.js';
 import { initializeTelemetry } from './telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from './utils/error-handler.js';
 import {
@@ -35,7 +36,6 @@ import {
 	checkProcessingStates,
 	safeReplyToInteraction,
 } from './utils/helpers.js';
-import { recordInteraction } from './telemetry/metrics.js';
 
 dotenv.config({ quiet: true });
 const botToken = process.env.BOT_TOKEN;

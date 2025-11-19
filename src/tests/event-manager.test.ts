@@ -1,7 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { ParticipantMap } from '../event/event-manager.js';
 import { EventManager } from '../event/event-manager.js';
-import type { ParticipantMap } from '../types.js';
 
 describe('EventManager', () => {
 	let eventManager: EventManager;

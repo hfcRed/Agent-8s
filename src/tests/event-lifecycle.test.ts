@@ -14,11 +14,11 @@ import {
 	createEventStartTimeout,
 	startEvent,
 } from '../event/event-lifecycle.js';
+import type { ParticipantMap } from '../event/event-manager.js';
 import { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
-import type { ParticipantMap } from '../types.js';
 
 vi.mock('../utils/retry.js', async () => {
 	const actual =
