@@ -1,0 +1,495 @@
+import type {
+	ButtonInteraction,
+	ChatInputCommandInteraction,
+	Client,
+	GuildMember,
+	GuildTextBasedChannel,
+	RepliableInteraction,
+	TextChannel,
+} from 'discord.js';
+import { PermissionFlagsBits } from 'discord.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+	ADMIN_PERMISSIONS,
+	EXCALIBUR_GUILD_ID,
+	EXCALIBUR_RANKS,
+	PING_ROLE_NAMES,
+} from '../../constants.js';
+import { EventManager } from '../../event/event-manager.js';
+import {
+	botHasPermission,
+	checkProcessingStates,
+	getExcaliburRankOfUser,
+	getPingsForServer,
+	isUserAdmin,
+	safeReplyToInteraction,
+} from '../../utils/helpers.js';
+
+describe('helpers', () => {
+	describe('isUserAdmin', () => {
+		it('should return true when member has Administrator permission', () => {
+			const member = {
+				permissions: {
+					has: vi.fn().mockImplementation((perm) => {
+						return perm === PermissionFlagsBits.Administrator;
+					}),
+				},
+			} as unknown as GuildMember;
+
+			expect(isUserAdmin(member)).toBe(true);
+		});
+
+		it('should return true when member has ManageMessages permission', () => {
+			const member = {
+				permissions: {
+					has: vi.fn().mockImplementation((perm) => {
+						return perm === PermissionFlagsBits.ManageMessages;
+					}),
+				},
+			} as unknown as GuildMember;
+
+			expect(isUserAdmin(member)).toBe(true);
+		});
+
+		it('should return false when member has no admin permissions', () => {
+			const member = {
+				permissions: {
+					has: vi.fn().mockReturnValue(false),
+				},
+			} as unknown as GuildMember;
+
+			expect(isUserAdmin(member)).toBe(false);
+		});
+
+		it('should check all admin permissions', () => {
+			const hasSpy = vi.fn().mockReturnValue(false);
+			const member = {
+				permissions: {
+					has: hasSpy,
+				},
+			} as unknown as GuildMember;
+
+			isUserAdmin(member);
+
+			expect(hasSpy).toHaveBeenCalledTimes(ADMIN_PERMISSIONS.length);
+		});
+	});
+
+	describe('getPingsForServer', () => {
+		it('should return casual ping role when casual is true', () => {
+			const mockCollection = {
+				size: 1,
+				map: (fn: (role: { id: string; name: string }) => string) => [
+					fn({ id: 'role1', name: PING_ROLE_NAMES.casual }),
+				],
+			};
+
+			const interaction = {
+				guild: {
+					roles: {
+						cache: {
+							filter: vi.fn().mockReturnValue(mockCollection),
+						},
+					},
+				},
+			} as unknown as ChatInputCommandInteraction;
+
+			const result = getPingsForServer(interaction, true);
+
+			expect(result).toContain('role1');
+			expect(result).toContain('||');
+		});
+
+		it('should return competitive ping role when casual is false', () => {
+			const mockCollection = {
+				size: 1,
+				map: (fn: (role: { id: string; name: string }) => string) => [
+					fn({ id: 'role2', name: PING_ROLE_NAMES.competitive }),
+				],
+			};
+
+			const interaction = {
+				guild: {
+					roles: {
+						cache: {
+							filter: vi.fn().mockReturnValue(mockCollection),
+						},
+					},
+				},
+			} as unknown as ChatInputCommandInteraction;
+
+			const result = getPingsForServer(interaction, false);
+
+			expect(result).toContain('role2');
+		});
+
+		it('should return null when no guild', () => {
+			const interaction = {
+				guild: null,
+			} as unknown as ChatInputCommandInteraction;
+
+			const result = getPingsForServer(interaction, true);
+
+			expect(result).toBeNull();
+		});
+
+		it('should return null when no matching roles found', () => {
+			const interaction = {
+				guild: {
+					roles: {
+						cache: {
+							filter: vi.fn().mockReturnValue(new Map()),
+						},
+					},
+				},
+			} as unknown as ChatInputCommandInteraction;
+
+			const result = getPingsForServer(interaction, true);
+
+			expect(result).toBeNull();
+		});
+
+		it('should join multiple roles with spaces', () => {
+			const mockCollection = {
+				size: 2,
+				map: (fn: (role: { id: string; name: string }) => string) => [
+					fn({ id: 'role1', name: PING_ROLE_NAMES.casual }),
+					fn({ id: 'role2', name: PING_ROLE_NAMES.casual }),
+				],
+			};
+
+			const interaction = {
+				guild: {
+					roles: {
+						cache: {
+							filter: vi.fn().mockReturnValue(mockCollection),
+						},
+					},
+				},
+			} as unknown as ChatInputCommandInteraction;
+
+			const result = getPingsForServer(interaction, true);
+
+			expect(result).toContain('role1');
+			expect(result).toContain('role2');
+			expect(result).toContain(' ');
+		});
+	});
+
+	describe('botHasPermission', () => {
+		it('should return true when bot has permission', () => {
+			const client = {
+				user: {
+					id: 'bot123',
+				},
+			} as unknown as Client;
+
+			const channel = {
+				isTextBased: () => true,
+				isDMBased: () => false,
+				permissionsFor: vi.fn().mockReturnValue({
+					has: vi.fn().mockReturnValue(true),
+				}),
+			} as unknown as GuildTextBasedChannel;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
+
+			expect(result).toBe(true);
+		});
+
+		it('should return false when bot lacks permission', () => {
+			const client = {
+				user: {
+					id: 'bot123',
+				},
+			} as unknown as Client;
+
+			const channel = {
+				isTextBased: () => true,
+				isDMBased: () => false,
+				permissionsFor: vi.fn().mockReturnValue({
+					has: vi.fn().mockReturnValue(false),
+				}),
+			} as unknown as GuildTextBasedChannel;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
+
+			expect(result).toBe(false);
+		});
+
+		it('should return false when channel is DM', () => {
+			const client = {
+				user: {
+					id: 'bot123',
+				},
+			} as unknown as Client;
+
+			const channel = {
+				isTextBased: () => true,
+				isDMBased: () => true,
+			} as unknown as TextChannel;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
+
+			expect(result).toBe(false);
+		});
+
+		it('should return false when channel is null', () => {
+			const client = {
+				user: {
+					id: 'bot123',
+				},
+			} as unknown as Client;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				null,
+			);
+
+			expect(result).toBe(false);
+		});
+
+		it('should return false when client user is null', () => {
+			const client = {
+				user: null,
+			} as unknown as Client;
+
+			const channel = {
+				isTextBased: () => true,
+				isDMBased: () => false,
+			} as unknown as TextChannel;
+
+			const result = botHasPermission(
+				PermissionFlagsBits.SendMessages,
+				client,
+				channel,
+			);
+
+			expect(result).toBe(false);
+		});
+	});
+
+	describe('getExcaliburRankOfUser', () => {
+		it('should return rank when user has matching role', () => {
+			const interaction = {
+				guild: {
+					id: EXCALIBUR_GUILD_ID,
+				},
+				member: {
+					roles: {
+						valueOf: () =>
+							new Map([
+								[
+									'role1',
+									{
+										id: EXCALIBUR_RANKS['1'].id,
+										name: EXCALIBUR_RANKS['1'].name,
+									},
+								],
+							]),
+					},
+				},
+			} as unknown as ButtonInteraction;
+
+			const result = getExcaliburRankOfUser(interaction);
+
+			expect(result).toBe('1');
+		});
+
+		it('should return null when not in Excalibur guild', () => {
+			const interaction = {
+				guild: {
+					id: 'different-guild',
+				},
+				member: {
+					roles: {
+						valueOf: () => new Map(),
+					},
+				},
+			} as unknown as ButtonInteraction;
+
+			const result = getExcaliburRankOfUser(interaction);
+
+			expect(result).toBeNull();
+		});
+
+		it('should return null when user has no matching rank role', () => {
+			const interaction = {
+				guild: {
+					id: EXCALIBUR_GUILD_ID,
+				},
+				member: {
+					roles: {
+						valueOf: () =>
+							new Map([['other-role', { id: 'other', name: 'Other' }]]),
+					},
+				},
+			} as unknown as ButtonInteraction;
+
+			const result = getExcaliburRankOfUser(interaction);
+
+			expect(result).toBeNull();
+		});
+
+		it('should match by role name if ID does not match', () => {
+			const interaction = {
+				guild: {
+					id: EXCALIBUR_GUILD_ID,
+				},
+				member: {
+					roles: {
+						valueOf: () =>
+							new Map([
+								[
+									'role-wrong-id',
+									{ id: 'wrong-id', name: EXCALIBUR_RANKS['2'].name },
+								],
+							]),
+					},
+				},
+			} as unknown as ButtonInteraction;
+
+			const result = getExcaliburRankOfUser(interaction);
+
+			expect(result).toBe('2');
+		});
+	});
+
+	describe('safeReplyToInteraction', () => {
+		beforeEach(() => {
+			vi.clearAllMocks();
+		});
+
+		it('should reply when interaction has not been replied to', async () => {
+			const replySpy = vi.fn().mockResolvedValue(undefined);
+			const interaction = {
+				replied: false,
+				deferred: false,
+				reply: replySpy,
+			} as unknown as RepliableInteraction;
+
+			await safeReplyToInteraction(interaction, 'Test message');
+
+			expect(replySpy).toHaveBeenCalledWith({
+				content: 'Test message',
+				flags: ['Ephemeral'],
+			});
+		});
+
+		it('should follow up when interaction was already replied', async () => {
+			const followUpSpy = vi.fn().mockResolvedValue(undefined);
+			const interaction = {
+				replied: true,
+				deferred: false,
+				followUp: followUpSpy,
+			} as unknown as RepliableInteraction;
+
+			await safeReplyToInteraction(interaction, 'Test message');
+
+			expect(followUpSpy).toHaveBeenCalledWith({
+				content: 'Test message',
+				flags: ['Ephemeral'],
+			});
+		});
+
+		it('should follow up when interaction was deferred', async () => {
+			const followUpSpy = vi.fn().mockResolvedValue(undefined);
+			const interaction = {
+				replied: false,
+				deferred: true,
+				followUp: followUpSpy,
+			} as unknown as RepliableInteraction;
+
+			await safeReplyToInteraction(interaction, 'Test message');
+
+			expect(followUpSpy).toHaveBeenCalledWith({
+				content: 'Test message',
+				flags: ['Ephemeral'],
+			});
+		});
+
+		it('should not throw when reply fails', async () => {
+			const interaction = {
+				replied: false,
+				deferred: false,
+				reply: vi.fn().mockRejectedValue(new Error('Network error')),
+			} as unknown as RepliableInteraction;
+
+			await expect(
+				safeReplyToInteraction(interaction, 'Test'),
+			).resolves.not.toThrow();
+		});
+	});
+
+	describe('checkProcessingStates', () => {
+		let eventManager: EventManager;
+
+		beforeEach(() => {
+			eventManager = new EventManager();
+		});
+
+		it('should return true when event is starting', async () => {
+			eventManager.setProcessing('msg1', 'starting');
+
+			const result = await checkProcessingStates('msg1', eventManager);
+
+			expect(result).toBe(true);
+		});
+
+		it('should return true when event is finishing', async () => {
+			eventManager.setProcessing('msg1', 'finishing');
+
+			const result = await checkProcessingStates('msg1', eventManager);
+
+			expect(result).toBe(true);
+		});
+
+		it('should return true when event is cancelling', async () => {
+			eventManager.setProcessing('msg1', 'cancelling');
+
+			const result = await checkProcessingStates('msg1', eventManager);
+
+			expect(result).toBe(true);
+		});
+
+		it('should return true when event is in cleanup', async () => {
+			eventManager.setProcessing('msg1', 'cleanup');
+
+			const result = await checkProcessingStates('msg1', eventManager);
+
+			expect(result).toBe(true);
+		});
+
+		it('should return false when event has no processing states', async () => {
+			const result = await checkProcessingStates('msg1', eventManager);
+
+			expect(result).toBe(false);
+		});
+
+		it('should reply to interaction when provided and processing', async () => {
+			eventManager.setProcessing('msg1', 'starting');
+			const interaction = {
+				replied: false,
+				deferred: false,
+				reply: vi.fn().mockResolvedValue(undefined),
+			} as unknown as ButtonInteraction;
+
+			await checkProcessingStates('msg1', eventManager, interaction);
+
+			expect(interaction.reply).toHaveBeenCalled();
+		});
+	});
+});
