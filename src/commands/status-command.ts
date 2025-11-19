@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { type ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { COLORS, ERROR_MESSAGES, TIME_UNITS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
@@ -6,7 +8,16 @@ import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { safeReplyToInteraction } from '../utils/helpers.js';
 
 const BOT_START_TIME = Date.now();
-const BOT_VERSION = process.env.npm_package_version || 'unknown';
+const BOT_VERSION = getBotVersion();
+
+function getBotVersion(): string {
+	try {
+		const versionPath = join(process.cwd(), '.version');
+		return readFileSync(versionPath, 'utf-8').trim();
+	} catch {
+		return 'unknown';
+	}
+}
 
 export async function handleStatusCommand(
 	interaction: ChatInputCommandInteraction,
