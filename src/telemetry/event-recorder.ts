@@ -57,9 +57,10 @@ export class EventRecorder {
 						event_message_id,
 						event_time_to_start,
 						actor_user_id,
+						target_user_id,
 						participants,
 						occurred_at
-					) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, to_timestamp($9 / 1000.0))`,
+					) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, to_timestamp($10 / 1000.0))`,
 						[
 							data.matchId,
 							event,
@@ -68,6 +69,7 @@ export class EventRecorder {
 							data.eventId,
 							data.timeToStart || null,
 							data.userId,
+							data.targetUserId || null,
 							JSON.stringify(data.participants),
 							Date.now(),
 						],
@@ -113,11 +115,11 @@ export class EventRecorder {
 					guild_id TEXT,
 					channel_id TEXT,
 					event_message_id TEXT,
+					event_time_to_start INTEGER,
 					actor_user_id TEXT,
-					participant_ids JSONB,
-					payload JSONB NOT NULL,
-					occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-					recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+					target_user_id TEXT,
+					participants JSONB,
+					occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 				);
 			`),
 			DATABASE_RETRY_OPTIONS,

@@ -173,7 +173,7 @@ describe('EventRecorder', () => {
 			);
 			expect(callArgs).toBeDefined();
 			if (callArgs) {
-				const jsonArg = callArgs[1][7];
+				const jsonArg = callArgs[1][8];
 				expect(typeof jsonArg).toBe('string');
 				expect(JSON.parse(jsonArg)).toEqual(participants);
 			}

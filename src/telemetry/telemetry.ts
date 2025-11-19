@@ -64,6 +64,9 @@ export class TelemetryService {
 				...p,
 				userId: this.hashId(p.userId),
 			})),
+			...(data.targetUserId && {
+				targetUserId: this.hashId(data.targetUserId),
+			}),
 		};
 
 		try {
