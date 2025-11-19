@@ -100,6 +100,7 @@ const eventManager = new EventManager();
 const threadManager = new ThreadManager();
 const voiceChannelManager = new VoiceChannelManager();
 const appClient = createDiscordClient();
+const lockedUsers = new Set<string>();
 
 loginClient(appClient, botToken).then();
 
@@ -109,6 +110,8 @@ appClient.once('clientReady', async () => {
 
 appClient.on('interactionCreate', async (interaction) => {
 	if (!interaction.isRepliable()) return;
+
+	const userId = interaction.user.id;
 
 	try {
 		if (isInShutdownMode()) {
@@ -134,6 +137,17 @@ appClient.on('interactionCreate', async (interaction) => {
 			});
 			return;
 		}
+
+		if (lockedUsers.has(userId)) {
+			await interaction.reply({
+				content:
+					'You already have an action in progress. Please wait for it to complete.',
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		lockedUsers.add(userId);
 
 		recordInteraction(interaction.type.toString());
 
@@ -264,8 +278,10 @@ appClient.on('interactionCreate', async (interaction) => {
 
 		await safeReplyToInteraction(
 			interaction,
-			'An error occurred while processing your request.',
+			'An unexpected error occurred while processing your request. Please try again later.',
 		);
+	} finally {
+		lockedUsers.delete(userId);
 	}
 });
 
