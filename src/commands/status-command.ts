@@ -1,4 +1,5 @@
 import { type ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { COLORS, ERROR_MESSAGES, TIME_UNITS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
@@ -28,7 +29,7 @@ export async function handleStatusCommand(
 		}
 
 		const embed = new EmbedBuilder()
-			.setColor(0x5865f2)
+			.setColor(COLORS.STATUS)
 			.setTitle('Bot Status')
 			.addFields(
 				{
@@ -95,19 +96,25 @@ export async function handleStatusCommand(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while fetching bot status.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.STATUS_ERROR);
 	}
 }
 
 function formatUptime(milliseconds: number) {
 	const units = [
-		{ label: 'd', value: Math.floor(milliseconds / 86400000) },
-		{ label: 'h', value: Math.floor((milliseconds / 3600000) % 24) },
-		{ label: 'm', value: Math.floor((milliseconds / 60000) % 60) },
-		{ label: 's', value: Math.floor((milliseconds / 1000) % 60) },
+		{ label: 'd', value: Math.floor(milliseconds / TIME_UNITS.DAY_IN_MS) },
+		{
+			label: 'h',
+			value: Math.floor((milliseconds / TIME_UNITS.HOUR_IN_MS) % 24),
+		},
+		{
+			label: 'm',
+			value: Math.floor((milliseconds / TIME_UNITS.MINUTE_IN_MS) % 60),
+		},
+		{
+			label: 's',
+			value: Math.floor((milliseconds / TIME_UNITS.SECOND_IN_MS) % 60),
+		},
 	];
 
 	return (

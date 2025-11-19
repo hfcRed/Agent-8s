@@ -7,14 +7,16 @@ import {
 } from 'discord.js';
 import {
 	COLORS,
+	FIELD_NAMES,
+	MATCH_ID_LENGTH,
 	MAX_PARTICIPANTS,
+	START_MESSAGES,
 	STATUS_MESSAGES,
 	TIMINGS,
 } from '../constants.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
-import type { ParticipantMap } from '../types.js';
 import {
 	createEventStartedButtons,
 	createRoleSelectMenu,
@@ -28,7 +30,7 @@ import {
 	withRetry,
 	withRetryOrNull,
 } from '../utils/retry.js';
-import type { EventManager } from './event-manager.js';
+import type { EventManager, ParticipantMap } from './event-manager.js';
 
 export async function startEvent(
 	message: Message,
@@ -46,7 +48,7 @@ export async function startEvent(
 	try {
 		timerData.hasStarted = true;
 		const matchId = eventManager.getMatchId(message.id);
-		const shortId = matchId?.slice(0, 5);
+		const shortId = matchId?.slice(0, MATCH_ID_LENGTH);
 
 		await eventManager.deleteRepingMessageIfExists(message.id, appClient);
 
@@ -58,11 +60,11 @@ export async function startEvent(
 
 		const embed = EmbedBuilder.from(message.embeds[0]).setColor(COLORS.STARTED);
 
-		updateEmbedField(embed, 'Status', STATUS_MESSAGES.STARTED);
+		updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.STARTED);
 		updateEmbedField(
 			embed,
-			'Start',
-			`⏳ <t:${Math.floor(Date.now() / 1000)}:R>`,
+			FIELD_NAMES.START,
+			START_MESSAGES.AT_TIME(Date.now()),
 		);
 
 		const buttonRow = createEventStartedButtons();
@@ -236,7 +238,7 @@ export async function cleanupStaleEvents(
 				const embed = EmbedBuilder.from(message.embeds[0]).setColor(
 					COLORS.CANCELLED,
 				);
-				updateEmbedField(embed, 'Status', STATUS_MESSAGES.EXPIRED);
+				updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.EXPIRED);
 
 				await withRetryOrNull(
 					() => message.edit({ embeds: [embed], components: [] }),
@@ -291,8 +293,8 @@ export async function createEventStartTimeout(
 	const embed = EmbedBuilder.from(message.embeds[0]);
 	updateEmbedField(
 		embed,
-		'Start',
-		`⏳ <t:${Math.floor((Date.now() + timeInMinutes * TIMINGS.MINUTE_IN_MS) / 1000)}:R>`,
+		FIELD_NAMES.START,
+		START_MESSAGES.AT_TIME(Date.now() + timeInMinutes * TIMINGS.MINUTE_IN_MS),
 	);
 	await message.edit({ embeds: [embed] });
 
@@ -323,8 +325,8 @@ export async function createEventStartTimeout(
 				const embed = EmbedBuilder.from(message.embeds[0]);
 				embed.setColor(COLORS.OPEN);
 
-				updateEmbedField(embed, 'Start', '👥 When 8 players have signed up');
-				updateEmbedField(embed, 'Status', STATUS_MESSAGES.OPEN);
+				updateEmbedField(embed, FIELD_NAMES.START, START_MESSAGES.WHEN_FULL);
+				updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.OPEN);
 
 				await message.edit({ embeds: [embed] });
 			}

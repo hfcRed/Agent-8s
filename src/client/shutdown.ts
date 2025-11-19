@@ -1,6 +1,13 @@
 import type { Client } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
-import { AUTHOR_ID, COLORS, STATUS_MESSAGES, TIMINGS } from '../constants.js';
+import {
+	AUTHOR_ID,
+	COLORS,
+	FIELD_NAMES,
+	STATUS_MESSAGES,
+	TIMESTAMP,
+	TIMINGS,
+} from '../constants.js';
 import { cleanupEvent } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
@@ -48,7 +55,7 @@ export async function gracefulShutdown(
 				await withRetryOrNull(
 					() =>
 						author.send(
-							`----------------------------------\n⚠️ Bot shutdown initiated!\n\n**Reason:** ${signal}\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+							`----------------------------------\n⚠️ Bot shutdown initiated!\n\n**Reason:** ${signal}\n**Time:** ${TIMESTAMP.FULL(Date.now())}\n----------------------------------`,
 						),
 					MEDIUM_RETRY_OPTIONS,
 				);
@@ -116,7 +123,11 @@ export async function gracefulShutdown(
 							COLORS.CANCELLED,
 						);
 
-						updateEmbedField(embed, 'Status', STATUS_MESSAGES.SHUTDOWN);
+						updateEmbedField(
+							embed,
+							FIELD_NAMES.STATUS,
+							STATUS_MESSAGES.SHUTDOWN,
+						);
 						await withRetryOrNull(
 							() => message.edit({ embeds: [embed], components: [] }),
 							MEDIUM_RETRY_OPTIONS,
@@ -214,7 +225,7 @@ export async function gracefulShutdown(
 				await withRetryOrNull(
 					() =>
 						author.send(
-							`----------------------------------\n❌ Error during bot shutdown\n\n**Error:** ${errorMessage}\n\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n----------------------------------`,
+							`----------------------------------\n❌ Error during bot shutdown\n\n**Error:** ${errorMessage}\n\n**Time:** ${TIMESTAMP.FULL(Date.now())}\n----------------------------------`,
 						),
 					MEDIUM_RETRY_OPTIONS,
 				);

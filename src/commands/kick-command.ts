@@ -3,7 +3,7 @@ import {
 	EmbedBuilder,
 	type TextChannel,
 } from 'discord.js';
-import { ERROR_MESSAGES } from '../constants.js';
+import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
@@ -48,7 +48,7 @@ export async function handleKickCommand(
 
 		if (targetUserId === userId) {
 			await interaction.editReply({
-				content: 'You cannot kick yourself from your own event.',
+				content: ERROR_MESSAGES.KICK_SELF,
 			});
 			return;
 		}
@@ -56,7 +56,7 @@ export async function handleKickCommand(
 		const participants = eventManager.getParticipants(userEventId);
 		if (!participants || !participants.has(targetUserId)) {
 			await interaction.editReply({
-				content: `<@${targetUserId}> is not signed up for your event.`,
+				content: ERROR_MESSAGES.KICK_NOT_PARTICIPANT(targetUserId),
 			});
 			return;
 		}
@@ -136,7 +136,7 @@ export async function handleKickCommand(
 		});
 
 		await interaction.editReply({
-			content: `Successfully kicked <@${targetUserId}> from your event.`,
+			content: SUCCESS_MESSAGES.KICK_SUCCESS(targetUserId),
 		});
 	} catch (error) {
 		handleError({
@@ -149,9 +149,6 @@ export async function handleKickCommand(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while trying to kick the user.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.KICK_ERROR);
 	}
 }

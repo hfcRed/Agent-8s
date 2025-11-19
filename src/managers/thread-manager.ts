@@ -2,8 +2,10 @@ import {
 	ChannelType,
 	type EmbedBuilder,
 	type TextChannel,
+	ThreadAutoArchiveDuration,
 	type ThreadChannel,
 } from 'discord.js';
+import { THREAD_NAME } from '../constants.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	LOW_RETRY_OPTIONS,
@@ -21,8 +23,8 @@ export class ThreadManager {
 			const thread = await withRetry(
 				() =>
 					channel.threads.create({
-						name: `8s Event - ${shortId}`,
-						autoArchiveDuration: 60,
+						name: THREAD_NAME(shortId),
+						autoArchiveDuration: ThreadAutoArchiveDuration.OneHour,
 						type: ChannelType.PrivateThread,
 						invitable: false,
 					}),

@@ -1,6 +1,6 @@
 import type { StringSelectMenuInteraction } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
-import { ERROR_MESSAGES } from '../constants.js';
+import { ERROR_MESSAGES, FIELD_NAMES, STATUS_MESSAGES } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
 import { updateParticipantFields } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
@@ -49,8 +49,8 @@ export async function handleRoleSelection(
 
 		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
 		const isFinalizing =
-			embed.data.fields?.find((field) => field.name === 'Status')?.value ===
-			'⏳ Finalizing...';
+			embed.data.fields?.find((field) => field.name === FIELD_NAMES.STATUS)
+				?.value === STATUS_MESSAGES.FINALIZING;
 
 		updateParticipantFields(embed, participantMap, timerData, isFinalizing);
 
@@ -66,9 +66,6 @@ export async function handleRoleSelection(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while updating your role selection.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.ROLE_UPDATE_ERROR);
 	}
 }

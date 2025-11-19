@@ -1,35 +1,40 @@
 import { DiscordAPIError, HTTPError } from 'discord.js';
 import pRetry, { AbortError, type Options as RetryOptions } from 'p-retry';
+import {
+	DISCORD_API_ERROR_CODES,
+	HTTP_STATUS_CODES,
+	RETRY_CONFIG,
+} from '../constants.js';
 import { ErrorSeverity, handleError } from './error-handler.js';
 
-const NON_RETRYABLE_DISCORD_CODES = new Set([
-	10003, // Unknown Channel
-	10004, // Unknown Guild
-	10008, // Unknown Message
-	10013, // Unknown User
-	10014, // Unknown Emoji
-	10015, // Unknown Webhook
-	10062, // Unknown Interaction
-	50001, // Missing Access
-	50013, // Missing Permissions
-	50035, // Invalid Form Body
-	50055, // Invalid Guild
+const NON_RETRYABLE_DISCORD_CODES = new Set<number>([
+	DISCORD_API_ERROR_CODES.UNKNOWN_CHANNEL,
+	DISCORD_API_ERROR_CODES.UNKNOWN_GUILD,
+	DISCORD_API_ERROR_CODES.UNKNOWN_MESSAGE,
+	DISCORD_API_ERROR_CODES.UNKNOWN_USER,
+	DISCORD_API_ERROR_CODES.UNKNOWN_EMOJI,
+	DISCORD_API_ERROR_CODES.UNKNOWN_WEBHOOK,
+	DISCORD_API_ERROR_CODES.UNKNOWN_INTERACTION,
+	DISCORD_API_ERROR_CODES.MISSING_ACCESS,
+	DISCORD_API_ERROR_CODES.MISSING_PERMISSIONS,
+	DISCORD_API_ERROR_CODES.INVALID_FORM_BODY,
+	DISCORD_API_ERROR_CODES.INVALID_GUILD,
 ]);
 
-const NON_RETRYABLE_HTTP_CODES = new Set([
-	400, // Bad Request
-	401, // Unauthorized
-	403, // Forbidden
-	404, // Not Found
-	405, // Method Not Allowed
-	409, // Conflict
-	410, // Gone
-	422, // Unprocessable Entity
+const NON_RETRYABLE_HTTP_CODES = new Set<number>([
+	HTTP_STATUS_CODES.BAD_REQUEST,
+	HTTP_STATUS_CODES.UNAUTHORIZED,
+	HTTP_STATUS_CODES.FORBIDDEN,
+	HTTP_STATUS_CODES.NOT_FOUND,
+	HTTP_STATUS_CODES.METHOD_NOT_ALLOWED,
+	HTTP_STATUS_CODES.CONFLICT,
+	HTTP_STATUS_CODES.GONE,
+	HTTP_STATUS_CODES.UNPROCESSABLE_ENTITY,
 ]);
 
 function shouldRetryError(error: unknown) {
 	if (error instanceof DiscordAPIError) {
-		if (error.code === 429) {
+		if (error.code === HTTP_STATUS_CODES.RATE_LIMIT) {
 			return false;
 		}
 
@@ -68,10 +73,7 @@ function abortRetry(error: unknown) {
 }
 
 export const LOW_RETRY_OPTIONS: RetryOptions = {
-	retries: 2,
-	factor: 2,
-	minTimeout: 500,
-	maxTimeout: 5000,
+	...RETRY_CONFIG.LOW,
 	randomize: true,
 	onFailedAttempt: (error) => {
 		if (!shouldRetryError(error.error)) {
@@ -91,10 +93,7 @@ export const LOW_RETRY_OPTIONS: RetryOptions = {
 };
 
 export const MEDIUM_RETRY_OPTIONS: RetryOptions = {
-	retries: 3,
-	factor: 2,
-	minTimeout: 1000,
-	maxTimeout: 10000,
+	...RETRY_CONFIG.MEDIUM,
 	randomize: true,
 	onFailedAttempt: (error) => {
 		if (!shouldRetryError(error.error)) {
@@ -114,10 +113,7 @@ export const MEDIUM_RETRY_OPTIONS: RetryOptions = {
 };
 
 export const HIGH_RETRY_OPTIONS: RetryOptions = {
-	retries: 5,
-	factor: 2,
-	minTimeout: 2000,
-	maxTimeout: 30000,
+	...RETRY_CONFIG.HIGH,
 	randomize: true,
 	onFailedAttempt: (error) => {
 		if (!shouldRetryError(error.error)) {
@@ -137,10 +133,7 @@ export const HIGH_RETRY_OPTIONS: RetryOptions = {
 };
 
 export const DATABASE_RETRY_OPTIONS: RetryOptions = {
-	retries: 4,
-	factor: 2,
-	minTimeout: 1500,
-	maxTimeout: 15000,
+	...RETRY_CONFIG.DATABASE,
 	randomize: true,
 	onFailedAttempt: (error) => {
 		if (!shouldRetryError(error.error)) {
@@ -149,29 +142,6 @@ export const DATABASE_RETRY_OPTIONS: RetryOptions = {
 
 		handleError({
 			reason: `Database retry attempt ${error.attemptNumber} failed`,
-			severity: ErrorSeverity.LOW,
-			error: error,
-			metadata: {
-				attemptsLeft: error.retriesLeft,
-				attemptNumber: error.attemptNumber,
-			},
-		});
-	},
-};
-
-export const TEST_RETRY_OPTIONS: RetryOptions = {
-	retries: 2,
-	factor: 1,
-	minTimeout: 1,
-	maxTimeout: 1,
-	randomize: false,
-	onFailedAttempt: (error) => {
-		if (!shouldRetryError(error.error)) {
-			abortRetry(error);
-		}
-
-		handleError({
-			reason: `Retry attempt ${error.attemptNumber} failed`,
 			severity: ErrorSeverity.LOW,
 			error: error,
 			metadata: {

@@ -8,6 +8,7 @@ import {
 import {
 	COLORS,
 	ERROR_MESSAGES,
+	FIELD_NAMES,
 	MAX_PARTICIPANTS,
 	STATUS_MESSAGES,
 	TIMINGS,
@@ -105,10 +106,7 @@ export async function handleSignUpButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while processing your sign-up.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.SIGN_UP_ERROR);
 	}
 }
 
@@ -170,10 +168,7 @@ export async function handleSignOutButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while processing your sign-out.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.SIGN_OUT_ERROR);
 	}
 }
 
@@ -212,7 +207,7 @@ export async function handleCancelButton(
 				COLORS.CANCELLED,
 			);
 
-			updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
+			updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.CANCELLED);
 
 			await interaction.editReply({ embeds: [embed], components: [] });
 
@@ -254,10 +249,7 @@ export async function handleCancelButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while cancelling the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.CANCEL_ERROR);
 	}
 }
 
@@ -315,10 +307,7 @@ export async function handleStartNowButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while starting the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.START_ERROR);
 	}
 }
 
@@ -357,7 +346,7 @@ export async function handleFinishButton(
 				COLORS.FINISHED,
 			);
 
-			updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
+			updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.FINISHED);
 
 			await interaction.editReply({ embeds: [embed], components: [] });
 
@@ -399,10 +388,7 @@ export async function handleFinishButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while finishing the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.FINISH_ERROR);
 	}
 }
 
@@ -488,10 +474,7 @@ export async function handleDropOutButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while dropping out of the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.DROP_OUT_ERROR);
 	}
 }
 
@@ -583,10 +566,7 @@ export async function handleDropInButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while dropping in to the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.DROP_IN_ERROR);
 	}
 }
 

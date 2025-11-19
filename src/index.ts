@@ -116,7 +116,7 @@ appClient.on('interactionCreate', async (interaction) => {
 	try {
 		if (isInShutdownMode()) {
 			await interaction.reply({
-				content: 'Bot is shutting down. Please try again later.',
+				content: ERROR_MESSAGES.SHUTDOWN_WARNING,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -140,8 +140,7 @@ appClient.on('interactionCreate', async (interaction) => {
 
 		if (lockedUsers.has(userId)) {
 			await interaction.reply({
-				content:
-					'You already have an action in progress. Please wait for it to complete.',
+				content: ERROR_MESSAGES.ACTION_IN_PROGRESS,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -276,10 +275,7 @@ appClient.on('interactionCreate', async (interaction) => {
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An unexpected error occurred while processing your request. Please try again later.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.UNEXPECTED_ERROR);
 	} finally {
 		lockedUsers.delete(userId);
 	}

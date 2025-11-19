@@ -1,6 +1,7 @@
 import http from 'node:http';
 import process from 'node:process';
 import client from 'prom-client';
+import { DEFAULT_METRICS_PORT } from '../constants.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 
 const register = new client.Registry();
@@ -35,7 +36,10 @@ const telemetryFailureCounter = new client.Counter({
 	registers: [register],
 });
 
-const port = Number.parseInt(process.env.METRICS_PORT || '9464', 10);
+const port = Number.parseInt(
+	process.env.METRICS_PORT || String(DEFAULT_METRICS_PORT),
+	10,
+);
 
 let serverStarted = false;
 let server: http.Server | null = null;

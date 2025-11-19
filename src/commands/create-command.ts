@@ -64,6 +64,18 @@ export async function handleCreateCommand(
 		const message = await reply.fetch();
 		const matchId = randomUUID();
 
+		eventManager.setCreator(message.id, interaction.user.id);
+		eventManager.setMatchId(message.id, matchId);
+		eventManager.setChannelId(message.id, message.channelId);
+
+		eventManager.setTimer(message.id, {
+			startTime,
+			duration: timeInMinutes
+				? timeInMinutes * TIMINGS.MINUTE_IN_MS
+				: undefined,
+			hasStarted: false,
+		});
+
 		eventManager.setParticipants(
 			message.id,
 			new Map([
@@ -77,16 +89,7 @@ export async function handleCreateCommand(
 				],
 			]),
 		);
-		eventManager.setCreator(message.id, interaction.user.id);
-		eventManager.setTimer(message.id, {
-			startTime,
-			duration: timeInMinutes
-				? timeInMinutes * TIMINGS.MINUTE_IN_MS
-				: undefined,
-			hasStarted: false,
-		});
-		eventManager.setMatchId(message.id, matchId);
-		eventManager.setChannelId(message.id, message.channelId);
+
 		if (interaction.guildId) {
 			eventManager.setGuildId(message.id, interaction.guildId);
 		}
@@ -123,9 +126,6 @@ export async function handleCreateCommand(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while creating the event. Please try again.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.CREATE_ERROR);
 	}
 }
