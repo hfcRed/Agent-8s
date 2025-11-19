@@ -1,4 +1,4 @@
-import { recordErrorMetric } from '../telemetry/metrics.js';
+import { recordError } from '../telemetry/metrics.js';
 
 export enum ErrorSeverity {
 	LOW = 'LOW',
@@ -6,7 +6,7 @@ export enum ErrorSeverity {
 	HIGH = 'HIGH',
 }
 
-export interface ErrorContext {
+interface ErrorContext {
 	reason: string;
 	severity: ErrorSeverity;
 	error: unknown;
@@ -32,7 +32,7 @@ export function handleError(context: ErrorContext) {
 	console.error(logParts.join('\n'));
 
 	if (!context.skipMetrics) {
-		recordErrorMetric(reason, severity);
+		recordError(reason, severity);
 	}
 }
 

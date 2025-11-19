@@ -1,6 +1,5 @@
 import {
 	type ButtonInteraction,
-	type ChatInputCommandInteraction,
 	type Client,
 	EmbedBuilder,
 	type GuildMember,
@@ -9,8 +8,8 @@ import {
 import {
 	COLORS,
 	ERROR_MESSAGES,
+	FIELD_NAMES,
 	MAX_PARTICIPANTS,
-	PROCESSING_MESSAGES,
 	STATUS_MESSAGES,
 	TIMINGS,
 	WEAPON_ROLES,
@@ -20,11 +19,10 @@ import {
 	createEventStartTimeout,
 	startEvent,
 } from '../event/event-lifecycle.js';
-import type { EventManager } from '../event/event-manager.js';
+import type { EventManager, ParticipantMap } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
-import type { ParticipantMap } from '../types.js';
 import {
 	updateEmbedField,
 	updateParticipantFields,
@@ -108,10 +106,7 @@ export async function handleSignUpButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while processing your sign-up.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.SIGN_UP_ERROR);
 	}
 }
 
@@ -173,10 +168,7 @@ export async function handleSignOutButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while processing your sign-out.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.SIGN_OUT_ERROR);
 	}
 }
 
@@ -215,7 +207,7 @@ export async function handleCancelButton(
 				COLORS.CANCELLED,
 			);
 
-			updateEmbedField(embed, 'Status', STATUS_MESSAGES.CANCELLED);
+			updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.CANCELLED);
 
 			await interaction.editReply({ embeds: [embed], components: [] });
 
@@ -257,10 +249,7 @@ export async function handleCancelButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while cancelling the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.CANCEL_ERROR);
 	}
 }
 
@@ -318,10 +307,7 @@ export async function handleStartNowButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while starting the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.START_ERROR);
 	}
 }
 
@@ -360,7 +346,7 @@ export async function handleFinishButton(
 				COLORS.FINISHED,
 			);
 
-			updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINISHED);
+			updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.FINISHED);
 
 			await interaction.editReply({ embeds: [embed], components: [] });
 
@@ -402,10 +388,7 @@ export async function handleFinishButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while finishing the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.FINISH_ERROR);
 	}
 }
 
@@ -458,11 +441,12 @@ export async function handleDropOutButton(
 		}
 
 		const voiceChannelIds = eventManager.getVoiceChannels(messageId);
-		if (voiceChannelIds) {
+		if (voiceChannelIds && interaction.guild) {
 			await voiceChannelManager.revokeAccessFromChannels(
 				appClient,
 				voiceChannelIds,
 				userId,
+				interaction.guild,
 			);
 		}
 
@@ -490,10 +474,7 @@ export async function handleDropOutButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while dropping out of the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.DROP_OUT_ERROR);
 	}
 }
 
@@ -585,10 +566,7 @@ export async function handleDropInButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while dropping in to the event.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.DROP_IN_ERROR);
 	}
 }
 
@@ -633,60 +611,4 @@ async function updateParticipantEmbed(
 	}
 
 	await interaction.editReply({ embeds: [embed] });
-}
-
-export async function checkProcessingStates(
-	messageId: string,
-	eventManager: EventManager,
-	interaction?: ButtonInteraction | ChatInputCommandInteraction,
-) {
-	if (eventManager.isProcessing(messageId, 'starting')) {
-		if (interaction) {
-			await safeReplyToInteraction(
-				interaction,
-				PROCESSING_MESSAGES.STILL_STARTING,
-			);
-		}
-		return true;
-	}
-	if (eventManager.isProcessing(messageId, 'finishing')) {
-		if (interaction) {
-			await safeReplyToInteraction(
-				interaction,
-				PROCESSING_MESSAGES.ALREADY_FINISHING,
-			);
-		}
-		return true;
-	}
-
-	if (eventManager.isProcessing(messageId, 'cancelling')) {
-		if (interaction) {
-			await safeReplyToInteraction(
-				interaction,
-				PROCESSING_MESSAGES.ALREADY_CANCELLING,
-			);
-		}
-		return true;
-	}
-
-	if (eventManager.isProcessing(messageId, 'cleanup')) {
-		if (interaction) {
-			await safeReplyToInteraction(
-				interaction,
-				PROCESSING_MESSAGES.CLEANING_UP,
-			);
-		}
-		return true;
-	}
-
-	if (
-		interaction &&
-		'message' in interaction &&
-		eventManager.isEventFinalizing(interaction.message)
-	) {
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.EVENT_FINALIZING);
-		return true;
-	}
-
-	return false;
 }

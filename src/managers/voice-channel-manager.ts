@@ -6,6 +6,7 @@ import {
 	PermissionFlagsBits,
 	type TextChannel,
 } from 'discord.js';
+import { VOICE_CHANNEL_NAME, VOICE_CHANNEL_NAMES } from '../constants.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	LOW_RETRY_OPTIONS,
@@ -25,15 +26,14 @@ export class VoiceChannelManager {
 		shortId: string,
 		appClient: Client,
 	) {
-		const voiceNames = ['👥 Group', '🔵 Team A', '🔴 Team B'];
 		const voiceChannels: string[] = [];
 
-		for (let i = 1; i <= 3; i++) {
+		for (let i = 0; i < VOICE_CHANNEL_NAMES.length; i++) {
 			try {
 				const voiceChannel = await withRetry(
 					() =>
 						guild.channels.create({
-							name: `${voiceNames[i - 1]} - ${shortId}`,
+							name: VOICE_CHANNEL_NAME(VOICE_CHANNEL_NAMES[i], shortId),
 							type: ChannelType.GuildVoice,
 							parent: parentChannel.parent,
 							permissionOverwrites: [
@@ -74,7 +74,7 @@ export class VoiceChannelManager {
 					severity: ErrorSeverity.MEDIUM,
 					error,
 					metadata: {
-						channelName: voiceNames[i - 1],
+						channelName: VOICE_CHANNEL_NAMES[i],
 						guildId: guild.id,
 						shortId,
 					},
@@ -163,12 +163,35 @@ export class VoiceChannelManager {
 		appClient: Client,
 		channelIds: string[],
 		userId: string,
+		guild: Guild,
 	) {
 		await Promise.allSettled(
 			channelIds.map((channelId) =>
 				this.revokeAccess(appClient, channelId, userId),
 			),
 		);
+
+		await this.disconnectUser(userId, guild);
+	}
+
+	async disconnectUser(userId: string, guild: Guild) {
+		try {
+			const member = await withRetry(
+				() => guild.members.fetch(userId),
+				MEDIUM_RETRY_OPTIONS,
+			);
+
+			if (member.voice.channelId) {
+				await withRetry(() => member.voice.disconnect(), MEDIUM_RETRY_OPTIONS);
+			}
+		} catch (error) {
+			handleError({
+				reason: 'Failed to disconnect user from voice channel',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { userId },
+			});
+		}
 	}
 
 	async deleteChannel(appClient: Client, channelId: string) {

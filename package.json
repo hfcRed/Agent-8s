@@ -8,10 +8,11 @@
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"check": "biome check --write .",
+		"typecheck": "tsc --noEmit",
 		"test": "vitest --run",
 		"test:watch": "vitest --watch",
 		"test:coverage": "vitest --coverage",
-		"run-all": "pnpm run format && pnpm run lint && pnpm run check && pnpm run test"
+		"run-all": "pnpm run format && pnpm run lint && pnpm run check && pnpm run typecheck && pnpm run test"
 	},
 	"packageManager": "pnpm@10.12.4",
 	"dependencies": {

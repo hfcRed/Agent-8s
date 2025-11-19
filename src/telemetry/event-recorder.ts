@@ -1,10 +1,13 @@
 import { Pool } from 'pg';
-import type { EventRecorderOptions, TelemetryEventData } from '../types.js';
+import { DEFAULT_SCHEMA, DEFAULT_TABLE } from '../constants.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { DATABASE_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
+import type { TelemetryEventData } from './telemetry.js';
 
-export const DEFAULT_SCHEMA = 'public';
-export const DEFAULT_TABLE = 'telemetry_events';
+interface EventRecorderOptions {
+	schema?: string;
+	table?: string;
+}
 
 /**
  * Class for persisting telemetry events to a PostgreSQL database.

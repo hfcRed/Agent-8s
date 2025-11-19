@@ -1,4 +1,4 @@
-name: Version Bump Check
+name: Version Check
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   check-version:
-    name: Check Version Bump in package.json
+    name: Check version bump in .version file
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
@@ -18,7 +18,7 @@ jobs:
       - name: Get PR branch version
         id: pr-version
         run: |
-          VERSION=$(jq -r '.version' package.json)
+          VERSION=$(cat .version | tr -d '[:space:]')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "PR branch version: $VERSION"
 
@@ -30,7 +30,7 @@ jobs:
       - name: Get main branch version
         id: main-version
         run: |
-          VERSION=$(jq -r '.version' package.json)
+          VERSION=$(cat .version | tr -d '[:space:]')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Main branch version: $VERSION"
 
@@ -44,8 +44,8 @@ jobs:
           echo "  PR:   $PR_VERSION"
           
           if [ "$PR_VERSION" = "$MAIN_VERSION" ]; then
-            echo "❌ Error: Version has not been bumped in package.json"
-            echo "Please update the version in package.json before merging to main."
+            echo "❌ Error: Version has not been bumped in .version file"
+            echo "Please update the version in .version before merging to main."
             exit 1
           else
             echo "✅ Version has been bumped from $MAIN_VERSION to $PR_VERSION"

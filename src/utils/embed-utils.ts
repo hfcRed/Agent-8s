@@ -8,12 +8,16 @@ import {
 } from 'discord.js';
 import {
 	COLORS,
+	FIELD_NAMES,
 	MAX_PARTICIPANTS,
+	PARTICIPANT_FIELD_NAME,
+	START_MESSAGES,
 	STATUS_MESSAGES,
 	TIMINGS,
+	TITLES,
 	WEAPON_ROLES,
 } from '../constants.js';
-import type { EventTimer, ParticipantMap } from '../types.js';
+import type { EventTimer, ParticipantMap } from '../event/event-manager.js';
 
 export function updateEmbedField(
 	embed: EmbedBuilder,
@@ -54,30 +58,31 @@ export function createEventEmbed(
 	const startTime = Date.now();
 	const embedFields = [
 		{
-			name: 'Participants (1)',
+			name: PARTICIPANT_FIELD_NAME(1),
 			value: `- <@${userId}>`,
 			inline: true,
 		},
 		{
-			name: 'Role',
+			name: FIELD_NAMES.ROLE,
 			value: `- ${WEAPON_ROLES[0]}`,
 			inline: true,
 		},
 		{
-			name: 'Start',
+			name: FIELD_NAMES.START,
 			value: timeInMinutes
-				? `⏳ <t:${Math.floor((startTime + timeInMinutes * TIMINGS.MINUTE_IN_MS) / 1000)}:R>`
-				: '👥 When 8 players have signed up',
+				? START_MESSAGES.AT_TIME(
+						startTime + timeInMinutes * TIMINGS.MINUTE_IN_MS,
+					)
+				: START_MESSAGES.WHEN_FULL,
 		},
-		{ name: 'Status', value: STATUS_MESSAGES.OPEN },
+		{ name: FIELD_NAMES.STATUS, value: STATUS_MESSAGES.OPEN },
 	];
-
 	const embed = new EmbedBuilder()
 		.setAuthor({
 			name: username,
 			iconURL: avatarUrl,
 		})
-		.setTitle(`${casual ? '[Casual] ' : '[Competitive]'} 8s Sign Up`)
+		.setTitle(casual ? TITLES.CASUAL : TITLES.COMPETITIVE)
 		.addFields(embedFields)
 		.setColor(COLORS.OPEN);
 
@@ -161,8 +166,8 @@ export function updateParticipantFields(
 ) {
 	updateEmbedFieldByMatch(
 		embed,
-		'Participants',
-		`Participants (${participantMap.size})`,
+		FIELD_NAMES.PARTICIPANTS,
+		PARTICIPANT_FIELD_NAME(participantMap.size),
 		Array.from(participantMap.values())
 			.map((p) => `- <@${p.userId}>`)
 			.join('\n'),
@@ -170,7 +175,7 @@ export function updateParticipantFields(
 
 	updateEmbedField(
 		embed,
-		'Role',
+		FIELD_NAMES.ROLE,
 		Array.from(participantMap.values())
 			.map((p) => `- ${p.role || 'None'}`)
 			.join('\n'),
@@ -184,7 +189,7 @@ export function updateParticipantFields(
 		participantMap.size === MAX_PARTICIPANTS
 			? STATUS_MESSAGES.READY
 			: STATUS_MESSAGES.OPEN;
-	updateEmbedField(embed, 'Status', status);
+	updateEmbedField(embed, FIELD_NAMES.STATUS, status);
 
 	const timeElapsed = Date.now() - timerData.startTime;
 	const timeIsUpOrNotSet =
@@ -196,6 +201,6 @@ export function updateParticipantFields(
 		!timerData.hasStarted
 	) {
 		embed.setColor(COLORS.FINALIZING);
-		updateEmbedField(embed, 'Status', STATUS_MESSAGES.FINALIZING);
+		updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.FINALIZING);
 	}
 }

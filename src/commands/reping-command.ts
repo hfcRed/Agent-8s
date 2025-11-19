@@ -1,13 +1,25 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
-import { ERROR_MESSAGES, MAX_PARTICIPANTS, TIMINGS } from '../constants.js';
+import {
+	ERROR_MESSAGES,
+	MAX_PARTICIPANTS,
+	REPING_MESSAGE,
+	TIMINGS,
+	TITLES,
+} from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
+import type { TelemetryService } from '../telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
-import { getPingsForServer, safeReplyToInteraction } from '../utils/helpers.js';
+import {
+	checkProcessingStates,
+	getPingsForServer,
+	safeReplyToInteraction,
+} from '../utils/helpers.js';
 import { MEDIUM_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
 
 export async function handleRepingCommand(
 	interaction: ChatInputCommandInteraction,
 	eventManager: EventManager,
+	telemetry?: TelemetryService,
 ) {
 	try {
 		await interaction.deferReply();
@@ -22,6 +34,13 @@ export async function handleRepingCommand(
 			return;
 		}
 
+		const processing = await checkProcessingStates(
+			userEventId,
+			eventManager,
+			interaction,
+		);
+		if (processing) return;
+
 		const lastUsed = eventManager.getRepingCooldown(userEventId);
 		const now = Date.now();
 
@@ -33,7 +52,7 @@ export async function handleRepingCommand(
 				const remainingMinutes = Math.ceil(remainingMs / 60000);
 
 				await interaction.editReply({
-					content: `Please wait ${remainingMinutes} more minute${remainingMinutes !== 1 ? 's' : ''} before re-pinging again.`,
+					content: ERROR_MESSAGES.REPING_COOLDOWN(remainingMinutes),
 				});
 				return;
 			}
@@ -72,7 +91,7 @@ export async function handleRepingCommand(
 		}
 
 		const embedTitle = message.embeds[0].title;
-		const isCasual = embedTitle?.includes('[Casual]') ?? false;
+		const isCasual = embedTitle?.includes(TITLES.CASUAL_PREFIX) ?? false;
 
 		const participants = eventManager.getParticipants(userEventId);
 		const currentCount = participants?.size ?? 0;
@@ -102,7 +121,7 @@ export async function handleRepingCommand(
 		const messageUrl = `https://discord.com/channels/${guildId}/${channelId}/${userEventId}`;
 
 		const reply = await interaction.editReply({
-			content: `${rolePing}\nLooking for **+${missingPlayers}** for ${messageUrl}`,
+			content: REPING_MESSAGE(rolePing, missingPlayers, messageUrl),
 		});
 
 		const repingMessage = await withRetry(
@@ -112,6 +131,15 @@ export async function handleRepingCommand(
 
 		eventManager.setRepingMessage(userEventId, repingMessage.id);
 		eventManager.setRepingCooldown(userEventId, now);
+
+		telemetry?.trackEventRepinged({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: message.id,
+			userId: interaction.user.id,
+			participants: Array.from(participants?.values() || []),
+			channelId: interaction.channelId,
+			matchId: eventManager.getMatchId(userEventId) || 'unknown',
+		});
 	} catch (error) {
 		handleError({
 			reason: 'Error executing reping command',
@@ -123,9 +151,6 @@ export async function handleRepingCommand(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			'An error occurred while trying to re-ping roles.',
-		);
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.REPING_ERROR);
 	}
 }

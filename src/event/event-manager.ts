@@ -1,8 +1,23 @@
 import type { Client, Message } from 'discord.js';
-import { STATUS_MESSAGES, TIMINGS } from '../constants.js';
-import type { EventOperation, EventTimer, ParticipantMap } from '../types.js';
+import { FIELD_NAMES, STATUS_MESSAGES, TIMINGS } from '../constants.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { LOW_RETRY_OPTIONS, withRetryOrNull } from '../utils/retry.js';
+
+type EventOperation = 'starting' | 'finishing' | 'cancelling' | 'cleanup';
+
+export interface EventTimer {
+	startTime: number;
+	duration?: number;
+	hasStarted: boolean;
+}
+
+export interface ParticipantData {
+	userId: string;
+	role: string;
+	rank: string | null;
+}
+
+export type ParticipantMap = Map<string, ParticipantData>;
 
 /**
  * Manages all in-memory state for active events.
@@ -285,7 +300,9 @@ export class EventManager {
 		const embed = message.embeds[0];
 		if (!embed || !embed.fields) return false;
 
-		const statusField = embed.fields.find((field) => field.name === 'Status');
+		const statusField = embed.fields.find(
+			(field) => field.name === FIELD_NAMES.STATUS,
+		);
 		return statusField?.value === STATUS_MESSAGES.FINALIZING;
 	}
 

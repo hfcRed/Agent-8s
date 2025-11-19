@@ -1,11 +1,26 @@
 import http from 'node:http';
 import process from 'node:process';
 import client from 'prom-client';
+import { DEFAULT_METRICS_PORT } from '../constants.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 
 const register = new client.Registry();
 
 client.collectDefaultMetrics({ register });
+
+const interactionCounter = new client.Counter({
+	name: 'application_interactions_total',
+	help: 'Count of interactions received by the application',
+	labelNames: ['type'],
+	registers: [register],
+});
+
+const errorCounter = new client.Counter({
+	name: 'application_errors_total',
+	help: 'Count of application errors by reason and severity',
+	labelNames: ['reason', 'severity'],
+	registers: [register],
+});
 
 const telemetryDispatchCounter = new client.Counter({
 	name: 'telemetry_events_forwarded_total',
@@ -21,14 +36,10 @@ const telemetryFailureCounter = new client.Counter({
 	registers: [register],
 });
 
-const errorCounter = new client.Counter({
-	name: 'application_errors_total',
-	help: 'Count of application errors by reason and severity',
-	labelNames: ['reason', 'severity'],
-	registers: [register],
-});
-
-const port = Number.parseInt(process.env.METRICS_PORT || '9464', 10);
+const port = Number.parseInt(
+	process.env.METRICS_PORT || String(DEFAULT_METRICS_PORT),
+	10,
+);
 
 let serverStarted = false;
 let server: http.Server | null = null;
@@ -114,6 +125,17 @@ export async function stopMetricsServer() {
 	});
 }
 
+export function recordInteraction(type: string) {
+	interactionCounter.inc({ type });
+}
+
+export function recordError(reason: string, severity: ErrorSeverity) {
+	errorCounter.inc({
+		reason: reason,
+		severity: severity,
+	});
+}
+
 export function recordTelemetryDispatch(
 	eventName: string,
 	guildId: string,
@@ -135,12 +157,5 @@ export function recordTelemetryFailure(
 		event: eventName,
 		guild: guildId,
 		channel: channelId,
-	});
-}
-
-export function recordErrorMetric(reason: string, severity: ErrorSeverity) {
-	errorCounter.inc({
-		reason: reason,
-		severity: severity,
 	});
 }

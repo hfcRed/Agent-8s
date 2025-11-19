@@ -17,7 +17,6 @@ import { ERROR_MESSAGES, TIMINGS } from './constants.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
 import { EventManager } from './event/event-manager.js';
 import {
-	checkProcessingStates,
 	handleCancelButton,
 	handleDropInButton,
 	handleDropOutButton,
@@ -29,9 +28,14 @@ import {
 import { handleRoleSelection } from './interactions/menu-handlers.js';
 import { ThreadManager } from './managers/thread-manager.js';
 import { VoiceChannelManager } from './managers/voice-channel-manager.js';
+import { recordInteraction } from './telemetry/metrics.js';
 import { initializeTelemetry } from './telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from './utils/error-handler.js';
-import { botHasPermission, safeReplyToInteraction } from './utils/helpers.js';
+import {
+	botHasPermission,
+	checkProcessingStates,
+	safeReplyToInteraction,
+} from './utils/helpers.js';
 
 dotenv.config({ quiet: true });
 const botToken = process.env.BOT_TOKEN;
@@ -47,14 +51,6 @@ if (!botToken) {
 
 const telemetryUrl = process.env.TELEMETRY_URL;
 const telemetryToken = process.env.TELEMETRY_TOKEN;
-
-const telemetry = initializeTelemetry(telemetryUrl, telemetryToken);
-const eventManager = new EventManager();
-const threadManager = new ThreadManager();
-const voiceChannelManager = new VoiceChannelManager();
-const appClient = createDiscordClient();
-
-loginClient(appClient, botToken).then();
 
 const commands = [
 	new SlashCommandBuilder()
@@ -99,51 +95,42 @@ const commands = [
 		.toJSON(),
 ];
 
+const telemetry = initializeTelemetry(telemetryUrl, telemetryToken);
+const eventManager = new EventManager();
+const threadManager = new ThreadManager();
+const voiceChannelManager = new VoiceChannelManager();
+const appClient = createDiscordClient();
+const lockedUsers = new Set<string>();
+
+loginClient(appClient, botToken).then();
+
 appClient.once('clientReady', async () => {
 	await registerCommands(appClient, botToken, commands);
 });
 
 appClient.on('interactionCreate', async (interaction) => {
-	if (isInShutdownMode()) {
-		if (!interaction.isRepliable()) return;
+	if (!interaction.isRepliable()) return;
 
-		await interaction.reply({
-			content: 'Bot is shutting down. Please try again later.',
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
-
-	const channel = interaction.channel;
-	const bot = appClient.user?.id;
-
-	const permitted = !!(
-		interaction.guild &&
-		interaction.member &&
-		interaction.member instanceof GuildMember &&
-		channel &&
-		bot &&
-		!channel.isDMBased() &&
-		channel.permissionsFor(bot)?.has('ViewChannel')
-	);
-
-	if (
-		!permitted &&
-		(interaction.isMessageComponent() || interaction.isChatInputCommand())
-	) {
-		await interaction.reply({
-			content: ERROR_MESSAGES.NO_BOT_PERMISSIONS,
-			flags: ['Ephemeral'],
-		});
-		return;
-	}
+	const userId = interaction.user.id;
 
 	try {
-		if (
+		if (isInShutdownMode()) {
+			await interaction.reply({
+				content: ERROR_MESSAGES.SHUTDOWN_WARNING,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		const isValidInteraction =
+			appClient.user &&
 			interaction.guild &&
-			interaction.isChatInputCommand() &&
-			!botHasPermission('ViewChannel', appClient, interaction.channel)
-		) {
+			interaction.channel &&
+			!interaction.channel.isDMBased() &&
+			interaction.member instanceof GuildMember &&
+			botHasPermission('ViewChannel', appClient, interaction.channel);
+
+		if (!isValidInteraction) {
 			await interaction.reply({
 				content: ERROR_MESSAGES.NO_BOT_PERMISSIONS,
 				flags: ['Ephemeral'],
@@ -151,55 +138,51 @@ appClient.on('interactionCreate', async (interaction) => {
 			return;
 		}
 
-		if (
-			interaction.isChatInputCommand() &&
-			interaction.commandName === 'create'
-		) {
-			await handleCreateCommand(
-				interaction,
-				eventManager,
-				threadManager,
-				voiceChannelManager,
-				telemetry,
-			);
+		if (lockedUsers.has(userId)) {
+			await interaction.reply({
+				content: ERROR_MESSAGES.ACTION_IN_PROGRESS,
+				flags: ['Ephemeral'],
+			});
 			return;
 		}
 
-		if (
-			interaction.isChatInputCommand() &&
-			interaction.commandName === 'status'
-		) {
-			await handleStatusCommand(interaction, eventManager, telemetry);
-			return;
-		}
+		lockedUsers.add(userId);
 
-		if (
-			interaction.isChatInputCommand() &&
-			interaction.commandName === 're-ping'
-		) {
-			await handleRepingCommand(interaction, eventManager);
-			return;
-		}
+		recordInteraction(interaction.type.toString());
 
-		if (
-			interaction.isChatInputCommand() &&
-			interaction.commandName === 'kick'
-		) {
-			await handleKickCommand(
-				interaction,
-				eventManager,
-				threadManager,
-				voiceChannelManager,
-			);
+		if (interaction.isChatInputCommand()) {
+			const commandHandlers: Record<string, () => Promise<void>> = {
+				reping: () => handleRepingCommand(interaction, eventManager, telemetry),
+				status: () => handleStatusCommand(interaction, eventManager, telemetry),
+				create: () =>
+					handleCreateCommand(
+						interaction,
+						eventManager,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					),
+				kick: () =>
+					handleKickCommand(
+						interaction,
+						eventManager,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					),
+			};
+
+			const handler =
+				commandHandlers[interaction.commandName.replaceAll('-', '')];
+
+			if (handler) await handler();
 			return;
 		}
 
 		if (!interaction.isMessageComponent()) return;
 
 		const messageId = interaction.message.id;
-		const participantMap = eventManager.getParticipants(messageId);
-
-		if (!participantMap) return;
+		if (!eventManager.getParticipants(messageId)) return;
 
 		if (interaction.isButton()) {
 			const isProcessing = await checkProcessingStates(
@@ -207,79 +190,74 @@ appClient.on('interactionCreate', async (interaction) => {
 				eventManager,
 				interaction,
 			);
-
 			if (isProcessing) return;
 
-			switch (interaction.customId) {
-				case 'signup':
-					await handleSignUpButton(
+			const buttonHandlers: Record<string, () => Promise<void>> = {
+				signup: () =>
+					handleSignUpButton(
 						interaction,
 						eventManager,
 						threadManager,
 						voiceChannelManager,
 						telemetry,
-					);
-					break;
-				case 'signout':
-					await handleSignOutButton(
+					),
+				signout: () =>
+					handleSignOutButton(
 						interaction,
 						eventManager,
 						threadManager,
 						voiceChannelManager,
 						telemetry,
-					);
-					break;
-				case 'cancel':
-					await handleCancelButton(
-						interaction,
-						eventManager,
-						appClient,
-						threadManager,
-						voiceChannelManager,
-						telemetry,
-					);
-					break;
-				case 'startnow':
-					await handleStartNowButton(
+					),
+				cancel: () =>
+					handleCancelButton(
 						interaction,
 						eventManager,
 						appClient,
 						threadManager,
 						voiceChannelManager,
 						telemetry,
-					);
-					break;
-				case 'finish':
-					await handleFinishButton(
+					),
+				startnow: () =>
+					handleStartNowButton(
 						interaction,
 						eventManager,
 						appClient,
 						threadManager,
 						voiceChannelManager,
 						telemetry,
-					);
-					break;
-				case 'dropout':
-					await handleDropOutButton(
+					),
+				finish: () =>
+					handleFinishButton(
 						interaction,
 						eventManager,
 						appClient,
 						threadManager,
 						voiceChannelManager,
 						telemetry,
-					);
-					break;
-				case 'dropin':
-					await handleDropInButton(
+					),
+				dropout: () =>
+					handleDropOutButton(
 						interaction,
 						eventManager,
 						appClient,
 						threadManager,
 						voiceChannelManager,
 						telemetry,
-					);
-					break;
-			}
+					),
+				dropin: () =>
+					handleDropInButton(
+						interaction,
+						eventManager,
+						appClient,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					),
+			};
+
+			const handler = buttonHandlers[interaction.customId];
+			if (handler) await handler();
 		}
 
 		if (interaction.isStringSelectMenu()) {
@@ -297,12 +275,9 @@ appClient.on('interactionCreate', async (interaction) => {
 			},
 		});
 
-		if (interaction.isRepliable()) {
-			await safeReplyToInteraction(
-				interaction,
-				'An error occurred while processing your request.',
-			);
-		}
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.UNEXPECTED_ERROR);
+	} finally {
+		lockedUsers.delete(userId);
 	}
 });
 
