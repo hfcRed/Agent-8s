@@ -24,6 +24,11 @@ FROM node:20-alpine AS runtime
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
 RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
+
+ARG APP_VERSION
+LABEL org.opencontainers.image.version=${APP_VERSION}
+ENV APP_VERSION=${APP_VERSION}
+
 COPY package.json pnpm-lock.yaml ./
 COPY --from=prune /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist
