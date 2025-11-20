@@ -46,6 +46,9 @@ jobs:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+
+    environment: production
+
     # Expose next version to the release job
     outputs:
       release_version: ${{ steps.version.outputs.version }}
@@ -140,9 +143,9 @@ jobs:
           build-args: |
             APP_VERSION=${{ steps.version.outputs.version }}
           tags: |
-            ${{ secrets.DO_REGISTRY_BASE_URL }}/agent8s:latest
-            ${{ secrets.DO_REGISTRY_BASE_URL }}/agent8s:${{ github.sha }}
-            ${{ secrets.DO_REGISTRY_BASE_URL }}/agent8s:v${{ steps.version.outputs.version }}
+            ${{ secrets.DO_REGISTRY_REPOSITORY }}/agent8s:latest
+            ${{ secrets.DO_REGISTRY_REPOSITORY }}/agent8s:${{ github.sha }}
+            ${{ secrets.DO_REGISTRY_REPOSITORY }}/agent8s:v${{ steps.version.outputs.version }}
 
   release:
     name: Tag repo and create GitHub Release
