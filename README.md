@@ -149,8 +149,8 @@ docker run --rm --env-file .env agent-8s
 
 ## Telemetry & Metrics
 
-- The bot exposes a Prometheus endpoint on `/metrics` bound to `0.0.0.0`. Override the port with `METRICS_PORT` (defaults to `9464`).
-- Every telemetry dispatch increments `telemetry_events_forwarded_total{...}`; failures increment the matching `telemetry_events_failed_total` series.
+- The bot exposes a Prometheus endpoint on `/metrics` and a `/healthz` health check bound to `0.0.0.0`. Override the port with `METRICS_PORT` (defaults to `9464`).
+- Metric names are prefixed with `agent8s_{env}`, where `env` is `prod` when `NODE_ENV=production` and `dev` otherwise: `agent8s_{env}_interactions_total{type}`, `agent8s_{env}_errors_total{reason,severity}`, `agent8s_{env}_telemetry_events_forwarded_total{event,guild,channel}`, and `agent8s_{env}_telemetry_events_failed_total{event,guild,channel}`.
 - Guild and channel labels fall back to `unknown` whenever the IDs cannot be resolved (for example, when telemetry is triggered outside a guild context).
 - The metrics endpoint is available even when remote telemetry is disabled, allowing local scraping without forwarding events.
 - Provide `DATABASE_URL` (and optional `DATABASE_SCHEMA`/`TELEMETRY_EVENTS_TABLE`) to persist lifecycle events in PostgreSQL. The bot prepares the target schema/table on startup and records match UUIDs, guild/channel IDs, user/participant identifiers, payload JSON, and timestamps for each lifecycle hook.
