@@ -143,6 +143,18 @@ export class TelemetryService {
 		await this.sendEvent('event_repinged', data);
 	}
 
+	async trackUserJoinedQueue(data: TelemetryEventData) {
+		await this.sendEvent('user_joined_queue', data);
+	}
+
+	async trackUserLeftQueue(data: TelemetryEventData) {
+		await this.sendEvent('user_left_queue', data);
+	}
+
+	async trackUserPromotedFromQueue(data: TelemetryEventData) {
+		await this.sendEvent('user_promoted_from_queue', data);
+	}
+
 	async dispose() {
 		await this.recorder?.dispose();
 	}

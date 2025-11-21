@@ -51,6 +51,7 @@ export const FIELD_NAMES = {
 	ROLE: 'Role',
 	START: 'Start',
 	STATUS: 'Status',
+	QUEUE: 'Queue',
 } as const;
 
 export const PARTICIPANT_FIELD_NAME = (current: number) =>
@@ -148,6 +149,14 @@ export const ERROR_MESSAGES = {
 	STATUS_ERROR: 'An error occurred while fetching bot status.',
 	REPING_ERROR: 'An error occurred while trying to re-ping roles.',
 	KICK_ERROR: 'An error occurred while trying to kick the user.',
+
+	QUEUE_EVENT_NOT_FULL: 'You can only join the queue when the event is full.',
+	QUEUE_ALREADY_IN_QUEUE: 'You are already in the queue for this event.',
+	QUEUE_ALREADY_PARTICIPATING:
+		'You are already participating in an active event. Please leave that event before joining a queue.',
+	QUEUE_NOT_IN_QUEUE: 'You are not in the queue for this event.',
+	JOIN_QUEUE_ERROR: 'An error occurred while joining the queue.',
+	LEAVE_QUEUE_ERROR: 'An error occurred while leaving the queue.',
 
 	KICK_NOT_PARTICIPANT: (userId: string) =>
 		`<@${userId}> is not signed up for your event.` as const,

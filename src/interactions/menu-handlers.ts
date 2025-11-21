@@ -1,4 +1,4 @@
-import type { StringSelectMenuInteraction } from 'discord.js';
+import type { GuildMember, StringSelectMenuInteraction } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
 import { ERROR_MESSAGES, FIELD_NAMES, STATUS_MESSAGES } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
@@ -40,7 +40,10 @@ export async function handleRoleSelection(
 		eventManager.addParticipant(messageId, userId, {
 			userId: userId,
 			role: selectedRole,
-			rank: getExcaliburRankOfUser(interaction),
+			rank: getExcaliburRankOfUser(
+				interaction.guild?.id,
+				interaction.member as GuildMember,
+			),
 		});
 
 		const timerData = eventManager.getTimer(messageId);

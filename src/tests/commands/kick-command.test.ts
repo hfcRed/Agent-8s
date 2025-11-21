@@ -19,6 +19,11 @@ vi.mock('../../utils/retry.js', () => ({
 
 vi.mock('../../utils/embed-utils.js', () => ({
 	updateParticipantFields: vi.fn(),
+	updateQueueField: vi.fn(),
+}));
+
+vi.mock('../../event/event-lifecycle.js', () => ({
+	promoteNextFromQueue: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('kick-command', () => {
@@ -84,6 +89,7 @@ describe('kick-command', () => {
 			getMatchId: vi.fn(() => 'match123'),
 			removeParticipant: vi.fn(),
 			isEventFinalizing: vi.fn(() => false),
+			getQueue: vi.fn(() => []),
 		};
 	}
 

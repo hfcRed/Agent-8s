@@ -62,6 +62,8 @@ Once an event starts, all participants will be added to a private thread only vi
 
 After an event has started, users can use the ``Drop In`` and ``Drop Out`` buttons to enter or exit the event.
 
+When an event has started after reaching 8 participants, users can join a waiting queue using the ``Join Queue`` button. Players in the queue will be automatically added to the event when a participant drops out. The queue operates on a first-in-first-out basis. Users can leave the queue at any time using the ``Leave Queue`` button.
+
 Admins can cancel and finish events at any point, even if they are not part of the event.
 
 Should an event not start because not enough players are found, or the event is not manually finished, the bot will automatically close and archive the event after 24 hours.
