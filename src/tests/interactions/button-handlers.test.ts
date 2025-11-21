@@ -13,6 +13,7 @@ import {
 vi.mock('../../utils/embed-utils.js', () => ({
 	updateEmbedField: vi.fn(),
 	updateParticipantFields: vi.fn(),
+	updateQueueField: vi.fn(),
 	createEventStartedButtons: vi.fn(() => ({ components: [] })),
 	createRoleSelectMenu: vi.fn(() => ({ components: [] })),
 }));
@@ -33,6 +34,7 @@ vi.mock('../../event/event-lifecycle.js', () => ({
 	startEvent: vi.fn().mockResolvedValue(undefined),
 	cleanupEvent: vi.fn().mockResolvedValue(undefined),
 	createEventStartTimeout: vi.fn(),
+	promoteNextFromQueue: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../utils/retry.js', () => ({
@@ -92,6 +94,8 @@ describe('button-handlers', () => {
 			deleteRepingMessageIfExists: vi.fn().mockResolvedValue(undefined),
 			getTimeout: vi.fn(() => undefined),
 			deleteTimeout: vi.fn(),
+			removeUserFromAllQueues: vi.fn().mockResolvedValue(undefined),
+			getQueue: vi.fn(() => []),
 		};
 	}
 

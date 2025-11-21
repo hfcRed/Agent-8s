@@ -40,6 +40,7 @@ describe('create-command', () => {
 			guild: { id: 'guild123' },
 			guildId: 'guild123',
 			channelId: 'channel123',
+			client: {},
 			options: {
 				getBoolean: vi.fn(() => false),
 				getString: vi.fn(() => null),
@@ -66,6 +67,7 @@ describe('create-command', () => {
 			setParticipants: vi.fn(),
 			setGuildId: vi.fn(),
 			getParticipants: vi.fn(() => new Map()),
+			removeUserFromAllQueues: vi.fn().mockResolvedValue(undefined),
 		};
 	}
 

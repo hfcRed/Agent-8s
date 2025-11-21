@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { ChatInputCommandInteraction } from 'discord.js';
+import type { ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { ERROR_MESSAGES, TIMINGS, WEAPON_ROLES } from '../constants.js';
 import { createEventStartTimeout } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
@@ -67,6 +67,11 @@ export async function handleCreateCommand(
 		eventManager.setCreator(message.id, interaction.user.id);
 		eventManager.setMatchId(message.id, matchId);
 		eventManager.setChannelId(message.id, message.channelId);
+		await eventManager.removeUserFromAllQueues(
+			interaction.user.id,
+			interaction.client,
+			telemetry,
+		);
 
 		eventManager.setTimer(message.id, {
 			startTime,
@@ -84,7 +89,10 @@ export async function handleCreateCommand(
 					{
 						userId: interaction.user.id,
 						role: WEAPON_ROLES[0],
-						rank: getExcaliburRankOfUser(interaction),
+						rank: getExcaliburRankOfUser(
+							interaction.guild?.id,
+							interaction.member as GuildMember,
+						),
 					},
 				],
 			]),

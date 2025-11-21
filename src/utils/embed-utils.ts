@@ -136,6 +136,16 @@ export function createEventStartedButtons() {
 			.setLabel('Drop Out')
 			.setStyle(ButtonStyle.Danger),
 		new ButtonBuilder()
+			.setEmoji('⏳')
+			.setCustomId('joinqueue')
+			.setLabel('Join Queue')
+			.setStyle(ButtonStyle.Secondary),
+		new ButtonBuilder()
+			.setEmoji('❌')
+			.setCustomId('leavequeue')
+			.setLabel('Leave Queue')
+			.setStyle(ButtonStyle.Secondary),
+		new ButtonBuilder()
 			.setEmoji('🏁')
 			.setCustomId('finish')
 			.setLabel('Finish Event')
@@ -203,4 +213,31 @@ export function updateParticipantFields(
 		embed.setColor(COLORS.FINALIZING);
 		updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.FINALIZING);
 	}
+}
+
+export function updateQueueField(embed: EmbedBuilder, queue: string[]) {
+	const fields = embed.data.fields || [];
+	const queueField = fields.find((f) => f.name === FIELD_NAMES.QUEUE);
+
+	if (queue.length > 0) {
+		const queueValue = queue.map((userId) => `- <@${userId}>`).join('\n');
+
+		if (queueField) {
+			queueField.value = queueValue;
+		} else {
+			fields.push({
+				name: FIELD_NAMES.QUEUE,
+				value: queueValue,
+				inline: false,
+			});
+		}
+	} else {
+		const index = fields.findIndex((f) => f.name === FIELD_NAMES.QUEUE);
+
+		if (index !== -1) {
+			fields.splice(index, 1);
+		}
+	}
+
+	embed.setFields(fields);
 }

@@ -284,85 +284,65 @@ describe('helpers', () => {
 
 	describe('getExcaliburRankOfUser', () => {
 		it('should return rank when user has matching role', () => {
-			const interaction = {
-				guild: {
-					id: EXCALIBUR_GUILD_ID,
+			const member = {
+				roles: {
+					valueOf: () =>
+						new Map([
+							[
+								'role1',
+								{
+									id: EXCALIBUR_RANKS['1'].id,
+									name: EXCALIBUR_RANKS['1'].name,
+								},
+							],
+						]),
 				},
-				member: {
-					roles: {
-						valueOf: () =>
-							new Map([
-								[
-									'role1',
-									{
-										id: EXCALIBUR_RANKS['1'].id,
-										name: EXCALIBUR_RANKS['1'].name,
-									},
-								],
-							]),
-					},
-				},
-			} as unknown as ButtonInteraction;
+			} as unknown as GuildMember;
 
-			const result = getExcaliburRankOfUser(interaction);
+			const result = getExcaliburRankOfUser(EXCALIBUR_GUILD_ID, member);
 
 			expect(result).toBe('1');
 		});
 
 		it('should return null when not in Excalibur guild', () => {
-			const interaction = {
-				guild: {
-					id: 'different-guild',
+			const member = {
+				roles: {
+					valueOf: () => new Map(),
 				},
-				member: {
-					roles: {
-						valueOf: () => new Map(),
-					},
-				},
-			} as unknown as ButtonInteraction;
+			} as unknown as GuildMember;
 
-			const result = getExcaliburRankOfUser(interaction);
+			const result = getExcaliburRankOfUser('different-guild', member);
 
 			expect(result).toBeNull();
 		});
 
 		it('should return null when user has no matching rank role', () => {
-			const interaction = {
-				guild: {
-					id: EXCALIBUR_GUILD_ID,
+			const member = {
+				roles: {
+					valueOf: () =>
+						new Map([['other-role', { id: 'other', name: 'Other' }]]),
 				},
-				member: {
-					roles: {
-						valueOf: () =>
-							new Map([['other-role', { id: 'other', name: 'Other' }]]),
-					},
-				},
-			} as unknown as ButtonInteraction;
+			} as unknown as GuildMember;
 
-			const result = getExcaliburRankOfUser(interaction);
+			const result = getExcaliburRankOfUser(EXCALIBUR_GUILD_ID, member);
 
 			expect(result).toBeNull();
 		});
 
 		it('should match by role name if ID does not match', () => {
-			const interaction = {
-				guild: {
-					id: EXCALIBUR_GUILD_ID,
+			const member = {
+				roles: {
+					valueOf: () =>
+						new Map([
+							[
+								'role-wrong-id',
+								{ id: 'wrong-id', name: EXCALIBUR_RANKS['2'].name },
+							],
+						]),
 				},
-				member: {
-					roles: {
-						valueOf: () =>
-							new Map([
-								[
-									'role-wrong-id',
-									{ id: 'wrong-id', name: EXCALIBUR_RANKS['2'].name },
-								],
-							]),
-					},
-				},
-			} as unknown as ButtonInteraction;
+			} as unknown as GuildMember;
 
-			const result = getExcaliburRankOfUser(interaction);
+			const result = getExcaliburRankOfUser(EXCALIBUR_GUILD_ID, member);
 
 			expect(result).toBe('2');
 		});

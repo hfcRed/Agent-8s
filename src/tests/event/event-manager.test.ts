@@ -365,4 +365,124 @@ describe('EventManager', () => {
 			clearTimeout(timeout);
 		});
 	});
+
+	describe('queue management', () => {
+		it('should return empty array for non-existent queue', () => {
+			const queue = eventManager.getQueue('event1');
+
+			expect(queue).toEqual([]);
+		});
+
+		it('should add user to queue', () => {
+			eventManager.addToQueue('event1', 'user1');
+
+			const queue = eventManager.getQueue('event1');
+			expect(queue).toContain('user1');
+			expect(queue).toHaveLength(1);
+		});
+
+		it('should add multiple users to queue in order', () => {
+			eventManager.addToQueue('event1', 'user1');
+			eventManager.addToQueue('event1', 'user2');
+			eventManager.addToQueue('event1', 'user3');
+
+			const queue = eventManager.getQueue('event1');
+			expect(queue).toEqual(['user1', 'user2', 'user3']);
+		});
+
+		it('should not add duplicate user to queue', () => {
+			eventManager.addToQueue('event1', 'user1');
+			eventManager.addToQueue('event1', 'user1');
+
+			const queue = eventManager.getQueue('event1');
+			expect(queue).toEqual(['user1']);
+		});
+
+		it('should remove specific user from queue', () => {
+			eventManager.addToQueue('event1', 'user1');
+			eventManager.addToQueue('event1', 'user2');
+			eventManager.addToQueue('event1', 'user3');
+
+			eventManager.removeFromQueue('event1', 'user2');
+
+			const queue = eventManager.getQueue('event1');
+			expect(queue).toEqual(['user1', 'user3']);
+		});
+
+		it('should check if user is in queue', () => {
+			eventManager.addToQueue('event1', 'user1');
+
+			expect(eventManager.isUserInQueue('event1', 'user1')).toBe(true);
+			expect(eventManager.isUserInQueue('event1', 'user2')).toBe(false);
+		});
+
+		it('should remove and return next user from queue', () => {
+			eventManager.addToQueue('event1', 'user1');
+			eventManager.addToQueue('event1', 'user2');
+			eventManager.addToQueue('event1', 'user3');
+
+			const next = eventManager.removeNextFromQueue('event1');
+
+			expect(next).toBe('user1');
+			expect(eventManager.getQueue('event1')).toEqual(['user2', 'user3']);
+		});
+
+		it('should return undefined when removing from empty queue', () => {
+			const next = eventManager.removeNextFromQueue('event1');
+
+			expect(next).toBeUndefined();
+		});
+
+		it('should maintain separate queues for different events', () => {
+			eventManager.addToQueue('event1', 'user1');
+			eventManager.addToQueue('event1', 'user2');
+			eventManager.addToQueue('event2', 'user3');
+			eventManager.addToQueue('event2', 'user4');
+
+			expect(eventManager.getQueue('event1')).toEqual(['user1', 'user2']);
+			expect(eventManager.getQueue('event2')).toEqual(['user3', 'user4']);
+		});
+
+		it('should remove user from all event queues', async () => {
+			const client = {
+				channels: {
+					fetch: vi.fn(),
+				},
+			} as unknown as Client;
+
+			eventManager.addToQueue('event1', 'user1');
+			eventManager.addToQueue('event1', 'user2');
+			eventManager.addToQueue('event2', 'user1');
+			eventManager.addToQueue('event2', 'user3');
+
+			await eventManager.removeUserFromAllQueues('user1', client);
+
+			expect(eventManager.getQueue('event1')).toEqual(['user2']);
+			expect(eventManager.getQueue('event2')).toEqual(['user3']);
+		});
+
+		it('should handle removeUserFromAllQueues when user not in any queue', async () => {
+			const client = {
+				channels: {
+					fetch: vi.fn(),
+				},
+			} as unknown as Client;
+
+			eventManager.addToQueue('event1', 'user1');
+
+			await eventManager.removeUserFromAllQueues('user2', client);
+
+			expect(eventManager.getQueue('event1')).toEqual(['user1']);
+		});
+
+		it('should clear queue when event data is cleared', () => {
+			eventManager.addToQueue('event1', 'user1');
+			eventManager.addToQueue('event1', 'user2');
+
+			eventManager.clearAllEventData('event1');
+
+			const queue = eventManager.getQueue('event1');
+			expect(queue).toEqual([]);
+		});
+	});
 });
