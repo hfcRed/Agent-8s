@@ -3,7 +3,10 @@ import { join } from 'node:path';
 import { type ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { COLORS, ERROR_MESSAGES, TIME_UNITS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
-import type { TelemetryService } from '../telemetry/telemetry.js';
+import type {
+	TelemetryService,
+	TelemetryStatus,
+} from '../telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { safeReplyToInteraction } from '../utils/helpers.js';
 
@@ -70,7 +73,7 @@ export async function handleStatusCommand(
 				},
 				{
 					name: '🔔 Telemetry',
-					value: telemetry ? '✅ Enabled' : '❌ Disabled',
+					value: formatTelemetryStatus(telemetry?.getStatus?.()),
 					inline: true,
 				},
 				{
@@ -139,4 +142,12 @@ function formatUptime(milliseconds: number) {
 function formatMemoryUsage(bytes: number) {
 	const mb = bytes / 1024 / 1024;
 	return `${mb.toFixed(2)} MB`;
+}
+
+function formatTelemetryStatus(status?: TelemetryStatus) {
+	if (!status) return '❌ Disabled';
+	if (status.remoteEnabled && status.databaseEnabled) return '✅ HTTP/DB';
+	if (status.remoteEnabled) return '✅ HTTP';
+	if (status.databaseEnabled) return '✅ DB';
+	return '❌ Disabled';
 }
