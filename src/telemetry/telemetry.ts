@@ -16,27 +16,39 @@ export interface TelemetryEventData {
 	targetUserId?: string;
 }
 
+export interface TelemetryStatus {
+	remoteEnabled: boolean;
+	databaseEnabled: boolean;
+}
+
+interface TelemetryConfig {
+	telemetryUrl?: string;
+	telemetryToken?: string;
+	databaseUrl?: string;
+	databaseSchema?: string;
+	telemetryEventsTable?: string;
+}
+
+dotenv.config({ quiet: true });
+
 /**
  * Class for forwarding events to a telemetry backend.
  */
 export class TelemetryService {
-	private backendUrl: string;
-	private apiKey: string;
+	private backendUrl?: string;
+	private apiKey?: string;
 	private recorder?: EventRecorder;
+	private readonly remoteEnabled: boolean;
 
-	constructor(telemetryUrl: string, telemetryToken: string) {
-		dotenv.config({ quiet: true });
-		const databaseUrl = process.env.DATABASE_URL;
-		const databaseSchema = process.env.DATABASE_SCHEMA;
-		const telemetryEventsTable = process.env.TELEMETRY_EVENTS_TABLE;
+	constructor(config: TelemetryConfig) {
+		this.backendUrl = config.telemetryUrl;
+		this.apiKey = config.telemetryToken;
+		this.remoteEnabled = Boolean(config.telemetryUrl && config.telemetryToken);
 
-		this.backendUrl = telemetryUrl;
-		this.apiKey = telemetryToken;
-
-		this.recorder = databaseUrl
-			? new EventRecorder(databaseUrl, {
-					schema: databaseSchema,
-					table: telemetryEventsTable,
+		this.recorder = config.databaseUrl
+			? new EventRecorder(config.databaseUrl, {
+					schema: config.databaseSchema,
+					table: config.telemetryEventsTable,
 				})
 			: undefined;
 
@@ -71,15 +83,26 @@ export class TelemetryService {
 
 		try {
 			await this.recorder?.record(event, hashedData);
+		} catch (error) {
+			handleError({
+				reason: 'Failed to record telemetry event to database',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { event, guildId: data.guildId, channelId: data.channelId },
+			});
+		}
 
-			const headers = {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${this.apiKey}`,
-			};
+		if (!this.remoteEnabled || !this.backendUrl || !this.apiKey) {
+			return;
+		}
 
+		try {
 			await fetch(`${this.backendUrl}/telemetry`, {
 				method: 'POST',
-				headers,
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${this.apiKey}`,
+				},
 				body: JSON.stringify({
 					event,
 					...hashedData,
@@ -143,8 +166,27 @@ export class TelemetryService {
 		await this.sendEvent('event_repinged', data);
 	}
 
+	async trackUserJoinedQueue(data: TelemetryEventData) {
+		await this.sendEvent('user_joined_queue', data);
+	}
+
+	async trackUserLeftQueue(data: TelemetryEventData) {
+		await this.sendEvent('user_left_queue', data);
+	}
+
+	async trackUserPromotedFromQueue(data: TelemetryEventData) {
+		await this.sendEvent('user_promoted_from_queue', data);
+	}
+
 	async dispose() {
 		await this.recorder?.dispose();
+	}
+
+	getStatus(): TelemetryStatus {
+		return {
+			remoteEnabled: this.remoteEnabled,
+			databaseEnabled: Boolean(this.recorder),
+		};
 	}
 }
 
@@ -152,9 +194,22 @@ export function initializeTelemetry(
 	telemetryUrl: string | undefined,
 	telemetryToken: string | undefined,
 ) {
-	if (!telemetryUrl || !telemetryToken) {
+	const databaseUrl = process.env.DATABASE_URL;
+	const databaseSchema = process.env.DATABASE_SCHEMA;
+	const telemetryEventsTable = process.env.TELEMETRY_EVENTS_TABLE;
+
+	const hasRemote = Boolean(telemetryUrl && telemetryToken);
+	const hasDatabase = Boolean(databaseUrl);
+
+	if (!hasRemote && !hasDatabase) {
 		return undefined;
 	}
 
-	return new TelemetryService(telemetryUrl, telemetryToken);
+	return new TelemetryService({
+		telemetryUrl: telemetryUrl,
+		telemetryToken: telemetryToken,
+		databaseUrl: databaseUrl,
+		databaseSchema: databaseSchema,
+		telemetryEventsTable: telemetryEventsTable,
+	});
 }

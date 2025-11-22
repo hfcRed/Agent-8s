@@ -17,6 +17,7 @@ import {
 import {
 	cleanupEvent,
 	createEventStartTimeout,
+	promoteNextFromQueue,
 	startEvent,
 } from '../event/event-lifecycle.js';
 import type { EventManager, ParticipantMap } from '../event/event-manager.js';
@@ -26,6 +27,7 @@ import type { TelemetryService } from '../telemetry/telemetry.js';
 import {
 	updateEmbedField,
 	updateParticipantFields,
+	updateQueueField,
 } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
@@ -73,8 +75,17 @@ export async function handleSignUpButton(
 		eventManager.addParticipant(messageId, userId, {
 			userId: userId,
 			role: WEAPON_ROLES[0],
-			rank: getExcaliburRankOfUser(interaction),
+			rank: getExcaliburRankOfUser(
+				interaction.guild?.id,
+				interaction.member as GuildMember,
+			),
 		});
+
+		await eventManager.removeUserFromAllQueues(
+			userId,
+			interaction.client,
+			telemetry,
+		);
 
 		const matchId = eventManager.getMatchId(messageId);
 		telemetry?.trackUserSignUp({
@@ -429,6 +440,17 @@ export async function handleDropOutButton(
 
 		eventManager.removeParticipant(messageId, userId);
 
+		const channel = interaction.channel as TextChannel;
+		await promoteNextFromQueue(
+			messageId,
+			eventManager,
+			appClient,
+			threadManager,
+			voiceChannelManager,
+			channel,
+			telemetry,
+		);
+
 		const threadId = eventManager.getThread(messageId);
 		if (threadId) {
 			const channel = interaction.channel as TextChannel | null;
@@ -451,7 +473,15 @@ export async function handleDropOutButton(
 		}
 
 		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-		updateParticipantFields(embed, participantMap, timerData, false);
+		const updatedParticipantMap = eventManager.getParticipants(messageId);
+
+		if (updatedParticipantMap) {
+			updateParticipantFields(embed, updatedParticipantMap, timerData, false);
+		}
+
+		const queue = eventManager.getQueue(messageId);
+		updateQueueField(embed, queue);
+
 		await interaction.editReply({ embeds: [embed] });
 
 		const matchId = eventManager.getMatchId(messageId);
@@ -515,8 +545,13 @@ export async function handleDropInButton(
 		eventManager.addParticipant(messageId, userId, {
 			userId: userId,
 			role: WEAPON_ROLES[0],
-			rank: getExcaliburRankOfUser(interaction),
+			rank: getExcaliburRankOfUser(
+				interaction.guild?.id,
+				interaction.member as GuildMember,
+			),
 		});
+
+		await eventManager.removeUserFromAllQueues(userId, appClient, telemetry);
 
 		if (participantMap.size === MAX_PARTICIPANTS) {
 			await eventManager.deleteRepingMessageIfExists(messageId, appClient);
@@ -611,4 +646,132 @@ async function updateParticipantEmbed(
 	}
 
 	await interaction.editReply({ embeds: [embed] });
+}
+
+export async function handleJoinQueueButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	telemetry?: TelemetryService,
+) {
+	try {
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const timerData = eventManager.getTimer(messageId);
+
+		if (!participantMap || !timerData) return;
+
+		await interaction.deferUpdate();
+
+		if (participantMap.size < MAX_PARTICIPANTS) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.QUEUE_EVENT_NOT_FULL,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		if (eventManager.isUserInQueue(messageId, userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.QUEUE_ALREADY_IN_QUEUE,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		if (eventManager.isUserInAnyEvent(userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.QUEUE_ALREADY_PARTICIPATING,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		eventManager.addToQueue(messageId, userId);
+
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+		const queue = eventManager.getQueue(messageId);
+
+		updateQueueField(embed, queue);
+
+		await interaction.editReply({ embeds: [embed] });
+
+		const matchId = eventManager.getMatchId(messageId);
+		telemetry?.trackUserJoinedQueue({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+	} catch (error) {
+		handleError({
+			reason: 'Error handling join queue button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
+		});
+
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.JOIN_QUEUE_ERROR);
+	}
+}
+
+export async function handleLeaveQueueButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	telemetry?: TelemetryService,
+) {
+	try {
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const timerData = eventManager.getTimer(messageId);
+
+		if (!participantMap || !timerData) return;
+
+		await interaction.deferUpdate();
+
+		if (!eventManager.isUserInQueue(messageId, userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.QUEUE_NOT_IN_QUEUE,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		eventManager.removeFromQueue(messageId, userId);
+
+		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+		const queue = eventManager.getQueue(messageId);
+
+		updateQueueField(embed, queue);
+
+		await interaction.editReply({ embeds: [embed] });
+
+		const matchId = eventManager.getMatchId(messageId);
+		telemetry?.trackUserLeftQueue({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+	} catch (error) {
+		handleError({
+			reason: 'Error handling leave queue button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
+		});
+
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.LEAVE_QUEUE_ERROR);
+	}
 }

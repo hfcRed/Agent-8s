@@ -21,6 +21,8 @@ import {
 	handleDropInButton,
 	handleDropOutButton,
 	handleFinishButton,
+	handleJoinQueueButton,
+	handleLeaveQueueButton,
 	handleSignOutButton,
 	handleSignUpButton,
 	handleStartNowButton,
@@ -254,6 +256,10 @@ appClient.on('interactionCreate', async (interaction) => {
 						voiceChannelManager,
 						telemetry,
 					),
+				joinqueue: () =>
+					handleJoinQueueButton(interaction, eventManager, telemetry),
+				leavequeue: () =>
+					handleLeaveQueueButton(interaction, eventManager, telemetry),
 			};
 
 			const handler = buttonHandlers[interaction.customId];

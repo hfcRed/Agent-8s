@@ -1,7 +1,13 @@
-import type { Client, Message } from 'discord.js';
+import { type Client, EmbedBuilder, type Message } from 'discord.js';
 import { FIELD_NAMES, STATUS_MESSAGES, TIMINGS } from '../constants.js';
+import type { TelemetryService } from '../telemetry/telemetry.js';
+import { updateQueueField } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
-import { LOW_RETRY_OPTIONS, withRetryOrNull } from '../utils/retry.js';
+import {
+	LOW_RETRY_OPTIONS,
+	withRetry,
+	withRetryOrNull,
+} from '../utils/retry.js';
 
 type EventOperation = 'starting' | 'finishing' | 'cancelling' | 'cleanup';
 
@@ -37,6 +43,7 @@ export class EventManager {
 	private guildIds = new Map<string, string>();
 	private repingCooldowns = new Map<string, number>();
 	private repingMessages = new Map<string, string>();
+	private queues = new Map<string, string[]>();
 
 	getParticipants(eventId: string) {
 		return this.participants.get(eventId);
@@ -306,6 +313,105 @@ export class EventManager {
 		return statusField?.value === STATUS_MESSAGES.FINALIZING;
 	}
 
+	getQueue(eventId: string) {
+		return this.queues.get(eventId) || [];
+	}
+
+	addToQueue(eventId: string, userId: string) {
+		const queue = this.queues.get(eventId) || [];
+
+		if (!queue.includes(userId)) {
+			queue.push(userId);
+			this.queues.set(eventId, queue);
+		}
+	}
+
+	removeFromQueue(eventId: string, userId: string) {
+		const queue = this.queues.get(eventId) || [];
+		const filtered = queue.filter((id) => id !== userId);
+
+		this.queues.set(eventId, filtered);
+	}
+
+	isUserInQueue(eventId: string, userId: string) {
+		const queue = this.queues.get(eventId) || [];
+		return queue.includes(userId);
+	}
+
+	removeNextFromQueue(eventId: string): string | undefined {
+		const queue = this.queues.get(eventId) || [];
+		const next = queue.shift();
+
+		this.queues.set(eventId, queue);
+		return next;
+	}
+
+	async removeUserFromAllQueues(
+		userId: string,
+		client: Client,
+		telemetry?: TelemetryService,
+	) {
+		for (const [eventId, queue] of this.queues.entries()) {
+			if (!queue.includes(userId)) continue;
+
+			const filtered = queue.filter((id) => id !== userId);
+
+			this.queues.set(eventId, filtered);
+
+			const channelId = this.getChannelId(eventId);
+			if (!channelId) continue;
+
+			try {
+				const channel = await withRetryOrNull(
+					() => client.channels.fetch(channelId),
+					LOW_RETRY_OPTIONS,
+				);
+
+				if (!channel || !channel.isTextBased()) continue;
+
+				const message = await withRetryOrNull(
+					() => channel.messages.fetch(eventId),
+					LOW_RETRY_OPTIONS,
+				);
+
+				if (!message || !message.embeds[0]) continue;
+
+				const embed = EmbedBuilder.from(message.embeds[0]);
+				updateQueueField(embed, filtered);
+
+				await withRetry(
+					() => message.edit({ embeds: [embed] }),
+					LOW_RETRY_OPTIONS,
+				);
+
+				await telemetry?.trackUserLeftQueue({
+					guildId: this.getGuildId(eventId) || 'unknown',
+					eventId: eventId,
+					userId: userId,
+					participants: Array.from(
+						(this.getParticipants(eventId) || new Map()).values(),
+					),
+					channelId: channelId,
+					matchId: this.getMatchId(eventId) || 'unknown',
+				});
+			} catch (error) {
+				handleError({
+					reason: 'Failed to update queue field after removing user',
+					severity: ErrorSeverity.LOW,
+					error,
+					metadata: {
+						eventId,
+						userId,
+					},
+				});
+			}
+		}
+	}
+
+	deleteQueue(eventId: string) {
+		this.queues.delete(eventId);
+	}
+
 	clearAllEventData(eventId: string) {
 		this.deleteParticipants(eventId);
 		this.deleteCreator(eventId);
@@ -318,6 +424,7 @@ export class EventManager {
 		this.deleteGuildId(eventId);
 		this.deleteRepingCooldown(eventId);
 		this.deleteRepingMessage(eventId);
+		this.deleteQueue(eventId);
 
 		const timeout = this.getTimeout(eventId);
 		if (timeout) {

@@ -11,9 +11,83 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version-check:
+    name: Verify .version is ahead of latest release
+    runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.validate.outputs.version }}
+    steps:
+      - name: Checkout (with tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate .version bump uses file-as-truth
+        id: validate
+        run: |
+          set -euo pipefail
+
+          parse_semver() {
+            local input="${1#v}"
+            if [[ "$input" =~ ^([0-9]+)\.([0-9]+)(\.[0-9]+)?$ ]]; then
+              local major="${BASH_REMATCH[1]}"
+              local minor="${BASH_REMATCH[2]}"
+              local patch="${BASH_REMATCH[3]#.}"
+              if [[ -z "$patch" ]]; then patch=0; fi
+              echo "${major} ${minor} ${patch}"
+            else
+              return 1
+            fi
+          }
+
+          if [ ! -f .version ]; then
+            echo ".version file is missing."
+            exit 1
+          fi
+
+          RAW=$(tr -d '[:space:]' < .version)
+          if [ -z "$RAW" ]; then
+            echo ".version file is empty."
+            exit 1
+          fi
+
+          if ! desired_parts="$(parse_semver "$RAW")"; then
+            echo ".version must be a valid semver string (e.g. 1.2, 1.2.3, v1.2.3)."
+            exit 1
+          fi
+          read -r desired_major desired_minor desired_patch <<<"$desired_parts"
+          version="${desired_major}.${desired_minor}.${desired_patch}"
+
+          tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          if [ -z "$tag" ]; then
+            echo "No previous release tags found; accepting .version=$version."
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! current_parts="$(parse_semver "$tag")"; then
+            echo "Latest tag \"$tag\" is not a valid semver tag."
+            exit 1
+          fi
+          read -r current_major current_minor current_patch <<<"$current_parts"
+
+          echo "Latest release tag: $tag"
+          echo "Proposed .version: $version"
+
+          if (( desired_major > current_major )) || (( desired_major == current_major && desired_minor > current_minor )) || (( desired_major == current_major && desired_minor == current_minor && desired_patch > current_patch )); then
+            echo ".version (${version}) is greater than the latest release tag (${tag})."
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo ".version must be greater than the latest release tag (${tag})."
+          exit 1
+
   test:
     name: Run Tests and Checks
     runs-on: ubuntu-latest
+    needs: version-check
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,7 +117,9 @@ jobs:
 
   build-and-push:
     name: Build and Push Image
-    needs: test
+    needs:
+      - test
+      - version-check
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
@@ -64,63 +140,17 @@ jobs:
         with:
           node-version: 20
 
-      - name: Compute release version (accepts .version=2.3 / 2.3.0 / v2.3.0)
+      - name: Use release version from .version (propagated)
         id: version
+        shell: bash
         run: |
-          node <<'NODE'
-          const cp = require('node:child_process');
-          const fs = require('node:fs');
-
-          function parseSemver(input) {
-            const m = String(input || '').trim().replace(/^v/, '').match(/^(\d+)\.(\d+)(?:\.(\d+))?$/);
-            if (!m) return null;
-            return { major:+m[1], minor:+m[2], patch: m[3] !== undefined ? +m[3] : 0 };
-          }
-          function cmp(a, b) {
-            if (a.major !== b.major) return a.major - b.major;
-            if (a.minor !== b.minor) return a.minor - b.minor;
-            return a.patch - b.patch;
-          }
-          function latestTag() {
-            try {
-              const out = cp.execSync(
-                "git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1",
-                { encoding: 'utf8' }
-              ).trim();
-              return out || null;
-            } catch { return null; }
-          }
-
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const fromPkg = parseSemver(pkg.version) || { major:0, minor:1, patch:0 };
-          const lt = latestTag();
-          const current = lt ? parseSemver(lt) : fromPkg;
-
-          let target;
-          let reason = 'defaulting to patch bump';
-
-          if (fs.existsSync('.version')) {
-            const raw = fs.readFileSync('.version', 'utf8').trim();
-            const desired = parseSemver(raw);
-            if (desired) {
-              if (cmp(desired, current) > 0) {
-                target = `${desired.major}.${desired.minor}.${desired.patch}`;
-                reason = `using override ${raw} -> ${target}`;
-              } else {
-                reason = `override "${raw}" is not greater than current ${current.major}.${current.minor}.${current.patch}`;
-              }
-            } else if (raw) {
-              reason = `ignoring invalid override "${raw}"`;
-            }
-          }
-
-          if (!target) {
-            target = `${current.major}.${current.minor}.${current.patch + 1}`;
-          }
-
-          console.log(`Release version: ${target} (${reason})`);
-          require('fs').appendFileSync(process.env.GITHUB_OUTPUT, `version=${target}\n`);
-          NODE
+          VERSION="${{ needs.version-check.outputs.release_version }}"
+          if [ -z "$VERSION" ]; then
+            echo "Version not provided by version-check job."
+            exit 1
+          fi
+          echo "Release version: ${VERSION} (from .version)"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Install doctl
         uses: digitalocean/action-doctl@v2

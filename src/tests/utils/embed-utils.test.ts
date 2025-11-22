@@ -225,13 +225,15 @@ describe('embed-utils', () => {
 		it('should create three buttons for started events', () => {
 			const row = createEventStartedButtons();
 
-			expect(row.components.length).toBe(3);
+			expect(row.components.length).toBe(5);
 			const customIds = row.components.map((c) => {
 				const data = c.data as { custom_id?: string };
 				return data.custom_id;
 			});
 			expect(customIds).toContain('dropin');
 			expect(customIds).toContain('dropout');
+			expect(customIds).toContain('joinqueue');
+			expect(customIds).toContain('leavequeue');
 			expect(customIds).toContain('finish');
 		});
 	});

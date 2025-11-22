@@ -6,7 +6,6 @@ import type {
 	GuildTextBasedChannel,
 	PermissionResolvable,
 	RepliableInteraction,
-	StringSelectMenuInteraction,
 	TextBasedChannel,
 } from 'discord.js';
 import { PermissionFlagsBits } from 'discord.js';
@@ -61,14 +60,12 @@ export function botHasPermission(
 }
 
 export function getExcaliburRankOfUser(
-	interaction:
-		| ChatInputCommandInteraction
-		| ButtonInteraction
-		| StringSelectMenuInteraction,
+	guildId: string | null | undefined,
+	member: GuildMember | null | undefined,
 ) {
-	if (interaction.guild?.id !== EXCALIBUR_GUILD_ID) return null;
+	if (guildId !== EXCALIBUR_GUILD_ID) return null;
 
-	const roles = interaction.member?.roles;
+	const roles = member?.roles;
 	if (!roles || Array.isArray(roles)) return null;
 
 	const resolved = Array.from(roles.valueOf()).map((r) => {

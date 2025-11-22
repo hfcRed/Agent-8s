@@ -13,6 +13,7 @@ import {
 	START_MESSAGES,
 	STATUS_MESSAGES,
 	TIMINGS,
+	WEAPON_ROLES,
 } from '../constants.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
@@ -23,7 +24,10 @@ import {
 	updateEmbedField,
 } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
-import { checkProcessingStates } from '../utils/helpers.js';
+import {
+	checkProcessingStates,
+	getExcaliburRankOfUser,
+} from '../utils/helpers.js';
 import {
 	LOW_RETRY_OPTIONS,
 	MEDIUM_RETRY_OPTIONS,
@@ -343,4 +347,59 @@ export async function createEventStartTimeout(
 	}, timeInMinutes * TIMINGS.MINUTE_IN_MS);
 
 	eventManager.setTimeout(message.id, timeout);
+}
+
+export async function promoteNextFromQueue(
+	messageId: string,
+	eventManager: EventManager,
+	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
+	channel: TextChannel,
+	telemetry?: TelemetryService,
+) {
+	const nextUserId = eventManager.removeNextFromQueue(messageId);
+	if (!nextUserId) return;
+
+	const guild = channel.guild;
+	const member = await withRetryOrNull(
+		() => guild.members.fetch(nextUserId),
+		LOW_RETRY_OPTIONS,
+	);
+
+	eventManager.addParticipant(messageId, nextUserId, {
+		userId: nextUserId,
+		role: WEAPON_ROLES[0],
+		rank: getExcaliburRankOfUser(guild.id, member),
+	});
+
+	await eventManager.removeUserFromAllQueues(nextUserId, appClient, telemetry);
+
+	const threadId = eventManager.getThread(messageId);
+	if (threadId) {
+		const thread = await threadManager.fetchThread(channel, threadId);
+		if (thread) {
+			await threadManager.addMember(thread, nextUserId);
+		}
+	}
+
+	const voiceChannelIds = eventManager.getVoiceChannels(messageId);
+	if (voiceChannelIds) {
+		await voiceChannelManager.grantAccessToChannels(
+			appClient,
+			voiceChannelIds,
+			nextUserId,
+		);
+	}
+
+	telemetry?.trackUserPromotedFromQueue({
+		guildId: guild.id,
+		eventId: messageId,
+		userId: nextUserId,
+		participants: Array.from(
+			(eventManager.getParticipants(messageId) || new Map()).values(),
+		),
+		channelId: channel.id,
+		matchId: eventManager.getMatchId(messageId) || 'unknown',
+	});
 }

@@ -4,11 +4,15 @@ import {
 	type TextChannel,
 } from 'discord.js';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants.js';
+import { promoteNextFromQueue } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
-import { updateParticipantFields } from '../utils/embed-utils.js';
+import {
+	updateParticipantFields,
+	updateQueueField,
+} from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	checkProcessingStates,
@@ -95,6 +99,16 @@ export async function handleKickCommand(
 
 		eventManager.removeParticipant(userEventId, targetUserId);
 
+		await promoteNextFromQueue(
+			userEventId,
+			eventManager,
+			interaction.client,
+			threadManager,
+			voiceChannelManager,
+			channel as TextChannel,
+			telemetry,
+		);
+
 		const threadId = eventManager.getThread(userEventId);
 		if (threadId) {
 			const thread = await threadManager.fetchThread(
@@ -117,11 +131,22 @@ export async function handleKickCommand(
 		}
 
 		const timerData = eventManager.getTimer(userEventId);
-		if (timerData) {
+		const updatedParticipants = eventManager.getParticipants(userEventId);
+
+		if (timerData && updatedParticipants) {
 			const embed = EmbedBuilder.from(message.embeds[0]);
 			const isFinalizing = eventManager.isEventFinalizing(message);
 
-			updateParticipantFields(embed, participants, timerData, isFinalizing);
+			updateParticipantFields(
+				embed,
+				updatedParticipants,
+				timerData,
+				isFinalizing,
+			);
+
+			const queue = eventManager.getQueue(userEventId);
+			updateQueueField(embed, queue);
+
 			await message.edit({ embeds: [embed] });
 		}
 
