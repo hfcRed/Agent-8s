@@ -129,6 +129,7 @@ export async function handleRepingCommand(
 
 		const reply = await interaction.editReply({
 			content: REPING_MESSAGE(rolePing, missingPlayers, messageUrl),
+			allowedMentions: { parse: ['roles', 'users', 'everyone'] },
 		});
 
 		const repingMessage = await withRetry(
