@@ -52,6 +52,7 @@ describe('reping-command', () => {
 					fetch: vi.fn().mockResolvedValue(mockChannel),
 				},
 			},
+			reply: vi.fn().mockResolvedValue(undefined),
 			deferReply: vi.fn().mockResolvedValue(undefined),
 			editReply: vi.fn().mockResolvedValue(mockReply),
 		};
@@ -102,6 +103,8 @@ describe('reping-command', () => {
 		});
 
 		it('should reject if user does not own event', async () => {
+			const mockReply = vi.fn().mockResolvedValue(undefined);
+			mockInteraction.reply = mockReply;
 			mockEventManager.userOwnsEvent.mockReturnValue(false as never);
 
 			await handleRepingCommand(
@@ -110,12 +113,15 @@ describe('reping-command', () => {
 				mockTelemetry as never,
 			);
 
-			expect(mockInteraction.editReply).toHaveBeenCalledWith({
+			expect(mockReply).toHaveBeenCalledWith({
 				content: ERROR_MESSAGES.NO_EVENT_OWNED,
+				flags: ['Ephemeral'],
 			});
 		});
 
 		it('should enforce cooldown period', async () => {
+			const mockReply = vi.fn().mockResolvedValue(undefined);
+			mockInteraction.reply = mockReply;
 			const now = Date.now();
 			mockEventManager.getRepingCooldown.mockReturnValue(
 				now - TIMINGS.REPING_COOLDOWN_MS / 2,
@@ -127,14 +133,17 @@ describe('reping-command', () => {
 				mockTelemetry as never,
 			);
 
-			expect(mockInteraction.editReply).toHaveBeenCalledWith(
+			expect(mockReply).toHaveBeenCalledWith(
 				expect.objectContaining({
 					content: expect.stringContaining('wait'),
+					flags: ['Ephemeral'],
 				}),
 			);
 		});
 
 		it('should reject if event is full', async () => {
+			const mockReply = vi.fn().mockResolvedValue(undefined);
+			mockInteraction.reply = mockReply;
 			const participants = new Map([
 				['user1', { userId: 'user1', role: 'None', rank: null }],
 				['user2', { userId: 'user2', role: 'Tank', rank: null }],
@@ -153,8 +162,9 @@ describe('reping-command', () => {
 				mockTelemetry as never,
 			);
 
-			expect(mockInteraction.editReply).toHaveBeenCalledWith({
+			expect(mockReply).toHaveBeenCalledWith({
 				content: ERROR_MESSAGES.REPING_EVENT_FULL,
+				flags: ['Ephemeral'],
 			});
 		});
 
@@ -187,6 +197,8 @@ describe('reping-command', () => {
 		});
 
 		it('should reject if channel not found', async () => {
+			const mockReply = vi.fn().mockResolvedValue(undefined);
+			mockInteraction.reply = mockReply;
 			mockEventManager.getChannelId.mockReturnValue(undefined as never);
 
 			await handleRepingCommand(
@@ -195,8 +207,9 @@ describe('reping-command', () => {
 				mockTelemetry as never,
 			);
 
-			expect(mockInteraction.editReply).toHaveBeenCalledWith({
+			expect(mockReply).toHaveBeenCalledWith({
 				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+				flags: ['Ephemeral'],
 			});
 		});
 

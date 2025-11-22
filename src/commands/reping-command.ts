@@ -22,14 +22,13 @@ export async function handleRepingCommand(
 	telemetry?: TelemetryService,
 ) {
 	try {
-		await interaction.deferReply();
-
 		const userId = interaction.user.id;
 		const userEventId = eventManager.userOwnsEvent(userId);
 
 		if (!userEventId) {
-			await interaction.editReply({
+			await interaction.reply({
 				content: ERROR_MESSAGES.NO_EVENT_OWNED,
+				flags: ['Ephemeral'],
 			});
 			return;
 		}
@@ -51,8 +50,9 @@ export async function handleRepingCommand(
 				const remainingMs = TIMINGS.REPING_COOLDOWN_MS - timeSinceLastUse;
 				const remainingMinutes = Math.ceil(remainingMs / 60000);
 
-				await interaction.editReply({
+				await interaction.reply({
 					content: ERROR_MESSAGES.REPING_COOLDOWN(remainingMinutes),
+					flags: ['Ephemeral'],
 				});
 				return;
 			}
@@ -60,8 +60,9 @@ export async function handleRepingCommand(
 
 		const channelId = eventManager.getChannelId(userEventId);
 		if (!channelId) {
-			await interaction.editReply({
+			await interaction.reply({
 				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+				flags: ['Ephemeral'],
 			});
 			return;
 		}
@@ -72,8 +73,9 @@ export async function handleRepingCommand(
 		);
 
 		if (!channel || !channel.isTextBased()) {
-			await interaction.editReply({
+			await interaction.reply({
 				content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
+				flags: ['Ephemeral'],
 			});
 			return;
 		}
@@ -84,8 +86,9 @@ export async function handleRepingCommand(
 		);
 
 		if (!message || !message.embeds[0]) {
-			await interaction.editReply({
+			await interaction.reply({
 				content: ERROR_MESSAGES.MESSAGE_NOT_FOUND,
+				flags: ['Ephemeral'],
 			});
 			return;
 		}
@@ -98,19 +101,23 @@ export async function handleRepingCommand(
 		const missingPlayers = MAX_PARTICIPANTS - currentCount;
 
 		if (currentCount === MAX_PARTICIPANTS) {
-			await interaction.editReply({
+			await interaction.reply({
 				content: ERROR_MESSAGES.REPING_EVENT_FULL,
+				flags: ['Ephemeral'],
 			});
 			return;
 		}
 
 		const rolePing = getPingsForServer(interaction, isCasual);
 		if (!rolePing) {
-			await interaction.editReply({
+			await interaction.reply({
 				content: ERROR_MESSAGES.ROLE_NOT_FOUND,
+				flags: ['Ephemeral'],
 			});
 			return;
 		}
+
+		await interaction.deferReply();
 
 		await eventManager.deleteRepingMessageIfExists(
 			userEventId,
@@ -122,6 +129,7 @@ export async function handleRepingCommand(
 
 		const reply = await interaction.editReply({
 			content: REPING_MESSAGE(rolePing, missingPlayers, messageUrl),
+			allowedMentions: { parse: ['roles', 'users', 'everyone'] },
 		});
 
 		const repingMessage = await withRetry(

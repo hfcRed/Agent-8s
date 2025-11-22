@@ -23,7 +23,7 @@ export function createDiscordClient() {
 			GatewayIntentBits.MessageContent,
 			GatewayIntentBits.DirectMessages,
 		],
-		allowedMentions: { parse: ['roles'] },
+		allowedMentions: { parse: ['roles', 'users', 'everyone'] },
 		partials: [Partials.Channel],
 	});
 }
