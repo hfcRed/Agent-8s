@@ -60,6 +60,7 @@ export async function handleCreateCommand(
 			content: rolePing || undefined,
 			embeds: [embed],
 			components: [buttonRow, selectRow],
+			allowedMentions: { parse: ['roles', 'users', 'everyone'] },
 		});
 		const message = await reply.fetch();
 		const matchId = randomUUID();
