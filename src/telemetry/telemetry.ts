@@ -206,10 +206,10 @@ export function initializeTelemetry(
 	}
 
 	return new TelemetryService({
-		telemetryUrl: telemetryUrl || undefined,
-		telemetryToken: telemetryToken || undefined,
-		databaseUrl: databaseUrl || undefined,
-		databaseSchema: databaseSchema || undefined,
-		telemetryEventsTable: telemetryEventsTable || undefined,
+		telemetryUrl: telemetryUrl,
+		telemetryToken: telemetryToken,
+		databaseUrl: databaseUrl,
+		databaseSchema: databaseSchema,
+		telemetryEventsTable: telemetryEventsTable,
 	});
 }
