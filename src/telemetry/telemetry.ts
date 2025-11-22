@@ -77,9 +77,9 @@ export class TelemetryService {
 				userId: this.hashId(p.userId),
 			})),
 			...(data.targetUserId && {
-			targetUserId: this.hashId(data.targetUserId),
-		}),
-	};
+				targetUserId: this.hashId(data.targetUserId),
+			}),
+		};
 
 		try {
 			await this.recorder?.record(event, hashedData);
