@@ -52,8 +52,8 @@ describe('reping-command', () => {
 					fetch: vi.fn().mockResolvedValue(mockChannel),
 				},
 			},
-			reply: vi.fn().mockResolvedValue(undefined),
-			deferReply: vi.fn().mockResolvedValue(undefined),
+			reply: vi.fn().mockResolvedValue(mockReply),
+			deferreply: vi.fn().mockResolvedValue(mockReply),
 			editReply: vi.fn().mockResolvedValue(mockReply),
 		};
 	}

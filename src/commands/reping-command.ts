@@ -117,8 +117,6 @@ export async function handleRepingCommand(
 			return;
 		}
 
-		await interaction.deferReply();
-
 		await eventManager.deleteRepingMessageIfExists(
 			userEventId,
 			interaction.client,
@@ -127,9 +125,8 @@ export async function handleRepingCommand(
 		const guildId = interaction.guildId;
 		const messageUrl = `https://discord.com/channels/${guildId}/${channelId}/${userEventId}`;
 
-		const reply = await interaction.editReply({
+		const reply = await interaction.reply({
 			content: REPING_MESSAGE(rolePing, missingPlayers, messageUrl),
-			allowedMentions: { parse: ['roles', 'users', 'everyone'] },
 		});
 
 		const repingMessage = await withRetry(
