@@ -46,8 +46,18 @@ describe('create-command', () => {
 				getString: vi.fn(() => null),
 				getInteger: vi.fn(() => null),
 			},
-			reply: vi.fn().mockResolvedValue(undefined),
-			deferReply: vi.fn().mockResolvedValue(undefined),
+			reply: vi.fn().mockResolvedValue({
+				fetch: vi.fn().mockResolvedValue({
+					id: 'message123',
+					channelId: 'channel123',
+				}),
+			}),
+			deferReply: vi.fn().mockResolvedValue({
+				fetch: vi.fn().mockResolvedValue({
+					id: 'message123',
+					channelId: 'channel123',
+				}),
+			}),
 			editReply: vi.fn().mockResolvedValue({
 				fetch: vi.fn().mockResolvedValue({
 					id: 'message123',
@@ -102,7 +112,10 @@ describe('create-command', () => {
 				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
 				flags: ['Ephemeral'],
 			});
-			expect(mockInteraction.deferReply).not.toHaveBeenCalled();
+			expect(mockInteraction.reply).toHaveBeenCalledWith({
+				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				flags: ['Ephemeral'],
+			});
 		});
 	});
 
@@ -116,8 +129,7 @@ describe('create-command', () => {
 				mockTelemetry as never,
 			);
 
-			expect(mockInteraction.deferReply).toHaveBeenCalled();
-			expect(mockInteraction.editReply).toHaveBeenCalled();
+			expect(mockInteraction.reply).toHaveBeenCalled();
 			expect(mockEventManager.setCreator).toHaveBeenCalledWith(
 				'message123',
 				'user123',
@@ -264,7 +276,7 @@ describe('create-command', () => {
 
 	describe('error handling', () => {
 		it('should handle errors and call safeReplyToInteraction', async () => {
-			mockInteraction.deferReply.mockRejectedValue(new Error('Network error'));
+			mockInteraction.reply.mockRejectedValue(new Error('Network error'));
 			const { safeReplyToInteraction } = await import('../../utils/helpers.js');
 
 			await handleCreateCommand(
