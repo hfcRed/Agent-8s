@@ -85,7 +85,6 @@ describe('button-handlers', () => {
 			getThread: vi.fn(),
 			getVoiceChannels: vi.fn(),
 			isUserInAnyEvent: vi.fn(() => false),
-			isEventFinalizing: vi.fn(() => false),
 			addParticipant: vi.fn(),
 			removeParticipant: vi.fn(),
 			setProcessing: vi.fn(),

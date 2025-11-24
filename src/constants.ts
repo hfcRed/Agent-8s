@@ -29,7 +29,7 @@ export const TIMINGS = {
 	HOUR_IN_MS: 60 * 60 * 1000,
 	DAY_IN_MS: 24 * 60 * 60 * 1000,
 	PROCESSING_TIMEOUT_MS: 30000,
-	EVENT_START_DELAY_MINUTES: DEV ? 0 : 0.25,
+	EVENT_START_DELAY_MINUTES: DEV ? 0 : 0,
 	SHUTDOWN_EVENT_CLEANUP_DELAY_MS: 2000,
 	REPING_COOLDOWN_MS: 15 * 60 * 1000,
 } as const;
@@ -59,7 +59,6 @@ export const PARTICIPANT_FIELD_NAME = (current: number) =>
 
 export const COLORS = {
 	OPEN: '#626CE9',
-	FINALIZING: '#E9D662',
 	STARTED: '#1cff5c',
 	CANCELLED: '#ff1c1c',
 	FINISHED: '#ff1c1c',
@@ -90,7 +89,6 @@ export const THREAD_NAME = (shortId: string) =>
 export const STATUS_MESSAGES = {
 	OPEN: '🟢 Open for Sign Ups',
 	READY: '✅ Ready to Start!',
-	FINALIZING: '⏳ Finalizing...',
 	STARTED: '✅ Event Started!',
 	CANCELLED: '❌ Event cancelled',
 	FINISHED: '🏁 Event Finished',
@@ -108,8 +106,6 @@ export const ERROR_MESSAGES = {
 		'You are already signed up for an event. Please sign out, cancel, or wait for the event to finish before joining a new one.',
 	NOT_SIGNED_UP: 'You need to be signed up to perform this action.',
 	EVENT_FULL: 'This event is already full! You cannot sign up.',
-	EVENT_FINALIZING:
-		'The event is finalizing and will start soon. Only role changes are allowed.',
 
 	CREATOR_ONLY_START: 'Only the event creator can start the event.',
 	CREATOR_ONLY_CANCEL:

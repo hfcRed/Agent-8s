@@ -88,7 +88,6 @@ describe('kick-command', () => {
 			getVoiceChannels: vi.fn(),
 			getMatchId: vi.fn(() => 'match123'),
 			removeParticipant: vi.fn(),
-			isEventFinalizing: vi.fn(() => false),
 			getQueue: vi.fn(() => []),
 		};
 	}

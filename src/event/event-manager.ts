@@ -1,5 +1,5 @@
-import { type Client, EmbedBuilder, type Message } from 'discord.js';
-import { FIELD_NAMES, STATUS_MESSAGES, TIMINGS } from '../constants.js';
+import { type Client, EmbedBuilder } from 'discord.js';
+import { TIMINGS } from '../constants.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import { updateQueueField } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
@@ -301,16 +301,6 @@ export class EventManager {
 
 	isUserInAnyEvent(userId: string) {
 		return this.userToEventIndex.has(userId);
-	}
-
-	isEventFinalizing(message: Message) {
-		const embed = message.embeds[0];
-		if (!embed || !embed.fields) return false;
-
-		const statusField = embed.fields.find(
-			(field) => field.name === FIELD_NAMES.STATUS,
-		);
-		return statusField?.value === STATUS_MESSAGES.FINALIZING;
 	}
 
 	getQueue(eventId: string) {
