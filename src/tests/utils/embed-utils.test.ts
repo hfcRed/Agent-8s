@@ -8,7 +8,7 @@ import {
 	STATUS_MESSAGES,
 	WEAPON_ROLES,
 } from '../../constants.js';
-import type { EventTimer, ParticipantMap } from '../../event/event-manager.js';
+import type { ParticipantMap } from '../../event/event-manager.js';
 import {
 	createEventButtons,
 	createEventEmbed,
@@ -268,13 +268,7 @@ describe('embed-utils', () => {
 				['user2', { userId: 'user2', role: 'Support', rank: null }],
 			]);
 
-			const timerData: EventTimer = {
-				startTime: Date.now(),
-				duration: undefined,
-				hasStarted: false,
-			};
-
-			updateParticipantFields(embed, participantMap, timerData, false);
+			updateParticipantFields(embed, participantMap);
 
 			const fields = embed.data.fields || [];
 			const participantField = fields.find((f) =>
@@ -301,74 +295,12 @@ describe('embed-utils', () => {
 				});
 			}
 
-			const timerData: EventTimer = {
-				startTime: Date.now(),
-				duration: 10 * 60 * 1000,
-				hasStarted: false,
-			};
-
-			updateParticipantFields(embed, participantMap, timerData, false);
+			updateParticipantFields(embed, participantMap);
 
 			const fields = embed.data.fields || [];
 			const statusField = fields.find((f) => f.name === FIELD_NAMES.STATUS);
 
-			expect([STATUS_MESSAGES.READY, STATUS_MESSAGES.FINALIZING]).toContain(
-				statusField?.value,
-			);
-		});
-
-		it('should set finalizing color and status when full and timer expired', () => {
-			const embed = new EmbedBuilder().addFields(
-				{ name: PARTICIPANT_FIELD_NAME(1), value: '- <@user1>' },
-				{ name: FIELD_NAMES.ROLE, value: '- None' },
-				{ name: FIELD_NAMES.STATUS, value: STATUS_MESSAGES.OPEN },
-			);
-
-			const participantMap: ParticipantMap = new Map();
-			for (let i = 0; i < MAX_PARTICIPANTS; i++) {
-				participantMap.set(`user${i}`, {
-					userId: `user${i}`,
-					role: 'None',
-					rank: null,
-				});
-			}
-
-			const timerData: EventTimer = {
-				startTime: Date.now() - 20 * 60 * 1000,
-				duration: 10 * 60 * 1000,
-				hasStarted: false,
-			};
-
-			updateParticipantFields(embed, participantMap, timerData, false);
-
-			expect(embed.data.color).toBe(parseInt(COLORS.FINALIZING.slice(1), 16));
-			const fields = embed.data.fields || [];
-			const statusField = fields.find((f) => f.name === FIELD_NAMES.STATUS);
-			expect(statusField?.value).toBe(STATUS_MESSAGES.FINALIZING);
-		});
-
-		it('should not update status when finalizing', () => {
-			const embed = new EmbedBuilder().addFields(
-				{ name: PARTICIPANT_FIELD_NAME(1), value: '- <@user1>' },
-				{ name: FIELD_NAMES.ROLE, value: '- None' },
-				{ name: FIELD_NAMES.STATUS, value: STATUS_MESSAGES.FINALIZING },
-			);
-
-			const participantMap: ParticipantMap = new Map([
-				['user1', { userId: 'user1', role: 'None', rank: null }],
-			]);
-
-			const timerData: EventTimer = {
-				startTime: Date.now(),
-				duration: undefined,
-				hasStarted: false,
-			};
-
-			updateParticipantFields(embed, participantMap, timerData, true);
-
-			const fields = embed.data.fields || [];
-			const statusField = fields.find((f) => f.name === FIELD_NAMES.STATUS);
-			expect(statusField?.value).toBe(STATUS_MESSAGES.FINALIZING);
+			expect([STATUS_MESSAGES.READY]).toContain(statusField?.value);
 		});
 
 		it('should update roles alongside participants', () => {
@@ -383,13 +315,7 @@ describe('embed-utils', () => {
 				['user2', { userId: 'user2', role: '🛡️ Support', rank: null }],
 			]);
 
-			const timerData: EventTimer = {
-				startTime: Date.now(),
-				duration: undefined,
-				hasStarted: false,
-			};
-
-			updateParticipantFields(embed, participantMap, timerData, false);
+			updateParticipantFields(embed, participantMap);
 
 			const fields = embed.data.fields || [];
 			const roleField = fields.find((f) => f.name === FIELD_NAMES.ROLE);

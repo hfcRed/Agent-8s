@@ -11,7 +11,6 @@ import type {
 import { PermissionFlagsBits } from 'discord.js';
 import {
 	ADMIN_PERMISSIONS,
-	ERROR_MESSAGES,
 	EXCALIBUR_GUILD_ID,
 	EXCALIBUR_RANKS,
 	PING_ROLE_NAMES,
@@ -151,15 +150,6 @@ export async function checkProcessingStates(
 				PROCESSING_MESSAGES.CLEANING_UP,
 			);
 		}
-		return true;
-	}
-
-	if (
-		interaction &&
-		'message' in interaction &&
-		eventManager.isEventFinalizing(interaction.message)
-	) {
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.EVENT_FINALIZING);
 		return true;
 	}
 

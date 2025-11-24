@@ -1,6 +1,5 @@
-import type { Client, Message } from 'discord.js';
+import type { Client } from 'discord.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FIELD_NAMES, STATUS_MESSAGES } from '../../constants.js';
 import {
 	EventManager,
 	type EventTimer,
@@ -256,50 +255,6 @@ describe('EventManager', () => {
 			await eventManager.deleteRepingMessageIfExists('event1', client);
 
 			expect(deleteSpy).toHaveBeenCalled();
-		});
-	});
-
-	describe('isEventFinalizing', () => {
-		it('should return true when status is finalizing', () => {
-			const message = {
-				embeds: [
-					{
-						fields: [
-							{
-								name: FIELD_NAMES.STATUS,
-								value: STATUS_MESSAGES.FINALIZING,
-							},
-						],
-					},
-				],
-			} as unknown as Message;
-
-			expect(eventManager.isEventFinalizing(message)).toBe(true);
-		});
-
-		it('should return false when status is not finalizing', () => {
-			const message = {
-				embeds: [
-					{
-						fields: [
-							{
-								name: FIELD_NAMES.STATUS,
-								value: STATUS_MESSAGES.OPEN,
-							},
-						],
-					},
-				],
-			} as unknown as Message;
-
-			expect(eventManager.isEventFinalizing(message)).toBe(false);
-		});
-
-		it('should return false when no embeds', () => {
-			const message = {
-				embeds: [],
-			} as unknown as Message;
-
-			expect(eventManager.isEventFinalizing(message)).toBe(false);
 		});
 	});
 

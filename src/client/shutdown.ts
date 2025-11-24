@@ -73,35 +73,6 @@ export async function gracefulShutdown(
 			const [eventId] = allTimers[i];
 
 			const channelId = eventManager.getChannelId(eventId);
-			let isFinalizing = false;
-
-			if (channelId) {
-				const channel = await withRetryOrNull(
-					() => client.channels.fetch(channelId),
-					MEDIUM_RETRY_OPTIONS,
-				);
-
-				if (channel?.isTextBased() && !channel.isDMBased()) {
-					const message = await withRetryOrNull(
-						() => channel.messages.fetch(eventId),
-						MEDIUM_RETRY_OPTIONS,
-					);
-
-					if (message) {
-						isFinalizing = eventManager.isEventFinalizing(message);
-					}
-				}
-			}
-
-			if (isFinalizing) {
-				const waitTime =
-					TIMINGS.EVENT_START_DELAY_MINUTES * TIMINGS.MINUTE_IN_MS * 2;
-				console.log(
-					`Event ${eventId} is finalizing, waiting ${waitTime}ms before cleanup...`,
-				);
-
-				await new Promise((resolve) => setTimeout(resolve, waitTime));
-			}
 
 			console.log(
 				`Updating event message ${i + 1}/${allTimers.length}: ${eventId}`,

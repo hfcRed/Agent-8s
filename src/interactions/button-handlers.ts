@@ -476,7 +476,7 @@ export async function handleDropOutButton(
 		const updatedParticipantMap = eventManager.getParticipants(messageId);
 
 		if (updatedParticipantMap) {
-			updateParticipantFields(embed, updatedParticipantMap, timerData, false);
+			updateParticipantFields(embed, updatedParticipantMap);
 		}
 
 		const queue = eventManager.getQueue(messageId);
@@ -578,7 +578,7 @@ export async function handleDropInButton(
 		}
 
 		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-		updateParticipantFields(embed, participantMap, timerData, false);
+		updateParticipantFields(embed, participantMap);
 		await interaction.editReply({ embeds: [embed] });
 
 		const matchId = eventManager.getMatchId(messageId);
@@ -615,14 +615,8 @@ async function updateParticipantEmbed(
 	telemetry?: TelemetryService,
 ) {
 	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-	const isFinalizing = eventManager.isEventFinalizing(interaction.message);
 
-	updateParticipantFields(embed, participantMap, timerData, isFinalizing);
-
-	if (isFinalizing) {
-		await interaction.editReply({ embeds: [embed] });
-		return;
-	}
+	updateParticipantFields(embed, participantMap);
 
 	const timeElapsed = Date.now() - timerData.startTime;
 	const timeIsUpOrNotSet =

@@ -17,7 +17,7 @@ import {
 	TITLES,
 	WEAPON_ROLES,
 } from '../constants.js';
-import type { EventTimer, ParticipantMap } from '../event/event-manager.js';
+import type { ParticipantMap } from '../event/event-manager.js';
 
 export function updateEmbedField(
 	embed: EmbedBuilder,
@@ -171,8 +171,6 @@ export function createRoleSelectMenu() {
 export function updateParticipantFields(
 	embed: EmbedBuilder,
 	participantMap: ParticipantMap,
-	timerData: EventTimer,
-	isFinalizing: boolean,
 ) {
 	updateEmbedFieldByMatch(
 		embed,
@@ -191,28 +189,11 @@ export function updateParticipantFields(
 			.join('\n'),
 	);
 
-	if (isFinalizing) {
-		return;
-	}
-
 	const status =
 		participantMap.size === MAX_PARTICIPANTS
 			? STATUS_MESSAGES.READY
 			: STATUS_MESSAGES.OPEN;
 	updateEmbedField(embed, FIELD_NAMES.STATUS, status);
-
-	const timeElapsed = Date.now() - timerData.startTime;
-	const timeIsUpOrNotSet =
-		!timerData.duration || timeElapsed >= timerData.duration;
-
-	if (
-		participantMap.size === MAX_PARTICIPANTS &&
-		timeIsUpOrNotSet &&
-		!timerData.hasStarted
-	) {
-		embed.setColor(COLORS.FINALIZING);
-		updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.FINALIZING);
-	}
 }
 
 export function updateQueueField(embed: EmbedBuilder, queue: string[]) {

@@ -135,14 +135,8 @@ export async function handleKickCommand(
 
 		if (timerData && updatedParticipants) {
 			const embed = EmbedBuilder.from(message.embeds[0]);
-			const isFinalizing = eventManager.isEventFinalizing(message);
 
-			updateParticipantFields(
-				embed,
-				updatedParticipants,
-				timerData,
-				isFinalizing,
-			);
+			updateParticipantFields(embed, updatedParticipants);
 
 			const queue = eventManager.getQueue(userEventId);
 			updateQueueField(embed, queue);
