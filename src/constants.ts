@@ -92,7 +92,7 @@ export const STATUS_MESSAGES = {
 	STARTED: '✅ Event Started!',
 	CANCELLED: '❌ Event cancelled',
 	FINISHED: '🏁 Event Finished',
-	EXPIRED: '⏰ Event Expired (24h timeout)',
+	EXPIRED: '⏰ Event Expired (6h timeout)',
 	SHUTDOWN: '⚠️ Event closed due to bot shutdown!',
 } as const;
 
