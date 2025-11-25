@@ -204,7 +204,7 @@ export async function cleanupStaleEvents(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const MAX_EVENT_LIFETIME = TIMINGS.HOUR_IN_MS * 6;
+	const MAX_EVENT_LIFETIME = TIMINGS.HOUR_IN_MS * 8;
 	const now = Date.now();
 
 	for (const [messageId, timerData] of eventManager.getAllTimers()) {
