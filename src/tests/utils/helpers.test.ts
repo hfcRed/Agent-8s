@@ -416,9 +416,14 @@ describe('helpers', () => {
 
 	describe('checkProcessingStates', () => {
 		let eventManager: EventManager;
+		let mockClient: Client;
 
 		beforeEach(() => {
-			eventManager = new EventManager();
+			mockClient = {
+				channels: { fetch: vi.fn() },
+				users: { cache: new Map() },
+			} as unknown as Client;
+			eventManager = new EventManager(mockClient);
 		});
 
 		it('should return true when event is starting', async () => {

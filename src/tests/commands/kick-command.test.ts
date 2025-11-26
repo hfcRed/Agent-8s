@@ -89,6 +89,7 @@ describe('kick-command', () => {
 			getMatchId: vi.fn(() => 'match123'),
 			removeParticipant: vi.fn(),
 			getQueue: vi.fn(() => []),
+			queueUpdate: vi.fn(),
 		};
 	}
 

@@ -1,8 +1,6 @@
 import type { GuildMember, StringSelectMenuInteraction } from 'discord.js';
-import { EmbedBuilder } from 'discord.js';
 import { ERROR_MESSAGES } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
-import { updateParticipantFields } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	getExcaliburRankOfUser,
@@ -50,11 +48,7 @@ export async function handleRoleSelection(
 
 		if (!timerData) return;
 
-		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-
-		updateParticipantFields(embed, participantMap);
-
-		await interaction.editReply({ embeds: [embed] });
+		eventManager.queueUpdate(messageId);
 	} catch (error) {
 		handleError({
 			reason: 'Error handling role selection',

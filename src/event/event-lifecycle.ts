@@ -1,39 +1,20 @@
+import type { Client, Guild, Message, TextChannel } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 import {
-	type Client,
-	EmbedBuilder,
-	type Guild,
-	type Message,
-	type TextChannel,
-} from 'discord.js';
-import {
-	COLORS,
-	FIELD_NAMES,
 	MATCH_ID_LENGTH,
 	MAX_PARTICIPANTS,
-	START_MESSAGES,
-	STATUS_MESSAGES,
 	TIMINGS,
 	WEAPON_ROLES,
 } from '../constants.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
-import {
-	createEventStartedButtons,
-	createRoleSelectMenu,
-	updateEmbedField,
-} from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	checkProcessingStates,
 	getExcaliburRankOfUser,
 } from '../utils/helpers.js';
-import {
-	LOW_RETRY_OPTIONS,
-	MEDIUM_RETRY_OPTIONS,
-	withRetry,
-	withRetryOrNull,
-} from '../utils/retry.js';
+import { LOW_RETRY_OPTIONS, withRetryOrNull } from '../utils/retry.js';
 import type { EventManager, ParticipantMap } from './event-manager.js';
 
 export async function startEvent(
@@ -62,23 +43,7 @@ export async function startEvent(
 			eventManager.deleteTimeout(message.id);
 		}
 
-		const embed = EmbedBuilder.from(message.embeds[0]).setColor(COLORS.STARTED);
-
-		updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.STARTED);
-		updateEmbedField(
-			embed,
-			FIELD_NAMES.START,
-			START_MESSAGES.AT_TIME(Date.now()),
-		);
-
-		const buttonRow = createEventStartedButtons();
-		const selectRow = createRoleSelectMenu();
-
-		await withRetry(
-			() =>
-				message.edit({ embeds: [embed], components: [buttonRow, selectRow] }),
-			MEDIUM_RETRY_OPTIONS,
-		);
+		eventManager.queueUpdate(message.id);
 
 		const participants = Array.from(participantMap.values());
 		const channel = message.channel as TextChannel;
@@ -214,53 +179,20 @@ export async function cleanupStaleEvents(
 			const channelId = eventManager.getChannelId(messageId);
 			const guildId = eventManager.getGuildId(messageId);
 
-			let message: Message | null = null;
+			eventManager.setTerminalState(messageId, 'expired');
+			eventManager.queueUpdate(messageId, true);
 
-			if (channelId) {
-				try {
-					const channel = await withRetryOrNull(
-						() => appClient.channels.fetch(channelId),
-						LOW_RETRY_OPTIONS,
-					);
+			const matchId = eventManager.getMatchId(messageId);
+			const participants = eventManager.getParticipants(messageId);
 
-					if (channel?.isTextBased() && !channel.isDMBased()) {
-						message = await withRetryOrNull(
-							() => channel.messages.fetch(messageId),
-							LOW_RETRY_OPTIONS,
-						);
-					}
-				} catch (error) {
-					handleError({
-						reason: 'Failed to fetch stale event message',
-						severity: ErrorSeverity.LOW,
-						error,
-						metadata: { messageId, channelId },
-					});
-				}
-			}
-			if (message) {
-				const embed = EmbedBuilder.from(message.embeds[0]).setColor(
-					COLORS.CANCELLED,
-				);
-				updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.EXPIRED);
-
-				await withRetryOrNull(
-					() => message.edit({ embeds: [embed], components: [] }),
-					LOW_RETRY_OPTIONS,
-				);
-
-				const matchId = eventManager.getMatchId(messageId);
-				const participants = eventManager.getParticipants(messageId);
-
-				telemetry?.trackEventExpired({
-					guildId: guildId || message.guild?.id || 'unknown',
-					eventId: messageId,
-					userId: appClient.user?.id || 'unknown',
-					participants: Array.from((participants || new Map()).values()),
-					channelId: message.channelId,
-					matchId: matchId || 'unknown',
-				});
-			}
+			telemetry?.trackEventExpired({
+				guildId: guildId || 'unknown',
+				eventId: messageId,
+				userId: appClient.user?.id || 'unknown',
+				participants: Array.from((participants || new Map()).values()),
+				channelId: channelId || 'unknown',
+				matchId: matchId || 'unknown',
+			});
 		} catch (error) {
 			handleError({
 				reason: `Failed to process stale event ${messageId}`,
@@ -294,13 +226,11 @@ export async function createEventStartTimeout(
 		eventManager.deleteTimeout(message.id);
 	}
 
-	const embed = EmbedBuilder.from(message.embeds[0]);
-	updateEmbedField(
-		embed,
-		FIELD_NAMES.START,
-		START_MESSAGES.AT_TIME(Date.now() + timeInMinutes * TIMINGS.MINUTE_IN_MS),
-	);
-	await message.edit({ embeds: [embed] });
+	const timerData = eventManager.getTimer(message.id);
+	if (timerData) {
+		timerData.duration = timeInMinutes * TIMINGS.MINUTE_IN_MS;
+		eventManager.queueUpdate(message.id);
+	}
 
 	const timeout = setTimeout(async () => {
 		try {
@@ -326,13 +256,10 @@ export async function createEventStartTimeout(
 					telemetry,
 				);
 			} else {
-				const embed = EmbedBuilder.from(message.embeds[0]);
-				embed.setColor(COLORS.OPEN);
-
-				updateEmbedField(embed, FIELD_NAMES.START, START_MESSAGES.WHEN_FULL);
-				updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.OPEN);
-
-				await message.edit({ embeds: [embed] });
+				if (timerData) {
+					timerData.duration = undefined;
+				}
+				eventManager.queueUpdate(message.id);
 			}
 		} catch (error) {
 			handleError({
@@ -373,7 +300,7 @@ export async function promoteNextFromQueue(
 		rank: getExcaliburRankOfUser(guild.id, member),
 	});
 
-	await eventManager.removeUserFromAllQueues(nextUserId, appClient, telemetry);
+	await eventManager.removeUserFromAllQueues(nextUserId, telemetry);
 
 	const threadId = eventManager.getThread(messageId);
 	if (threadId) {

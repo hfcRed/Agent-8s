@@ -22,9 +22,14 @@ vi.mock('../../utils/error-handler.js', () => ({
 
 describe('EventManager', () => {
 	let eventManager: EventManager;
+	let mockClient: Client;
 
 	beforeEach(() => {
-		eventManager = new EventManager();
+		mockClient = {
+			channels: { fetch: vi.fn() },
+			users: { cache: new Map() },
+		} as unknown as Client;
+		eventManager = new EventManager(mockClient);
 		vi.clearAllMocks();
 	});
 
@@ -399,33 +404,21 @@ describe('EventManager', () => {
 		});
 
 		it('should remove user from all event queues', async () => {
-			const client = {
-				channels: {
-					fetch: vi.fn(),
-				},
-			} as unknown as Client;
-
 			eventManager.addToQueue('event1', 'user1');
 			eventManager.addToQueue('event1', 'user2');
 			eventManager.addToQueue('event2', 'user1');
 			eventManager.addToQueue('event2', 'user3');
 
-			await eventManager.removeUserFromAllQueues('user1', client);
+			await eventManager.removeUserFromAllQueues('user1');
 
 			expect(eventManager.getQueue('event1')).toEqual(['user2']);
 			expect(eventManager.getQueue('event2')).toEqual(['user3']);
 		});
 
 		it('should handle removeUserFromAllQueues when user not in any queue', async () => {
-			const client = {
-				channels: {
-					fetch: vi.fn(),
-				},
-			} as unknown as Client;
-
 			eventManager.addToQueue('event1', 'user1');
 
-			await eventManager.removeUserFromAllQueues('user2', client);
+			await eventManager.removeUserFromAllQueues('user2');
 
 			expect(eventManager.getQueue('event1')).toEqual(['user1']);
 		});

@@ -95,6 +95,8 @@ describe('button-handlers', () => {
 			deleteTimeout: vi.fn(),
 			removeUserFromAllQueues: vi.fn().mockResolvedValue(undefined),
 			getQueue: vi.fn(() => []),
+			setTerminalState: vi.fn(),
+			queueUpdate: vi.fn(),
 		};
 	}
 
@@ -284,6 +286,14 @@ describe('button-handlers', () => {
 				'message123',
 				'cancelling',
 			);
+			expect(mockEventManager.setTerminalState).toHaveBeenCalledWith(
+				'message123',
+				'cancelled',
+			);
+			expect(mockEventManager.queueUpdate).toHaveBeenCalledWith(
+				'message123',
+				true,
+			);
 			expect(cleanupEvent).toHaveBeenCalled();
 			expect(mockEventManager.clearProcessing).toHaveBeenCalledWith(
 				'message123',
@@ -403,6 +413,14 @@ describe('button-handlers', () => {
 				mockTelemetry as never,
 			);
 
+			expect(mockEventManager.setTerminalState).toHaveBeenCalledWith(
+				'message123',
+				'finished',
+			);
+			expect(mockEventManager.queueUpdate).toHaveBeenCalledWith(
+				'message123',
+				true,
+			);
 			expect(cleanupEvent).toHaveBeenCalled();
 			expect(mockTelemetry.trackEventFinished).toHaveBeenCalled();
 		});

@@ -1,18 +1,10 @@
-import {
-	type ChatInputCommandInteraction,
-	EmbedBuilder,
-	type TextChannel,
-} from 'discord.js';
+import type { ChatInputCommandInteraction, TextChannel } from 'discord.js';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants.js';
 import { promoteNextFromQueue } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
-import {
-	updateParticipantFields,
-	updateQueueField,
-} from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	checkProcessingStates,
@@ -134,14 +126,7 @@ export async function handleKickCommand(
 		const updatedParticipants = eventManager.getParticipants(userEventId);
 
 		if (timerData && updatedParticipants) {
-			const embed = EmbedBuilder.from(message.embeds[0]);
-
-			updateParticipantFields(embed, updatedParticipants);
-
-			const queue = eventManager.getQueue(userEventId);
-			updateQueueField(embed, queue);
-
-			await message.edit({ embeds: [embed] });
+			eventManager.queueUpdate(userEventId);
 		}
 
 		telemetry?.trackUserKicked({

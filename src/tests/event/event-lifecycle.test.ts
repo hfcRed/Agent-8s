@@ -91,6 +91,7 @@ describe('event-lifecycle', () => {
 			deleteRepingMessageIfExists: vi.fn().mockResolvedValue(undefined),
 			clearAllEventData: vi.fn(),
 			deleteProcessingStates: vi.fn(),
+			queueUpdate: vi.fn(),
 		};
 	}
 
@@ -407,7 +408,7 @@ describe('event-lifecycle', () => {
 			);
 
 			expect(mockEventManager.setTimeout).toHaveBeenCalled();
-			expect(mockMessage.edit).toHaveBeenCalled();
+			expect(mockEventManager.queueUpdate).toHaveBeenCalledWith('message123');
 		});
 
 		it('should clear existing timeout', async () => {

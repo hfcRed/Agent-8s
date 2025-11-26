@@ -1,22 +1,16 @@
-import {
-	type ButtonInteraction,
-	type Client,
-	EmbedBuilder,
-	type GuildMember,
-	type TextChannel,
+import type {
+	ButtonInteraction,
+	Client,
+	GuildMember,
+	TextChannel,
 } from 'discord.js';
 import {
-	COLORS,
 	ERROR_MESSAGES,
-	FIELD_NAMES,
 	MAX_PARTICIPANTS,
-	STATUS_MESSAGES,
-	TIMINGS,
 	WEAPON_ROLES,
 } from '../constants.js';
 import {
 	cleanupEvent,
-	createEventStartTimeout,
 	promoteNextFromQueue,
 	startEvent,
 } from '../event/event-lifecycle.js';
@@ -24,11 +18,6 @@ import type { EventManager, ParticipantMap } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
-import {
-	updateEmbedField,
-	updateParticipantFields,
-	updateQueueField,
-} from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	getExcaliburRankOfUser,
@@ -81,11 +70,7 @@ export async function handleSignUpButton(
 			),
 		});
 
-		await eventManager.removeUserFromAllQueues(
-			userId,
-			interaction.client,
-			telemetry,
-		);
+		await eventManager.removeUserFromAllQueues(userId, telemetry);
 
 		const matchId = eventManager.getMatchId(messageId);
 		telemetry?.trackUserSignUp({
@@ -214,13 +199,8 @@ export async function handleCancelButton(
 
 		eventManager.setProcessing(messageId, 'cancelling');
 		try {
-			const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
-				COLORS.CANCELLED,
-			);
-
-			updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.CANCELLED);
-
-			await interaction.editReply({ embeds: [embed], components: [] });
+			eventManager.setTerminalState(messageId, 'cancelled');
+			eventManager.queueUpdate(messageId, true);
 
 			const matchId = eventManager.getMatchId(messageId);
 			telemetry?.trackEventCancelled({
@@ -353,13 +333,8 @@ export async function handleFinishButton(
 
 		eventManager.setProcessing(messageId, 'finishing');
 		try {
-			const embed = EmbedBuilder.from(interaction.message.embeds[0]).setColor(
-				COLORS.FINISHED,
-			);
-
-			updateEmbedField(embed, FIELD_NAMES.STATUS, STATUS_MESSAGES.FINISHED);
-
-			await interaction.editReply({ embeds: [embed], components: [] });
+			eventManager.setTerminalState(messageId, 'finished');
+			eventManager.queueUpdate(messageId, true);
 
 			const matchId = eventManager.getMatchId(messageId);
 			telemetry?.trackEventFinished({
@@ -472,17 +447,7 @@ export async function handleDropOutButton(
 			);
 		}
 
-		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-		const updatedParticipantMap = eventManager.getParticipants(messageId);
-
-		if (updatedParticipantMap) {
-			updateParticipantFields(embed, updatedParticipantMap);
-		}
-
-		const queue = eventManager.getQueue(messageId);
-		updateQueueField(embed, queue);
-
-		await interaction.editReply({ embeds: [embed] });
+		eventManager.queueUpdate(messageId);
 
 		const matchId = eventManager.getMatchId(messageId);
 		telemetry?.trackUserDropOut({
@@ -551,7 +516,7 @@ export async function handleDropInButton(
 			),
 		});
 
-		await eventManager.removeUserFromAllQueues(userId, appClient, telemetry);
+		await eventManager.removeUserFromAllQueues(userId, telemetry);
 
 		if (participantMap.size === MAX_PARTICIPANTS) {
 			await eventManager.deleteRepingMessageIfExists(messageId, appClient);
@@ -577,9 +542,7 @@ export async function handleDropInButton(
 			);
 		}
 
-		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-		updateParticipantFields(embed, participantMap);
-		await interaction.editReply({ embeds: [embed] });
+		eventManager.queueUpdate(messageId);
 
 		const matchId = eventManager.getMatchId(messageId);
 		telemetry?.trackUserDropIn({
@@ -614,10 +577,7 @@ async function updateParticipantEmbed(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-
-	updateParticipantFields(embed, participantMap);
-
+	const messageId = interaction.message.id;
 	const timeElapsed = Date.now() - timerData.startTime;
 	const timeIsUpOrNotSet =
 		!timerData.duration || timeElapsed >= timerData.duration;
@@ -627,11 +587,11 @@ async function updateParticipantEmbed(
 		timeIsUpOrNotSet &&
 		!timerData.hasStarted
 	) {
-		await interaction.editReply({ embeds: [embed] });
-		createEventStartTimeout(
+		startEvent(
 			interaction.message,
-			TIMINGS.EVENT_START_DELAY_MINUTES,
+			participantMap,
 			eventManager,
+			interaction.client,
 			threadManager,
 			voiceChannelManager,
 			telemetry,
@@ -639,7 +599,7 @@ async function updateParticipantEmbed(
 		return;
 	}
 
-	await interaction.editReply({ embeds: [embed] });
+	eventManager.queueUpdate(messageId);
 }
 
 export async function handleJoinQueueButton(
@@ -683,12 +643,7 @@ export async function handleJoinQueueButton(
 
 		eventManager.addToQueue(messageId, userId);
 
-		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-		const queue = eventManager.getQueue(messageId);
-
-		updateQueueField(embed, queue);
-
-		await interaction.editReply({ embeds: [embed] });
+		eventManager.queueUpdate(messageId);
 
 		const matchId = eventManager.getMatchId(messageId);
 		telemetry?.trackUserJoinedQueue({
@@ -739,12 +694,7 @@ export async function handleLeaveQueueButton(
 
 		eventManager.removeFromQueue(messageId, userId);
 
-		const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-		const queue = eventManager.getQueue(messageId);
-
-		updateQueueField(embed, queue);
-
-		await interaction.editReply({ embeds: [embed] });
+		eventManager.queueUpdate(messageId);
 
 		const matchId = eventManager.getMatchId(messageId);
 		telemetry?.trackUserLeftQueue({

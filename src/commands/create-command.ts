@@ -65,11 +65,9 @@ export async function handleCreateCommand(
 		eventManager.setCreator(message.id, interaction.user.id);
 		eventManager.setMatchId(message.id, matchId);
 		eventManager.setChannelId(message.id, message.channelId);
-		await eventManager.removeUserFromAllQueues(
-			interaction.user.id,
-			interaction.client,
-			telemetry,
-		);
+		eventManager.setMessageData(message.id, casual, info);
+
+		await eventManager.removeUserFromAllQueues(interaction.user.id, telemetry);
 
 		eventManager.setTimer(message.id, {
 			startTime,
