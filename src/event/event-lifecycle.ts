@@ -180,7 +180,7 @@ export async function cleanupStaleEvents(
 			const guildId = eventManager.getGuildId(messageId);
 
 			eventManager.setTerminalState(messageId, 'expired');
-			eventManager.queueUpdate(messageId, true);
+			await eventManager.queueUpdate(messageId, true);
 
 			const matchId = eventManager.getMatchId(messageId);
 			const participants = eventManager.getParticipants(messageId);

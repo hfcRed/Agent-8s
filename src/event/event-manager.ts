@@ -601,7 +601,7 @@ export class EventManager {
 		};
 
 		if (immediate) {
-			performUpdate();
+			return performUpdate();
 		} else {
 			const timeout = setTimeout(
 				performUpdate,

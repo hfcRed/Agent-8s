@@ -200,7 +200,7 @@ export async function handleCancelButton(
 		eventManager.setProcessing(messageId, 'cancelling');
 		try {
 			eventManager.setTerminalState(messageId, 'cancelled');
-			eventManager.queueUpdate(messageId, true);
+			await eventManager.queueUpdate(messageId, true);
 
 			const matchId = eventManager.getMatchId(messageId);
 			telemetry?.trackEventCancelled({
@@ -334,7 +334,7 @@ export async function handleFinishButton(
 		eventManager.setProcessing(messageId, 'finishing');
 		try {
 			eventManager.setTerminalState(messageId, 'finished');
-			eventManager.queueUpdate(messageId, true);
+			await eventManager.queueUpdate(messageId, true);
 
 			const matchId = eventManager.getMatchId(messageId);
 			telemetry?.trackEventFinished({

@@ -70,7 +70,7 @@ export async function gracefulShutdown(
 			);
 			if (channelId) {
 				eventManager.setTerminalState(eventId, 'shutdown');
-				eventManager.queueUpdate(eventId, true);
+				await eventManager.queueUpdate(eventId, true);
 			}
 
 			console.log(`Cleaning up event ${i + 1}/${allTimers.length}: ${eventId}`);
