@@ -188,26 +188,38 @@ export const EXCALIBUR_RANKS = {
 	'1': {
 		name: 'TX Grandmaster',
 		id: '1429217994168598669',
+		emoteName: 'Ex8s1_grandmaster',
+		emoteId: '1429215523824078941',
 	},
 	'2': {
 		name: 'T1 Legend',
 		id: '1428998361188532264',
+		emoteName: 'Ex8s2_legend',
+		emoteId: '1428988098892529787',
 	},
 	'3': {
 		name: 'T2 Ascendant',
 		id: '1428997469303341166',
+		emoteName: 'Ex8s3_ascendant',
+		emoteId: '1428988084535427102',
 	},
 	'4': {
 		name: 'T3 Elite',
 		id: '1428997715106332815',
+		emoteName: 'Ex8s4_elite',
+		emoteId: '1428988071059259392',
 	},
 	'5': {
 		name: 'T4 Knight',
 		id: '1428998081126596618',
+		emoteName: 'Ex8s5_knight',
+		emoteId: '1428988053472415768',
 	},
 	'6': {
 		name: 'T5 Squire',
 		id: '1428998419250286704',
+		emoteName: 'Ex8s6_novice',
+		emoteId: '1428988037383327825',
 	},
 } as const;
 

@@ -1,6 +1,8 @@
 import { type Client, EmbedBuilder } from 'discord.js';
 import {
 	COLORS,
+	EXCALIBUR_GUILD_ID,
+	EXCALIBUR_RANKS,
 	FIELD_NAMES,
 	MAX_PARTICIPANTS,
 	PARTICIPANT_FIELD_NAME,
@@ -488,8 +490,22 @@ export class EventManager {
 			startMessage = START_MESSAGES.AT_TIME(startTimestamp);
 		}
 
+		const isExcalibur = this.getGuildId(eventId) === EXCALIBUR_GUILD_ID;
+
 		const participantList = participants
-			.map((p) => `- <@${p.userId}>`)
+			.map((p) => {
+				const rank = p.rank
+					? EXCALIBUR_RANKS[p.rank as keyof typeof EXCALIBUR_RANKS]
+					: undefined;
+
+				const emote = isExcalibur
+					? rank
+						? `<:${rank.emoteName}:${rank.emoteId}> `
+						: '⚫'
+					: '';
+
+				return `- ${emote}<@${p.userId}>`;
+			})
 			.join('\n');
 		const roleList = participants
 			.map((p) => `- ${p.role || 'None'}`)
