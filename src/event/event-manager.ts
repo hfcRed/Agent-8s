@@ -1,8 +1,6 @@
 import { type Client, EmbedBuilder } from 'discord.js';
 import {
 	COLORS,
-	EXCALIBUR_GUILD_ID,
-	EXCALIBUR_RANKS,
 	FIELD_NAMES,
 	MAX_PARTICIPANTS,
 	PARTICIPANT_FIELD_NAME,
@@ -18,6 +16,7 @@ import {
 	createRoleSelectMenu,
 } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import { getEmoteForRank } from '../utils/helpers.js';
 import {
 	LOW_RETRY_OPTIONS,
 	withRetry,
@@ -490,22 +489,11 @@ export class EventManager {
 			startMessage = START_MESSAGES.AT_TIME(startTimestamp);
 		}
 
-		const isExcalibur = this.getGuildId(eventId) === EXCALIBUR_GUILD_ID;
-
 		const participantList = participants
-			.map((p) => {
-				const rank = p.rank
-					? EXCALIBUR_RANKS[p.rank as keyof typeof EXCALIBUR_RANKS]
-					: undefined;
-
-				const emote = isExcalibur
-					? rank
-						? `<:${rank.emoteName}:${rank.emoteId}> `
-						: '⚫'
-					: '';
-
-				return `- ${emote}<@${p.userId}>`;
-			})
+			.map(
+				(p) =>
+					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>`,
+			)
 			.join('\n');
 		const roleList = participants
 			.map((p) => `- ${p.role || 'None'}`)

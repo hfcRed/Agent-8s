@@ -43,7 +43,14 @@ export async function handleCreateCommand(
 		const buttonRow = createEventButtons(timeInMinutes);
 		const selectRow = createRoleSelectMenu();
 
+		const rankId = getExcaliburRankOfUser(
+			interaction.guild?.id,
+			interaction.member as GuildMember,
+		);
+
 		const embed = createEventEmbed(
+			interaction.guild?.id,
+			rankId,
 			interaction.user.username,
 			interaction.user.displayAvatarURL(),
 			interaction.user.id,
@@ -85,10 +92,7 @@ export async function handleCreateCommand(
 					{
 						userId: interaction.user.id,
 						role: WEAPON_ROLES[0],
-						rank: getExcaliburRankOfUser(
-							interaction.guild?.id,
-							interaction.member as GuildMember,
-						),
+						rank: rankId,
 					},
 				],
 			]),

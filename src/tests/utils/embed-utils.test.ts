@@ -16,6 +16,8 @@ describe('embed-utils', () => {
 	describe('createEventEmbed', () => {
 		it('should create embed with all required fields for casual event', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',
@@ -37,6 +39,8 @@ describe('embed-utils', () => {
 
 		it('should create embed with all required fields for competitive event', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',
@@ -48,6 +52,8 @@ describe('embed-utils', () => {
 
 		it('should include timer information when provided', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',
@@ -62,6 +68,8 @@ describe('embed-utils', () => {
 
 		it('should include description when info is provided', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',
@@ -75,6 +83,8 @@ describe('embed-utils', () => {
 
 		it('should set default weapon role', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',

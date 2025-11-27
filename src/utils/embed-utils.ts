@@ -16,8 +16,11 @@ import {
 	TITLES,
 	WEAPON_ROLES,
 } from '../constants.js';
+import { getEmoteForRank } from './helpers.js';
 
 export function createEventEmbed(
+	guildId: string | null | undefined,
+	rankId: string | null,
 	username: string,
 	avatarUrl: string,
 	userId: string,
@@ -29,7 +32,7 @@ export function createEventEmbed(
 	const embedFields = [
 		{
 			name: PARTICIPANT_FIELD_NAME(1),
-			value: `- <@${userId}>`,
+			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}>`,
 			inline: true,
 		},
 		{

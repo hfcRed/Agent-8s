@@ -19,6 +19,7 @@ import { EventManager } from '../../event/event-manager.js';
 import {
 	botHasPermission,
 	checkProcessingStates,
+	getEmoteForRank,
 	getExcaliburRankOfUser,
 	getPingsForServer,
 	isUserAdmin,
@@ -475,6 +476,105 @@ describe('helpers', () => {
 			await checkProcessingStates('msg1', eventManager, interaction);
 
 			expect(interaction.reply).toHaveBeenCalled();
+		});
+	});
+
+	describe('getEmoteForRank', () => {
+		it('should return empty string for non-Excalibur guild', () => {
+			const result = getEmoteForRank('differentGuildId', '1');
+
+			expect(result).toBe('');
+		});
+
+		it('should return empty string when guildId is null', () => {
+			const result = getEmoteForRank(null, '1');
+
+			expect(result).toBe('');
+		});
+
+		it('should return empty string when guildId is undefined', () => {
+			const result = getEmoteForRank(undefined, '1');
+
+			expect(result).toBe('');
+		});
+
+		it('should return default emote when rankId is null', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, null);
+
+			expect(result).toBe('⚫ ');
+		});
+
+		it('should return default emote when rankId is invalid', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, 'invalidRank');
+
+			expect(result).toBe('⚫ ');
+		});
+
+		it('should return correct emote for rank 1 (Grandmaster)', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, '1');
+
+			expect(result).toBe(
+				`<:${EXCALIBUR_RANKS['1'].emoteName}:${EXCALIBUR_RANKS['1'].emoteId}> `,
+			);
+			expect(result).toContain('Ex8s1_grandmaster');
+		});
+
+		it('should return correct emote for rank 2 (Legend)', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, '2');
+
+			expect(result).toBe(
+				`<:${EXCALIBUR_RANKS['2'].emoteName}:${EXCALIBUR_RANKS['2'].emoteId}> `,
+			);
+			expect(result).toContain('Ex8s2_legend');
+		});
+
+		it('should return correct emote for rank 3 (Ascendant)', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, '3');
+
+			expect(result).toBe(
+				`<:${EXCALIBUR_RANKS['3'].emoteName}:${EXCALIBUR_RANKS['3'].emoteId}> `,
+			);
+			expect(result).toContain('Ex8s3_ascendant');
+		});
+
+		it('should return correct emote for rank 4 (Elite)', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, '4');
+
+			expect(result).toBe(
+				`<:${EXCALIBUR_RANKS['4'].emoteName}:${EXCALIBUR_RANKS['4'].emoteId}> `,
+			);
+			expect(result).toContain('Ex8s4_elite');
+		});
+
+		it('should return correct emote for rank 5 (Knight)', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, '5');
+
+			expect(result).toBe(
+				`<:${EXCALIBUR_RANKS['5'].emoteName}:${EXCALIBUR_RANKS['5'].emoteId}> `,
+			);
+			expect(result).toContain('Ex8s5_knight');
+		});
+
+		it('should return correct emote for rank 6 (Squire)', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, '6');
+
+			expect(result).toBe(
+				`<:${EXCALIBUR_RANKS['6'].emoteName}:${EXCALIBUR_RANKS['6'].emoteId}> `,
+			);
+			expect(result).toContain('Ex8s6_novice');
+		});
+
+		it('should include trailing space in emote string', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, '1');
+
+			expect(result).toMatch(/ $/);
+		});
+
+		it('should include trailing space in default emote', () => {
+			const result = getEmoteForRank(EXCALIBUR_GUILD_ID, null);
+
+			expect(result).toBe('⚫ ');
+			expect(result).toMatch(/ $/);
 		});
 	});
 });
