@@ -1,8 +1,22 @@
 import { type Client, EmbedBuilder } from 'discord.js';
-import { TIMINGS } from '../constants.js';
+import {
+	COLORS,
+	FIELD_NAMES,
+	MAX_PARTICIPANTS,
+	PARTICIPANT_FIELD_NAME,
+	START_MESSAGES,
+	STATUS_MESSAGES,
+	TIMINGS,
+	TITLES,
+} from '../constants.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
-import { updateQueueField } from '../utils/embed-utils.js';
+import {
+	createEventButtons,
+	createEventStartedButtons,
+	createRoleSelectMenu,
+} from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
+import { getEmoteForRank } from '../utils/helpers.js';
 import {
 	LOW_RETRY_OPTIONS,
 	withRetry,
@@ -44,6 +58,16 @@ export class EventManager {
 	private repingCooldowns = new Map<string, number>();
 	private repingMessages = new Map<string, string>();
 	private queues = new Map<string, string[]>();
+
+	private casual = new Map<string, boolean>();
+	private info = new Map<string, string | undefined>();
+	private updateTimeouts = new Map<string, NodeJS.Timeout>();
+	private terminalStates = new Map<
+		string,
+		'cancelled' | 'finished' | 'expired' | 'shutdown' | null
+	>();
+
+	constructor(private client: Client) {}
 
 	getParticipants(eventId: string) {
 		return this.participants.get(eventId);
@@ -336,65 +360,25 @@ export class EventManager {
 		return next;
 	}
 
-	async removeUserFromAllQueues(
-		userId: string,
-		client: Client,
-		telemetry?: TelemetryService,
-	) {
+	async removeUserFromAllQueues(userId: string, telemetry?: TelemetryService) {
 		for (const [eventId, queue] of this.queues.entries()) {
 			if (!queue.includes(userId)) continue;
 
 			const filtered = queue.filter((id) => id !== userId);
 
 			this.queues.set(eventId, filtered);
+			this.queueUpdate(eventId);
 
-			const channelId = this.getChannelId(eventId);
-			if (!channelId) continue;
-
-			try {
-				const channel = await withRetryOrNull(
-					() => client.channels.fetch(channelId),
-					LOW_RETRY_OPTIONS,
-				);
-
-				if (!channel || !channel.isTextBased()) continue;
-
-				const message = await withRetryOrNull(
-					() => channel.messages.fetch(eventId),
-					LOW_RETRY_OPTIONS,
-				);
-
-				if (!message || !message.embeds[0]) continue;
-
-				const embed = EmbedBuilder.from(message.embeds[0]);
-				updateQueueField(embed, filtered);
-
-				await withRetry(
-					() => message.edit({ embeds: [embed] }),
-					LOW_RETRY_OPTIONS,
-				);
-
-				await telemetry?.trackUserLeftQueue({
-					guildId: this.getGuildId(eventId) || 'unknown',
-					eventId: eventId,
-					userId: userId,
-					participants: Array.from(
-						(this.getParticipants(eventId) || new Map()).values(),
-					),
-					channelId: channelId,
-					matchId: this.getMatchId(eventId) || 'unknown',
-				});
-			} catch (error) {
-				handleError({
-					reason: 'Failed to update queue field after removing user',
-					severity: ErrorSeverity.LOW,
-					error,
-					metadata: {
-						eventId,
-						userId,
-					},
-				});
-			}
+			await telemetry?.trackUserLeftQueue({
+				guildId: this.getGuildId(eventId) || 'unknown',
+				eventId: eventId,
+				userId: userId,
+				participants: Array.from(
+					(this.getParticipants(eventId) || new Map()).values(),
+				),
+				channelId: this.getChannelId(eventId) || 'unknown',
+				matchId: this.getMatchId(eventId) || 'unknown',
+			});
 		}
 	}
 
@@ -416,10 +400,218 @@ export class EventManager {
 		this.deleteRepingMessage(eventId);
 		this.deleteQueue(eventId);
 
+		this.casual.delete(eventId);
+		this.info.delete(eventId);
+		this.terminalStates.delete(eventId);
+
 		const timeout = this.getTimeout(eventId);
 		if (timeout) {
 			clearTimeout(timeout);
 			this.deleteTimeout(eventId);
+		}
+
+		const updateTimeout = this.updateTimeouts.get(eventId);
+		if (updateTimeout) {
+			clearTimeout(updateTimeout);
+			this.updateTimeouts.delete(eventId);
+		}
+	}
+
+	setMessageData(eventId: string, casual: boolean, info?: string) {
+		this.casual.set(eventId, casual);
+		this.info.set(eventId, info);
+	}
+
+	setTerminalState(
+		eventId: string,
+		state: 'cancelled' | 'finished' | 'expired' | 'shutdown',
+	) {
+		this.terminalStates.set(eventId, state);
+	}
+
+	getTerminalState(eventId: string) {
+		return this.terminalStates.get(eventId);
+	}
+
+	buildEmbed(eventId: string): EmbedBuilder | null {
+		const participantMap = this.getParticipants(eventId);
+		const timerData = this.getTimer(eventId);
+		const creatorId = this.getCreator(eventId);
+		const queue = this.getQueue(eventId);
+		const casualMode = this.casual.get(eventId) ?? true;
+		const infoText = this.info.get(eventId);
+
+		if (!participantMap || !timerData || !creatorId) return null;
+
+		const creator = this.client.users.cache.get(creatorId);
+		const username = creator?.username || 'unknown';
+		const avatarUrl = creator?.displayAvatarURL() || '';
+
+		const participants = Array.from(participantMap.values());
+		const participantCount = participants.length;
+
+		const terminalState = this.getTerminalState(eventId);
+
+		let color: string = COLORS.OPEN;
+		let status: string = STATUS_MESSAGES.OPEN;
+
+		if (terminalState) {
+			switch (terminalState) {
+				case 'cancelled':
+					color = COLORS.CANCELLED;
+					status = STATUS_MESSAGES.CANCELLED;
+					break;
+				case 'finished':
+					color = COLORS.FINISHED;
+					status = STATUS_MESSAGES.FINISHED;
+					break;
+				case 'expired':
+					color = COLORS.CANCELLED;
+					status = STATUS_MESSAGES.EXPIRED;
+					break;
+				case 'shutdown':
+					color = COLORS.CANCELLED;
+					status = STATUS_MESSAGES.SHUTDOWN;
+					break;
+			}
+		} else if (timerData.hasStarted && participantCount === MAX_PARTICIPANTS) {
+			color = COLORS.STARTED;
+			status = STATUS_MESSAGES.STARTED;
+		} else if (participantCount === MAX_PARTICIPANTS) {
+			status = STATUS_MESSAGES.READY;
+		}
+
+		let startMessage: string = START_MESSAGES.WHEN_FULL;
+		if (timerData.hasStarted) {
+			startMessage = START_MESSAGES.AT_TIME(timerData.startTime);
+		} else if (timerData.duration) {
+			const startTimestamp = timerData.startTime + timerData.duration;
+			startMessage = START_MESSAGES.AT_TIME(startTimestamp);
+		}
+
+		const participantList = participants
+			.map(
+				(p) =>
+					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>`,
+			)
+			.join('\n');
+		const roleList = participants
+			.map((p) => `- ${p.role || 'None'}`)
+			.join('\n');
+
+		const embed = new EmbedBuilder()
+			.setAuthor({
+				name: username,
+				iconURL: avatarUrl,
+			})
+			.setTitle(casualMode ? TITLES.CASUAL : TITLES.COMPETITIVE)
+			.addFields([
+				{
+					name: PARTICIPANT_FIELD_NAME(participantCount),
+					value: participantList,
+					inline: true,
+				},
+				{
+					name: FIELD_NAMES.ROLE,
+					value: roleList,
+					inline: true,
+				},
+				{
+					name: FIELD_NAMES.START,
+					value: startMessage,
+					inline: false,
+				},
+				{
+					name: FIELD_NAMES.STATUS,
+					value: status,
+					inline: false,
+				},
+			])
+			.setColor(color as `#${string}`);
+
+		if (infoText) {
+			embed.setDescription(infoText);
+		}
+
+		if (queue.length > 0) {
+			const queueValue = queue.map((userId) => `- <@${userId}>`).join('\n');
+			embed.addFields({
+				name: FIELD_NAMES.QUEUE,
+				value: queueValue,
+				inline: false,
+			});
+		}
+
+		return embed;
+	}
+
+	buildComponents(eventId: string) {
+		const timerData = this.getTimer(eventId);
+		const terminalState = this.getTerminalState(eventId);
+
+		if (!timerData || terminalState) return [];
+
+		if (timerData.hasStarted) {
+			return [createEventStartedButtons(), createRoleSelectMenu()];
+		}
+
+		const timeInMinutes = timerData.duration
+			? timerData.duration / TIMINGS.MINUTE_IN_MS
+			: undefined;
+		return [createEventButtons(timeInMinutes)];
+	}
+
+	queueUpdate(eventId: string, immediate = false) {
+		const existingTimeout = this.updateTimeouts.get(eventId);
+		if (existingTimeout) {
+			clearTimeout(existingTimeout);
+		}
+
+		const performUpdate = async () => {
+			try {
+				this.updateTimeouts.delete(eventId);
+
+				const channelId = this.getChannelId(eventId);
+				if (!channelId) return;
+
+				const channel = await withRetryOrNull(
+					() => this.client.channels.fetch(channelId),
+					LOW_RETRY_OPTIONS,
+				);
+				if (!channel || !channel.isTextBased()) return;
+
+				const message = await withRetryOrNull(
+					() => channel.messages.fetch(eventId),
+					LOW_RETRY_OPTIONS,
+				);
+				if (!message) return;
+
+				const embed = this.buildEmbed(eventId);
+				const components = this.buildComponents(eventId);
+				if (!embed) return;
+
+				await withRetry(
+					() => message.edit({ embeds: [embed], components }),
+					LOW_RETRY_OPTIONS,
+				);
+			} catch (error) {
+				handleError({
+					reason: 'Failed to update event message',
+					severity: ErrorSeverity.LOW,
+					error,
+					metadata: { eventId },
+				});
+			}
+		};
+
+		if (immediate) {
+			return performUpdate();
+		} else {
+			const timeout = setTimeout(
+				performUpdate,
+				TIMINGS.MESSAGE_UPDATE_DEBOUNCE_MS,
+			);
+			this.updateTimeouts.set(eventId, timeout);
 		}
 	}
 }

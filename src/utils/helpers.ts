@@ -84,6 +84,18 @@ export function getExcaliburRankOfUser(
 	return null;
 }
 
+export function getEmoteForRank(
+	guildId: string | null | undefined,
+	rankId: string | null,
+) {
+	if (guildId !== EXCALIBUR_GUILD_ID) return '';
+	if (!rankId || !(rankId in EXCALIBUR_RANKS)) return '⚫ ';
+
+	const rank = EXCALIBUR_RANKS[rankId as keyof typeof EXCALIBUR_RANKS];
+
+	return `<:${rank.emoteName}:${rank.emoteId}> `;
+}
+
 export async function safeReplyToInteraction(
 	interaction: RepliableInteraction,
 	content: string,

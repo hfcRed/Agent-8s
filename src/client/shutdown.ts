@@ -1,20 +1,11 @@
 import type { Client } from 'discord.js';
-import { EmbedBuilder } from 'discord.js';
-import {
-	AUTHOR_ID,
-	COLORS,
-	FIELD_NAMES,
-	STATUS_MESSAGES,
-	TIMESTAMP,
-	TIMINGS,
-} from '../constants.js';
+import { AUTHOR_ID, TIMESTAMP, TIMINGS } from '../constants.js';
 import { cleanupEvent } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import { stopMetricsServer } from '../telemetry/metrics.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
-import { updateEmbedField } from '../utils/embed-utils.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { MEDIUM_RETRY_OPTIONS, withRetryOrNull } from '../utils/retry.js';
 
@@ -78,33 +69,8 @@ export async function gracefulShutdown(
 				`Updating event message ${i + 1}/${allTimers.length}: ${eventId}`,
 			);
 			if (channelId) {
-				const channel = await withRetryOrNull(
-					() => client.channels.fetch(channelId),
-					MEDIUM_RETRY_OPTIONS,
-				);
-
-				if (channel?.isTextBased() && !channel.isDMBased()) {
-					const message = await withRetryOrNull(
-						() => channel.messages.fetch(eventId),
-						MEDIUM_RETRY_OPTIONS,
-					);
-
-					if (message) {
-						const embed = EmbedBuilder.from(message.embeds[0]).setColor(
-							COLORS.CANCELLED,
-						);
-
-						updateEmbedField(
-							embed,
-							FIELD_NAMES.STATUS,
-							STATUS_MESSAGES.SHUTDOWN,
-						);
-						await withRetryOrNull(
-							() => message.edit({ embeds: [embed], components: [] }),
-							MEDIUM_RETRY_OPTIONS,
-						);
-					}
-				}
+				eventManager.setTerminalState(eventId, 'shutdown');
+				await eventManager.queueUpdate(eventId, true);
 			}
 
 			console.log(`Cleaning up event ${i + 1}/${allTimers.length}: ${eventId}`);

@@ -9,7 +9,6 @@ import {
 import {
 	COLORS,
 	FIELD_NAMES,
-	MAX_PARTICIPANTS,
 	PARTICIPANT_FIELD_NAME,
 	START_MESSAGES,
 	STATUS_MESSAGES,
@@ -17,37 +16,11 @@ import {
 	TITLES,
 	WEAPON_ROLES,
 } from '../constants.js';
-import type { ParticipantMap } from '../event/event-manager.js';
-
-export function updateEmbedField(
-	embed: EmbedBuilder,
-	fieldName: string,
-	newValue: string,
-) {
-	const fields = embed.data.fields || [];
-	const field = fields.find((f) => f.name === fieldName);
-	if (field) {
-		field.value = newValue;
-	}
-	embed.setFields(fields);
-}
-
-export function updateEmbedFieldByMatch(
-	embed: EmbedBuilder,
-	partialName: string,
-	newName: string,
-	newValue: string,
-) {
-	const fields = embed.data.fields || [];
-	const field = fields.find((f) => f.name.includes(partialName));
-	if (field) {
-		field.name = newName;
-		field.value = newValue;
-	}
-	embed.setFields(fields);
-}
+import { getEmoteForRank } from './helpers.js';
 
 export function createEventEmbed(
+	guildId: string | null | undefined,
+	rankId: string | null,
 	username: string,
 	avatarUrl: string,
 	userId: string,
@@ -59,7 +32,7 @@ export function createEventEmbed(
 	const embedFields = [
 		{
 			name: PARTICIPANT_FIELD_NAME(1),
-			value: `- <@${userId}>`,
+			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}>`,
 			inline: true,
 		},
 		{
@@ -166,59 +139,4 @@ export function createRoleSelectMenu() {
 		);
 
 	return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-}
-
-export function updateParticipantFields(
-	embed: EmbedBuilder,
-	participantMap: ParticipantMap,
-) {
-	updateEmbedFieldByMatch(
-		embed,
-		FIELD_NAMES.PARTICIPANTS,
-		PARTICIPANT_FIELD_NAME(participantMap.size),
-		Array.from(participantMap.values())
-			.map((p) => `- <@${p.userId}>`)
-			.join('\n'),
-	);
-
-	updateEmbedField(
-		embed,
-		FIELD_NAMES.ROLE,
-		Array.from(participantMap.values())
-			.map((p) => `- ${p.role || 'None'}`)
-			.join('\n'),
-	);
-
-	const status =
-		participantMap.size === MAX_PARTICIPANTS
-			? STATUS_MESSAGES.READY
-			: STATUS_MESSAGES.OPEN;
-	updateEmbedField(embed, FIELD_NAMES.STATUS, status);
-}
-
-export function updateQueueField(embed: EmbedBuilder, queue: string[]) {
-	const fields = embed.data.fields || [];
-	const queueField = fields.find((f) => f.name === FIELD_NAMES.QUEUE);
-
-	if (queue.length > 0) {
-		const queueValue = queue.map((userId) => `- <@${userId}>`).join('\n');
-
-		if (queueField) {
-			queueField.value = queueValue;
-		} else {
-			fields.push({
-				name: FIELD_NAMES.QUEUE,
-				value: queueValue,
-				inline: false,
-			});
-		}
-	} else {
-		const index = fields.findIndex((f) => f.name === FIELD_NAMES.QUEUE);
-
-		if (index !== -1) {
-			fields.splice(index, 1);
-		}
-	}
-
-	embed.setFields(fields);
 }

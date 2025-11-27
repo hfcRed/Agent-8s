@@ -54,6 +54,7 @@ describe('menu-handlers', () => {
 				hasStarted: false,
 			})),
 			addParticipant: vi.fn(),
+			queueUpdate: vi.fn(),
 		};
 	}
 
@@ -77,7 +78,7 @@ describe('menu-handlers', () => {
 					role: 'Tank',
 				}),
 			);
-			expect(mockInteraction.editReply).toHaveBeenCalled();
+			expect(mockEventManager.queueUpdate).toHaveBeenCalledWith('message123');
 		});
 
 		it('should reject if user not signed up', async () => {

@@ -1,108 +1,23 @@
-import { EmbedBuilder } from 'discord.js';
 import { describe, expect, it } from 'vitest';
 import {
 	COLORS,
 	FIELD_NAMES,
-	MAX_PARTICIPANTS,
 	PARTICIPANT_FIELD_NAME,
-	STATUS_MESSAGES,
 	WEAPON_ROLES,
 } from '../../constants.js';
-import type { ParticipantMap } from '../../event/event-manager.js';
 import {
 	createEventButtons,
 	createEventEmbed,
 	createEventStartedButtons,
 	createRoleSelectMenu,
-	updateEmbedField,
-	updateEmbedFieldByMatch,
-	updateParticipantFields,
 } from '../../utils/embed-utils.js';
 
 describe('embed-utils', () => {
-	describe('updateEmbedField', () => {
-		it('should update an existing field value', () => {
-			const embed = new EmbedBuilder().addFields({
-				name: 'Test Field',
-				value: 'Old Value',
-			});
-
-			updateEmbedField(embed, 'Test Field', 'New Value');
-
-			const fields = embed.data.fields || [];
-			const field = fields.find((f) => f.name === 'Test Field');
-			expect(field?.value).toBe('New Value');
-		});
-
-		it('should not modify non-matching fields', () => {
-			const embed = new EmbedBuilder().addFields(
-				{ name: 'Field 1', value: 'Value 1' },
-				{ name: 'Field 2', value: 'Value 2' },
-			);
-
-			updateEmbedField(embed, 'Field 1', 'Updated');
-
-			const fields = embed.data.fields || [];
-			expect(fields.find((f) => f.name === 'Field 1')?.value).toBe('Updated');
-			expect(fields.find((f) => f.name === 'Field 2')?.value).toBe('Value 2');
-		});
-
-		it('should handle missing field gracefully', () => {
-			const embed = new EmbedBuilder().addFields({
-				name: 'Existing',
-				value: 'Value',
-			});
-
-			updateEmbedField(embed, 'Non-Existent', 'New');
-
-			const fields = embed.data.fields || [];
-			expect(fields.length).toBe(1);
-			expect(fields[0].value).toBe('Value');
-		});
-	});
-
-	describe('updateEmbedFieldByMatch', () => {
-		it('should update field matching partial name', () => {
-			const embed = new EmbedBuilder().addFields({
-				name: 'Participants (2)',
-				value: 'List',
-			});
-
-			updateEmbedFieldByMatch(
-				embed,
-				'Participants',
-				'Participants (3)',
-				'- @user1\n- @user2\n- @user3',
-			);
-
-			const fields = embed.data.fields || [];
-			const field = fields[0];
-			expect(field.name).toBe('Participants (3)');
-			expect(field.value).toBe('- @user1\n- @user2\n- @user3');
-		});
-
-		it('should not update non-matching fields', () => {
-			const embed = new EmbedBuilder().addFields(
-				{ name: 'Status', value: 'Open' },
-				{ name: 'Role', value: 'None' },
-			);
-
-			updateEmbedFieldByMatch(
-				embed,
-				'Participants',
-				'Participants (1)',
-				'@user',
-			);
-
-			const fields = embed.data.fields || [];
-			expect(fields[0].name).toBe('Status');
-			expect(fields[1].name).toBe('Role');
-		});
-	});
-
 	describe('createEventEmbed', () => {
 		it('should create embed with all required fields for casual event', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',
@@ -124,6 +39,8 @@ describe('embed-utils', () => {
 
 		it('should create embed with all required fields for competitive event', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',
@@ -135,6 +52,8 @@ describe('embed-utils', () => {
 
 		it('should include timer information when provided', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',
@@ -149,6 +68,8 @@ describe('embed-utils', () => {
 
 		it('should include description when info is provided', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',
@@ -162,6 +83,8 @@ describe('embed-utils', () => {
 
 		it('should set default weapon role', () => {
 			const embed = createEventEmbed(
+				null,
+				null,
 				'TestUser',
 				'https://example.com/avatar.png',
 				'123456789',
@@ -252,75 +175,6 @@ describe('embed-utils', () => {
 
 			const selectMenu = row.components[0];
 			expect(selectMenu.data.placeholder).toBeTruthy();
-		});
-	});
-
-	describe('updateParticipantFields', () => {
-		it('should update participant count and list', () => {
-			const embed = new EmbedBuilder().addFields(
-				{ name: PARTICIPANT_FIELD_NAME(1), value: '- <@user1>' },
-				{ name: FIELD_NAMES.ROLE, value: '- None' },
-				{ name: FIELD_NAMES.STATUS, value: STATUS_MESSAGES.OPEN },
-			);
-
-			const participantMap: ParticipantMap = new Map([
-				['user1', { userId: 'user1', role: 'Slayer', rank: null }],
-				['user2', { userId: 'user2', role: 'Support', rank: null }],
-			]);
-
-			updateParticipantFields(embed, participantMap);
-
-			const fields = embed.data.fields || [];
-			const participantField = fields.find((f) =>
-				f.name.includes('Participants'),
-			);
-			expect(participantField?.name).toBe(PARTICIPANT_FIELD_NAME(2));
-			expect(participantField?.value).toContain('user1');
-			expect(participantField?.value).toContain('user2');
-		});
-
-		it('should update status to ready when full', () => {
-			const embed = new EmbedBuilder().addFields(
-				{ name: PARTICIPANT_FIELD_NAME(1), value: '- <@user1>' },
-				{ name: FIELD_NAMES.ROLE, value: '- None' },
-				{ name: FIELD_NAMES.STATUS, value: STATUS_MESSAGES.OPEN },
-			);
-
-			const participantMap: ParticipantMap = new Map();
-			for (let i = 0; i < MAX_PARTICIPANTS; i++) {
-				participantMap.set(`user${i}`, {
-					userId: `user${i}`,
-					role: 'None',
-					rank: null,
-				});
-			}
-
-			updateParticipantFields(embed, participantMap);
-
-			const fields = embed.data.fields || [];
-			const statusField = fields.find((f) => f.name === FIELD_NAMES.STATUS);
-
-			expect([STATUS_MESSAGES.READY]).toContain(statusField?.value);
-		});
-
-		it('should update roles alongside participants', () => {
-			const embed = new EmbedBuilder().addFields(
-				{ name: PARTICIPANT_FIELD_NAME(1), value: '- <@user1>' },
-				{ name: FIELD_NAMES.ROLE, value: '- None' },
-				{ name: FIELD_NAMES.STATUS, value: STATUS_MESSAGES.OPEN },
-			);
-
-			const participantMap: ParticipantMap = new Map([
-				['user1', { userId: 'user1', role: '🔪 Slayer', rank: null }],
-				['user2', { userId: 'user2', role: '🛡️ Support', rank: null }],
-			]);
-
-			updateParticipantFields(embed, participantMap);
-
-			const fields = embed.data.fields || [];
-			const roleField = fields.find((f) => f.name === FIELD_NAMES.ROLE);
-			expect(roleField?.value).toContain('🔪 Slayer');
-			expect(roleField?.value).toContain('🛡️ Support');
 		});
 	});
 });

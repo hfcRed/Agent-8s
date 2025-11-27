@@ -76,6 +76,7 @@ describe('create-command', () => {
 			setTimer: vi.fn(),
 			setParticipants: vi.fn(),
 			setGuildId: vi.fn(),
+			setMessageData: vi.fn(),
 			getParticipants: vi.fn(() => new Map()),
 			removeUserFromAllQueues: vi.fn().mockResolvedValue(undefined),
 		};

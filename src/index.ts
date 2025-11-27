@@ -98,10 +98,10 @@ const commands = [
 ];
 
 const telemetry = initializeTelemetry(telemetryUrl, telemetryToken);
-const eventManager = new EventManager();
 const threadManager = new ThreadManager();
 const voiceChannelManager = new VoiceChannelManager();
 const appClient = createDiscordClient();
+const eventManager = new EventManager(appClient);
 const lockedUsers = new Set<string>();
 
 loginClient(appClient, botToken).then();
