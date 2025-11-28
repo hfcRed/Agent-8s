@@ -24,6 +24,7 @@ import {
 } from '../utils/retry.js';
 
 type EventOperation = 'starting' | 'finishing' | 'cancelling' | 'cleanup';
+type TerminalStates = 'cancelled' | 'finished' | 'expired' | 'shutdown';
 
 export interface EventTimer {
 	startTime: number;
@@ -62,10 +63,7 @@ export class EventManager {
 	private casual = new Map<string, boolean>();
 	private info = new Map<string, string | undefined>();
 	private updateTimeouts = new Map<string, NodeJS.Timeout>();
-	private terminalStates = new Map<
-		string,
-		'cancelled' | 'finished' | 'expired' | 'shutdown' | null
-	>();
+	private terminalStates = new Map<string, TerminalStates>();
 
 	constructor(private client: Client) {}
 
@@ -558,7 +556,7 @@ export class EventManager {
 		const timeInMinutes = timerData.duration
 			? timerData.duration / TIMINGS.MINUTE_IN_MS
 			: undefined;
-		return [createEventButtons(timeInMinutes)];
+		return [createEventButtons(timeInMinutes), createRoleSelectMenu()];
 	}
 
 	queueUpdate(eventId: string, immediate = false) {
