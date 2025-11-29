@@ -352,7 +352,7 @@ export class EventManager {
 		return queue.includes(userId);
 	}
 
-	removeNextFromQueue(eventId: string): string | undefined {
+	removeNextFromQueue(eventId: string) {
 		const queue = this.queues.get(eventId) || [];
 		const next = queue.shift();
 
@@ -433,7 +433,7 @@ export class EventManager {
 		return this.terminalStates.get(eventId);
 	}
 
-	buildEmbed(eventId: string): EmbedBuilder | null {
+	buildEmbed(eventId: string) {
 		const participantMap = this.getParticipants(eventId);
 		const timerData = this.getTimer(eventId);
 		const creatorId = this.getCreator(eventId);

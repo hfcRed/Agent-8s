@@ -186,7 +186,7 @@ export class TelemetryService {
 		await this.recorder?.dispose();
 	}
 
-	getStatus(): TelemetryStatus {
+	getStatus() {
 		return {
 			remoteEnabled: this.remoteEnabled,
 			databaseEnabled: Boolean(this.recorder),
