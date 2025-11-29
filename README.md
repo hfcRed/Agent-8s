@@ -67,6 +67,8 @@ When an event has started after reaching 8 participants, users can join a waitin
 
 If spectators are enabled for an event, up to two users can spectate the event using the ``Spectate`` button. Spectators can stop spectating at any time using the ``Stop Spectating`` button. If a spectator uses the ``Drop In`` button they will be moved from spectators to participants. Spectators can also join the queue, and if promoted from the queue, they will automatically be removed from the spectators list.
 
+If the owner of an event drops out after the event has started, ownership is transferred to the next available person in the event.
+
 Admins can cancel and finish events at any point, even if they are not part of the event.
 
 Should an event not start because not enough players are found, or the event is not manually finished, the bot will automatically close and archive the event after 24 hours.
