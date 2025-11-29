@@ -327,7 +327,13 @@ export class EventManager {
 	}
 
 	isUserInAnyEvent(userId: string) {
-		return this.userToEventIndex.has(userId);
+		if (this.userToEventIndex.has(userId)) return true;
+
+		for (const spectators of this.spectators.values()) {
+			if (spectators.includes(userId)) return true;
+		}
+
+		return false;
 	}
 
 	getUserEventId(userId: string) {

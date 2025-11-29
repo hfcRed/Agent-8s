@@ -776,6 +776,14 @@ export async function handleSpectateButton(
 			return;
 		}
 
+		if (eventManager.isUserInAnyEvent(userId) && !participantMap.has(userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
 		if (eventManager.isSpectatorsFull(messageId)) {
 			await interaction.followUp({
 				content: ERROR_MESSAGES.SPECTATE_FULL,
