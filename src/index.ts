@@ -25,7 +25,9 @@ import {
 	handleLeaveQueueButton,
 	handleSignOutButton,
 	handleSignUpButton,
+	handleSpectateButton,
 	handleStartNowButton,
+	handleStopSpectatingButton,
 } from './interactions/button-handlers.js';
 import { handleRoleSelection } from './interactions/menu-handlers.js';
 import { ThreadManager } from './managers/thread-manager.js';
@@ -260,6 +262,24 @@ appClient.on('interactionCreate', async (interaction) => {
 					handleJoinQueueButton(interaction, eventManager, telemetry),
 				leavequeue: () =>
 					handleLeaveQueueButton(interaction, eventManager, telemetry),
+				spectate: () =>
+					handleSpectateButton(
+						interaction,
+						eventManager,
+						appClient,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					),
+				stopspectating: () =>
+					handleStopSpectatingButton(
+						interaction,
+						eventManager,
+						appClient,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					),
 			};
 
 			const handler = buttonHandlers[interaction.customId];

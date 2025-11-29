@@ -145,19 +145,31 @@ describe('embed-utils', () => {
 	});
 
 	describe('createEventStartedButtons', () => {
-		it('should create three buttons for started events', () => {
-			const row = createEventStartedButtons();
+		it('should create two button rows for started events with spectate buttons', () => {
+			const rows = createEventStartedButtons();
 
-			expect(row.components.length).toBe(5);
-			const customIds = row.components.map((c) => {
+			expect(rows.length).toBe(2);
+
+			// First row should have 5 buttons
+			expect(rows[0].components.length).toBe(5);
+			const row1CustomIds = rows[0].components.map((c) => {
 				const data = c.data as { custom_id?: string };
 				return data.custom_id;
 			});
-			expect(customIds).toContain('dropin');
-			expect(customIds).toContain('dropout');
-			expect(customIds).toContain('joinqueue');
-			expect(customIds).toContain('leavequeue');
-			expect(customIds).toContain('finish');
+			expect(row1CustomIds).toContain('dropin');
+			expect(row1CustomIds).toContain('dropout');
+			expect(row1CustomIds).toContain('joinqueue');
+			expect(row1CustomIds).toContain('leavequeue');
+			expect(row1CustomIds).toContain('finish');
+
+			// Second row should have 2 spectate buttons
+			expect(rows[1].components.length).toBe(2);
+			const row2CustomIds = rows[1].components.map((c) => {
+				const data = c.data as { custom_id?: string };
+				return data.custom_id;
+			});
+			expect(row2CustomIds).toContain('spectate');
+			expect(row2CustomIds).toContain('stopspectating');
 		});
 	});
 

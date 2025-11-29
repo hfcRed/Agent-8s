@@ -3,6 +3,7 @@ import {
 	COLORS,
 	FIELD_NAMES,
 	MAX_PARTICIPANTS,
+	MAX_SPECTATORS,
 	PARTICIPANT_FIELD_NAME,
 	START_MESSAGES,
 	STATUS_MESSAGES,
@@ -61,6 +62,7 @@ export class EventManager {
 	private repingCooldowns = new Map<string, number>();
 	private repingMessages = new Map<string, string>();
 	private queues = new Map<string, string[]>();
+	private spectators = new Map<string, string[]>();
 
 	private casual = new Map<string, boolean>();
 	private info = new Map<string, string | undefined>();
@@ -390,6 +392,41 @@ export class EventManager {
 		this.queues.delete(eventId);
 	}
 
+	getSpectators(eventId: string) {
+		return this.spectators.get(eventId) || [];
+	}
+
+	addSpectator(eventId: string, userId: string) {
+		const spectators = this.spectators.get(eventId) || [];
+
+		if (spectators.length >= MAX_SPECTATORS || spectators.includes(userId))
+			return;
+
+		spectators.push(userId);
+		this.spectators.set(eventId, spectators);
+	}
+
+	removeSpectator(eventId: string, userId: string) {
+		const spectators = this.spectators.get(eventId) || [];
+		const filtered = spectators.filter((id) => id !== userId);
+
+		this.spectators.set(eventId, filtered);
+	}
+
+	isUserSpectating(eventId: string, userId: string) {
+		const spectators = this.spectators.get(eventId) || [];
+		return spectators.includes(userId);
+	}
+
+	isSpectatorsFull(eventId: string) {
+		const spectators = this.spectators.get(eventId) || [];
+		return spectators.length >= MAX_SPECTATORS;
+	}
+
+	deleteSpectators(eventId: string) {
+		this.spectators.delete(eventId);
+	}
+
 	clearAllEventData(eventId: string) {
 		this.deleteParticipants(eventId);
 		this.deleteCreator(eventId);
@@ -403,6 +440,7 @@ export class EventManager {
 		this.deleteRepingCooldown(eventId);
 		this.deleteRepingMessage(eventId);
 		this.deleteQueue(eventId);
+		this.deleteSpectators(eventId);
 
 		this.casual.delete(eventId);
 		this.info.delete(eventId);
@@ -442,6 +480,7 @@ export class EventManager {
 		const timerData = this.getTimer(eventId);
 		const creatorId = this.getCreator(eventId);
 		const queue = this.getQueue(eventId);
+		const spectators = this.getSpectators(eventId);
 		const casualMode = this.casual.get(eventId) ?? true;
 		const infoText = this.info.get(eventId);
 
@@ -537,6 +576,17 @@ export class EventManager {
 			embed.setDescription(infoText);
 		}
 
+		if (spectators.length > 0) {
+			const spectatorsValue = spectators
+				.map((userId) => `- <@${userId}>`)
+				.join('\n');
+			embed.addFields({
+				name: FIELD_NAMES.SPECTATORS,
+				value: spectatorsValue,
+				inline: false,
+			});
+		}
+
 		if (queue.length > 0) {
 			const queueValue = queue.map((userId) => `- <@${userId}>`).join('\n');
 			embed.addFields({
@@ -556,7 +606,7 @@ export class EventManager {
 		if (!timerData || terminalState) return [];
 
 		if (timerData.hasStarted) {
-			return [createEventStartedButtons(), createRoleSelectMenu()];
+			return [...createEventStartedButtons(), createRoleSelectMenu()];
 		}
 
 		const timeInMinutes = timerData.duration

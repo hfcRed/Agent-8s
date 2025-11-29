@@ -9,6 +9,7 @@ export const DEFAULT_SCHEMA = 'public';
 export const DEFAULT_TABLE = 'telemetry_events';
 
 export const MAX_PARTICIPANTS = DEV ? 2 : 8;
+export const MAX_SPECTATORS = 2;
 export const MATCH_ID_LENGTH = 5;
 
 export const WEAPON_ROLES = [
@@ -51,6 +52,7 @@ export const FIELD_NAMES = {
 	ROLE: 'Role',
 	START: 'Start',
 	STATUS: 'Status',
+	SPECTATORS: 'Spectators',
 	QUEUE: 'Queue',
 } as const;
 
@@ -156,6 +158,12 @@ export const ERROR_MESSAGES = {
 	QUEUE_NOT_IN_QUEUE: 'You are not in the queue for this event.',
 	JOIN_QUEUE_ERROR: 'An error occurred while joining the queue.',
 	LEAVE_QUEUE_ERROR: 'An error occurred while leaving the queue.',
+
+	SPECTATE_ALREADY_SPECTATING: 'You are already spectating this event.',
+	SPECTATE_FULL: 'This event already has the maximum number of spectators.',
+	SPECTATE_NOT_SPECTATING: 'You are not spectating this event.',
+	SPECTATE_ERROR: 'An error occurred while starting to spectate.',
+	STOP_SPECTATE_ERROR: 'An error occurred while stopping spectating.',
 
 	KICK_NOT_PARTICIPANT: (userId: string) =>
 		`<@${userId}> is not signed up for your event.` as const,

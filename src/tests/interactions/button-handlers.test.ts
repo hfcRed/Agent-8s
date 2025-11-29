@@ -98,6 +98,8 @@ describe('button-handlers', () => {
 			setTerminalState: vi.fn(),
 			queueUpdate: vi.fn(),
 			transferOwnership: vi.fn(),
+			isUserSpectating: vi.fn(() => false),
+			removeSpectator: vi.fn(),
 		};
 	}
 

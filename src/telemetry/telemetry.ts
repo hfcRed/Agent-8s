@@ -182,6 +182,14 @@ export class TelemetryService {
 		await this.sendEvent('ownership_transferred', data);
 	}
 
+	async trackUserStartedSpectating(data: TelemetryEventData) {
+		await this.sendEvent('user_started_spectating', data);
+	}
+
+	async trackUserStoppedSpectating(data: TelemetryEventData) {
+		await this.sendEvent('user_stopped_spectating', data);
+	}
+
 	async dispose() {
 		await this.recorder?.dispose();
 	}

@@ -97,7 +97,7 @@ export function createEventButtons(timeInMinutes?: number) {
 }
 
 export function createEventStartedButtons() {
-	return new ActionRowBuilder<ButtonBuilder>().addComponents(
+	const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()
 			.setEmoji('📝')
 			.setCustomId('dropin')
@@ -124,6 +124,21 @@ export function createEventStartedButtons() {
 			.setLabel('Finish Event')
 			.setStyle(ButtonStyle.Success),
 	);
+
+	const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+		new ButtonBuilder()
+			.setEmoji('👁️')
+			.setCustomId('spectate')
+			.setLabel('Spectate')
+			.setStyle(ButtonStyle.Secondary),
+		new ButtonBuilder()
+			.setEmoji('🚫')
+			.setCustomId('stopspectating')
+			.setLabel('Stop Spectating')
+			.setStyle(ButtonStyle.Secondary),
+	);
+
+	return [row1, row2];
 }
 
 export function createRoleSelectMenu() {
