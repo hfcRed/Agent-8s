@@ -759,8 +759,9 @@ export async function handleSpectateButton(
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
 		const participantMap = eventManager.getParticipants(messageId);
+		const creatorId = eventManager.getCreator(messageId);
 
-		if (!participantMap) return;
+		if (!participantMap || !creatorId) return;
 
 		await interaction.deferUpdate();
 
@@ -793,7 +794,46 @@ export async function handleSpectateButton(
 		eventManager.addSpectator(messageId, userId);
 
 		if (participantMap.has(userId)) {
+			if (userId === creatorId) {
+				if (participantMap.size <= 1) {
+					eventManager.removeSpectator(messageId, userId);
+					await interaction.followUp({
+						content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+						flags: ['Ephemeral'],
+					});
+					return;
+				}
+
+				const newOwnerId = await eventManager.transferOwnership(
+					messageId,
+					userId,
+					threadManager,
+					telemetry,
+				);
+
+				if (!newOwnerId) {
+					eventManager.removeSpectator(messageId, userId);
+					await interaction.followUp({
+						content: ERROR_MESSAGES.SPECTATE_ERROR,
+						flags: ['Ephemeral'],
+					});
+					return;
+				}
+			}
+
 			eventManager.removeParticipant(messageId, userId);
+
+			const channel = interaction.channel as TextChannel;
+			await promoteNextFromQueue(
+				messageId,
+				eventManager,
+				appClient,
+				threadManager,
+				voiceChannelManager,
+				channel,
+				telemetry,
+			);
+
 			eventManager.queueUpdate(messageId);
 
 			telemetry?.trackUserDropOut(telemetryData);
