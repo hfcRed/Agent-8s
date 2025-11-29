@@ -756,6 +756,9 @@ export async function handleSpectateButton(
 	telemetry?: TelemetryService,
 ) {
 	try {
+		const enabled = eventManager.getSpectatorsEnabled(interaction.message.id);
+		if (!enabled) return;
+
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
 		const participantMap = eventManager.getParticipants(messageId);

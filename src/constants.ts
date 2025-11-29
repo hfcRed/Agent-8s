@@ -164,6 +164,8 @@ export const ERROR_MESSAGES = {
 	SPECTATE_NOT_SPECTATING: 'You are not spectating this event.',
 	SPECTATE_ERROR: 'An error occurred while starting to spectate.',
 	STOP_SPECTATE_ERROR: 'An error occurred while stopping spectating.',
+	TOGGLE_SPECTATORS_ERROR:
+		'An error occurred while toggling spectators for your event.',
 
 	KICK_NOT_PARTICIPANT: (userId: string) =>
 		`<@${userId}> is not signed up for your event.` as const,
@@ -176,6 +178,9 @@ export const SUCCESS_MESSAGES = {
 		`Successfully kicked <@${userId}> from your event.` as const,
 	OWNERSHIP_TRANSFERRED: (userId: string) =>
 		`⚠️ Event owner dropped out! <@${userId}> you are now the owner of this event.` as const,
+	SPECTATORS_ENABLED: 'Spectators are now **enabled** for your event.',
+	SPECTATORS_DISABLED:
+		'Spectators are now **disabled** for your event. All current spectators have been removed.',
 } as const;
 
 export const PROCESSING_MESSAGES = {

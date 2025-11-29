@@ -101,6 +101,7 @@ describe('button-handlers', () => {
 			transferOwnership: vi.fn(),
 			isUserSpectating: vi.fn(() => false),
 			isSpectatorsFull: vi.fn(() => false),
+			getSpectatorsEnabled: vi.fn(() => true),
 			addSpectator: vi.fn(),
 			removeSpectator: vi.fn(),
 		};

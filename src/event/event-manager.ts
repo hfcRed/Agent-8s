@@ -476,6 +476,10 @@ export class EventManager {
 		return this.spectatorsEnabled.get(eventId) ?? true;
 	}
 
+	setSpectatorsEnabled(eventId: string, enabled: boolean) {
+		this.spectatorsEnabled.set(eventId, enabled);
+	}
+
 	setTerminalState(
 		eventId: string,
 		state: 'cancelled' | 'finished' | 'expired' | 'shutdown',

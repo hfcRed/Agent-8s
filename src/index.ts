@@ -13,6 +13,7 @@ import { handleCreateCommand } from './commands/create-command.js';
 import { handleKickCommand } from './commands/kick-command.js';
 import { handleRepingCommand } from './commands/reping-command.js';
 import { handleStatusCommand } from './commands/status-command.js';
+import { handleToggleSpectatorsCommand } from './commands/toggle-spectators-command.js';
 import { ERROR_MESSAGES, TIMINGS } from './constants.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
 import { EventManager } from './event/event-manager.js';
@@ -103,6 +104,10 @@ const commands = [
 			option.setName('user').setDescription('User to kick').setRequired(true),
 		)
 		.toJSON(),
+	new SlashCommandBuilder()
+		.setName('toggle-spectators')
+		.setDescription('Enable or disable spectators for your event.')
+		.toJSON(),
 ];
 
 const telemetry = initializeTelemetry(telemetryUrl, telemetryToken);
@@ -179,6 +184,14 @@ appClient.on('interactionCreate', async (interaction) => {
 						threadManager,
 						voiceChannelManager,
 						telemetry,
+					),
+				togglespectators: () =>
+					handleToggleSpectatorsCommand(
+						interaction,
+						eventManager,
+						appClient,
+						threadManager,
+						voiceChannelManager,
 					),
 			};
 

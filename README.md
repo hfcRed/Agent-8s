@@ -51,6 +51,10 @@ Kick the selected user from your event.
 
 - ``user``: User to kick
 
+#### ``/toggle-spectators``
+
+Enable or disable spectators for your event. When disabling spectators, all current spectators will be removed from the event.
+
 #### ``/status``
 
 Display bot status and statistics.
