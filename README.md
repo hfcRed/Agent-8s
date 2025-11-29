@@ -38,6 +38,7 @@ Create a new 8s event.
 
 - ``time``: Time in minutes before the event starts. If not specified, event starts when 8 players sign up.
 - ``casual``: Whether to ping casual roles.
+- ``spectators``: Whether to allow spectators for this event.
 - ``info``: Add a description to the event.
 
 #### ``/re-ping``
@@ -63,6 +64,8 @@ Once an event starts, all participants will be added to a private thread only vi
 After an event has started, users can use the ``Drop In`` and ``Drop Out`` buttons to enter or exit the event.
 
 When an event has started after reaching 8 participants, users can join a waiting queue using the ``Join Queue`` button. Players in the queue will be automatically added to the event when a participant drops out. The queue operates on a first-in-first-out basis. Users can leave the queue at any time using the ``Leave Queue`` button.
+
+If spectators are enabled for an event, up to two users can spectate the event using the ``Spectate`` button. Spectators can stop spectating at any time using the ``Stop Spectating`` button. If a spectator uses the ``Drop In`` button they will be moved from spectators to participants. Spectators can also join the queue, and if promoted from the queue, they will automatically be removed from the spectators list.
 
 Admins can cancel and finish events at any point, even if they are not part of the event.
 
