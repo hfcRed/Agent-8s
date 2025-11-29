@@ -64,7 +64,7 @@ describe('reping-command', () => {
 		]);
 
 		return {
-			userOwnsEvent: vi.fn(() => 'message123'),
+			getUserEventId: vi.fn(() => 'message123'),
 			getParticipants: vi.fn(() => participants),
 			getRepingCooldown: vi.fn(),
 			getChannelId: vi.fn(() => 'channel123'),
@@ -102,10 +102,10 @@ describe('reping-command', () => {
 			expect(mockEventManager.setRepingCooldown).toHaveBeenCalled();
 		});
 
-		it('should reject if user does not own event', async () => {
+		it('should reject if user is not in any event', async () => {
 			const mockReply = vi.fn().mockResolvedValue(undefined);
 			mockInteraction.reply = mockReply;
-			mockEventManager.userOwnsEvent.mockReturnValue(false as never);
+			mockEventManager.getUserEventId.mockReturnValue(undefined as never);
 
 			await handleRepingCommand(
 				mockInteraction as never,
@@ -114,7 +114,7 @@ describe('reping-command', () => {
 			);
 
 			expect(mockReply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.NO_EVENT_OWNED,
+				content: ERROR_MESSAGES.NOT_IN_EVENT,
 				flags: ['Ephemeral'],
 			});
 		});

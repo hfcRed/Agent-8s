@@ -122,6 +122,7 @@ export const ERROR_MESSAGES = {
 	NOT_ENOUGH_PARTICIPANTS:
 		'Cannot start the event yet - not enough participants signed up.',
 	NO_EVENT_OWNED: "You don't own any active events.",
+	NOT_IN_EVENT: "You're not currently in any active events.",
 	REPING_EVENT_FULL: 'Your event is already full. No need to re-ping roles.',
 
 	CHANNEL_NOT_FOUND: 'Could not find the event channel.',

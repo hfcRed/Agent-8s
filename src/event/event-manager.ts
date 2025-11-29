@@ -327,6 +327,10 @@ export class EventManager {
 		return this.userToEventIndex.has(userId);
 	}
 
+	getUserEventId(userId: string) {
+		return this.userToEventIndex.get(userId);
+	}
+
 	getQueue(eventId: string) {
 		return this.queues.get(eventId) || [];
 	}

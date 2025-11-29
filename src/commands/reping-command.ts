@@ -23,11 +23,11 @@ export async function handleRepingCommand(
 ) {
 	try {
 		const userId = interaction.user.id;
-		const userEventId = eventManager.userOwnsEvent(userId);
+		const userEventId = eventManager.getUserEventId(userId);
 
 		if (!userEventId) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.NO_EVENT_OWNED,
+				content: ERROR_MESSAGES.NOT_IN_EVENT,
 				flags: ['Ephemeral'],
 			});
 			return;
