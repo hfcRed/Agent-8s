@@ -75,6 +75,12 @@ const commands = [
 				.setDescription('Whether to ping casual roles.')
 				.setRequired(false),
 		)
+		.addBooleanOption((option) =>
+			option
+				.setName('spectators')
+				.setDescription('Whether to allow spectators for this event.')
+				.setRequired(false),
+		)
 		.addStringOption((option) =>
 			option
 				.setName('info')

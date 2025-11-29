@@ -96,7 +96,7 @@ export function createEventButtons(timeInMinutes?: number) {
 	return new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons);
 }
 
-export function createEventStartedButtons() {
+export function createEventStartedButtons(spectators: boolean = false) {
 	const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()
 			.setEmoji('📝')
@@ -124,6 +124,8 @@ export function createEventStartedButtons() {
 			.setLabel('Finish Event')
 			.setStyle(ButtonStyle.Success),
 	);
+
+	if (!spectators) return [row1];
 
 	const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()

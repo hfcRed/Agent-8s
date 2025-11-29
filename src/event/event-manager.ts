@@ -66,6 +66,7 @@ export class EventManager {
 
 	private casual = new Map<string, boolean>();
 	private info = new Map<string, string | undefined>();
+	private spectatorsEnabled = new Map<string, boolean>();
 	private updateTimeouts = new Map<string, NodeJS.Timeout>();
 	private terminalStates = new Map<string, TerminalStates>();
 
@@ -444,6 +445,7 @@ export class EventManager {
 
 		this.casual.delete(eventId);
 		this.info.delete(eventId);
+		this.spectatorsEnabled.delete(eventId);
 		this.terminalStates.delete(eventId);
 
 		const timeout = this.getTimeout(eventId);
@@ -459,9 +461,19 @@ export class EventManager {
 		}
 	}
 
-	setMessageData(eventId: string, casual: boolean, info?: string) {
+	setMessageData(
+		eventId: string,
+		casual: boolean,
+		spectators: boolean,
+		info?: string,
+	) {
 		this.casual.set(eventId, casual);
+		this.spectatorsEnabled.set(eventId, spectators);
 		this.info.set(eventId, info);
+	}
+
+	getSpectatorsEnabled(eventId: string) {
+		return this.spectatorsEnabled.get(eventId) ?? true;
 	}
 
 	setTerminalState(
@@ -606,7 +618,9 @@ export class EventManager {
 		if (!timerData || terminalState) return [];
 
 		if (timerData.hasStarted) {
-			return [...createEventStartedButtons(), createRoleSelectMenu()];
+			const spectators = this.getSpectatorsEnabled(eventId);
+
+			return [...createEventStartedButtons(spectators), createRoleSelectMenu()];
 		}
 
 		const timeInMinutes = timerData.duration
