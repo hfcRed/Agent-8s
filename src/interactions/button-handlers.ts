@@ -397,20 +397,37 @@ export async function handleDropOutButton(
 
 		await interaction.deferUpdate();
 
-		if (userId === creatorId) {
-			await interaction.followUp({
-				content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
-				flags: ['Ephemeral'],
-			});
-			return;
-		}
-
 		if (!participantMap.has(userId)) {
 			await interaction.followUp({
 				content: ERROR_MESSAGES.NOT_SIGNED_UP,
 				flags: ['Ephemeral'],
 			});
 			return;
+		}
+
+		if (userId === creatorId) {
+			if (participantMap.size <= 1) {
+				await interaction.followUp({
+					content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+
+			const newOwnerId = await eventManager.transferOwnership(
+				messageId,
+				userId,
+				threadManager,
+				telemetry,
+			);
+
+			if (!newOwnerId) {
+				await interaction.followUp({
+					content: ERROR_MESSAGES.DROP_OUT_ERROR,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
 		}
 
 		eventManager.removeParticipant(messageId, userId);

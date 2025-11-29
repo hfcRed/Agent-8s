@@ -6,9 +6,11 @@ import {
 	PARTICIPANT_FIELD_NAME,
 	START_MESSAGES,
 	STATUS_MESSAGES,
+	SUCCESS_MESSAGES,
 	TIMINGS,
 	TITLES,
 } from '../constants.js';
+import type { ThreadManager } from '../managers/thread-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import {
 	createEventButtons,
@@ -490,7 +492,7 @@ export class EventManager {
 		const participantList = participants
 			.map(
 				(p) =>
-					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>`,
+					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>${p.userId === creatorId ? ' 👑' : ''}`,
 			)
 			.join('\n');
 		const roleList = participants
@@ -557,6 +559,71 @@ export class EventManager {
 			? timerData.duration / TIMINGS.MINUTE_IN_MS
 			: undefined;
 		return [createEventButtons(timeInMinutes), createRoleSelectMenu()];
+	}
+
+	async transferOwnership(
+		eventId: string,
+		oldOwnerId: string,
+		threadManager: ThreadManager,
+		telemetry?: TelemetryService,
+	) {
+		const participants = this.getParticipants(eventId);
+		if (!participants || participants.size < 2) return null;
+
+		let newOwnerId: string | null = null;
+		for (const userId of participants.keys()) {
+			if (userId !== oldOwnerId) {
+				newOwnerId = userId;
+				break;
+			}
+		}
+		if (!newOwnerId) return null;
+
+		this.setCreator(eventId, newOwnerId);
+
+		await telemetry?.trackOwnershipTransferred({
+			guildId: this.getGuildId(eventId) || 'unknown',
+			eventId: eventId,
+			userId: oldOwnerId,
+			targetUserId: newOwnerId,
+			participants: Array.from(participants.values()),
+			channelId: this.getChannelId(eventId) || 'unknown',
+			matchId: this.getMatchId(eventId) || 'unknown',
+		});
+
+		const threadId = this.getThread(eventId);
+		const channelId = this.getChannelId(eventId);
+		if (!threadId || !channelId) return newOwnerId;
+
+		try {
+			const channel = await withRetryOrNull(
+				() => this.client.channels.fetch(channelId),
+				LOW_RETRY_OPTIONS,
+			);
+
+			if (channel?.isTextBased() && 'threads' in channel) {
+				const thread = await threadManager.fetchThread(
+					channel as Parameters<typeof threadManager.fetchThread>[0],
+					threadId,
+				);
+
+				if (thread) {
+					await threadManager.sendMessage(
+						thread,
+						SUCCESS_MESSAGES.OWNERSHIP_TRANSFERRED(newOwnerId),
+					);
+				}
+			}
+		} catch (error) {
+			handleError({
+				reason: 'Failed to send ownership transfer notification',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { eventId, newOwnerId },
+			});
+		}
+
+		return newOwnerId;
 	}
 
 	queueUpdate(eventId: string, immediate = false) {

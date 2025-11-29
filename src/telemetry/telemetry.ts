@@ -178,6 +178,10 @@ export class TelemetryService {
 		await this.sendEvent('user_promoted_from_queue', data);
 	}
 
+	async trackOwnershipTransferred(data: TelemetryEventData) {
+		await this.sendEvent('ownership_transferred', data);
+	}
+
 	async dispose() {
 		await this.recorder?.dispose();
 	}

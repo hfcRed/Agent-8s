@@ -32,7 +32,7 @@ export function createEventEmbed(
 	const embedFields = [
 		{
 			name: PARTICIPANT_FIELD_NAME(1),
-			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}>`,
+			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}> 👑`,
 			inline: true,
 		},
 		{

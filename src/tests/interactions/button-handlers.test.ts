@@ -97,6 +97,7 @@ describe('button-handlers', () => {
 			getQueue: vi.fn(() => []),
 			setTerminalState: vi.fn(),
 			queueUpdate: vi.fn(),
+			transferOwnership: vi.fn(),
 		};
 	}
 
@@ -478,6 +479,76 @@ describe('button-handlers', () => {
 			expect(
 				mockVoiceChannelManager.revokeAccessFromChannels,
 			).toHaveBeenCalled();
+		});
+
+		it('should allow owner to drop out when other participants exist', async () => {
+			const participants = new Map([
+				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['user456', { userId: 'user456', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('user123');
+			mockEventManager.transferOwnership = vi.fn().mockResolvedValue('user456');
+
+			await handleDropOutButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockEventManager.transferOwnership).toHaveBeenCalled();
+			expect(mockEventManager.removeParticipant).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+			);
+		});
+
+		it('should reject owner drop out when they are the only participant', async () => {
+			const participants = new Map([
+				['user123', { userId: 'user123', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('user123');
+
+			await handleDropOutButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockInteraction.followUp).toHaveBeenCalledWith({
+				content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+				flags: ['Ephemeral'],
+			});
+			expect(mockEventManager.removeParticipant).not.toHaveBeenCalled();
+		});
+
+		it('should reject if user is not signed up', async () => {
+			const participants = new Map([
+				['creator456', { userId: 'creator456', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('creator456');
+
+			await handleDropOutButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockInteraction.followUp).toHaveBeenCalledWith({
+				content: ERROR_MESSAGES.NOT_SIGNED_UP,
+				flags: ['Ephemeral'],
+			});
 		});
 	});
 

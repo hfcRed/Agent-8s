@@ -114,6 +114,8 @@ export const ERROR_MESSAGES = {
 		'Only the event creator or administrators can finish this event.',
 	CREATOR_CANNOT_SIGNOUT:
 		'The event creator cannot sign out. Please cancel or finish the event instead.',
+	OWNER_ONLY_PARTICIPANT:
+		'You are the only participant in this event. Please finish the event instead of dropping out.',
 	NO_BOT_PERMISSIONS: 'I do not have permission to interact in this channel.',
 	KICK_SELF: 'You cannot kick yourself from your own event.',
 
@@ -163,6 +165,8 @@ export const ERROR_MESSAGES = {
 export const SUCCESS_MESSAGES = {
 	KICK_SUCCESS: (userId: string) =>
 		`Successfully kicked <@${userId}> from your event.` as const,
+	OWNERSHIP_TRANSFERRED: (userId: string) =>
+		`⚠️ Event owner dropped out! <@${userId}> you are now the owner of this event.` as const,
 } as const;
 
 export const PROCESSING_MESSAGES = {
