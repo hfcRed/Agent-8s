@@ -167,6 +167,11 @@ export const ERROR_MESSAGES = {
 	TOGGLE_SPECTATORS_ERROR:
 		'An error occurred while toggling spectators for your event.',
 
+	DROPOUT_ALL_NOT_IN_EVENTS:
+		"You're not currently participating in, spectating, or queued for any events.",
+	DROPOUT_ALL_ERROR:
+		'An error occurred while processing your dropout-all request.',
+
 	KICK_NOT_PARTICIPANT: (userId: string) =>
 		`<@${userId}> is not signed up for your event.` as const,
 	REPING_COOLDOWN: (minutesLeft: number) =>
@@ -181,6 +186,8 @@ export const SUCCESS_MESSAGES = {
 	SPECTATORS_ENABLED: 'Spectators are now **enabled** for your event.',
 	SPECTATORS_DISABLED:
 		'Spectators are now **disabled** for your event. All current spectators have been removed.',
+	DROPOUT_ALL_SUCCESS:
+		'Successfully removed you from all events, queues, and spectator lists.',
 } as const;
 
 export const PROCESSING_MESSAGES = {

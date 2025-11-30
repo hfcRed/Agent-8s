@@ -55,6 +55,10 @@ Kick the selected user from your event.
 
 Enable or disable spectators for your event. When disabling spectators, all current spectators will be removed from the event.
 
+#### ``/dropout-all``
+
+Remove yourself from all events, queues, and spectator lists. If you own an event, it will be cancelled. This command is useful as an escape hatch if an event gets stuck in an unrecoverable state.
+
 #### ``/status``
 
 Display bot status and statistics.

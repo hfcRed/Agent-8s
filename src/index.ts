@@ -10,6 +10,7 @@ import {
 } from './client/discord-client.js';
 import { isInShutdownMode, setupShutdownHandlers } from './client/shutdown.js';
 import { handleCreateCommand } from './commands/create-command.js';
+import { handleDropoutAllCommand } from './commands/dropout-all-command.js';
 import { handleKickCommand } from './commands/kick-command.js';
 import { handleRepingCommand } from './commands/reping-command.js';
 import { handleStatusCommand } from './commands/status-command.js';
@@ -108,6 +109,12 @@ const commands = [
 		.setName('toggle-spectators')
 		.setDescription('Enable or disable spectators for your event.')
 		.toJSON(),
+	new SlashCommandBuilder()
+		.setName('dropout-all')
+		.setDescription(
+			'Remove yourself from all events, queues, and spectator lists.',
+		)
+		.toJSON(),
 ];
 
 const telemetry = initializeTelemetry(telemetryUrl, telemetryToken);
@@ -192,6 +199,15 @@ appClient.on('interactionCreate', async (interaction) => {
 						appClient,
 						threadManager,
 						voiceChannelManager,
+					),
+				dropoutall: () =>
+					handleDropoutAllCommand(
+						interaction,
+						eventManager,
+						appClient,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
 					),
 			};
 
