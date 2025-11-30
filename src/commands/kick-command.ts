@@ -50,7 +50,13 @@ export async function handleKickCommand(
 		}
 
 		const participants = eventManager.getParticipants(userEventId);
-		if (!participants || !participants.has(targetUserId)) {
+		const isParticipant = participants?.has(targetUserId);
+		const isSpectator = eventManager.isUserSpectating(
+			userEventId,
+			targetUserId,
+		);
+
+		if (!isParticipant && !isSpectator) {
 			await interaction.editReply({
 				content: ERROR_MESSAGES.KICK_NOT_PARTICIPANT(targetUserId),
 			});
@@ -89,17 +95,21 @@ export async function handleKickCommand(
 			return;
 		}
 
-		eventManager.removeParticipant(userEventId, targetUserId);
+		if (isParticipant) {
+			eventManager.removeParticipant(userEventId, targetUserId);
 
-		await promoteNextFromQueue(
-			userEventId,
-			eventManager,
-			interaction.client,
-			threadManager,
-			voiceChannelManager,
-			channel as TextChannel,
-			telemetry,
-		);
+			await promoteNextFromQueue(
+				userEventId,
+				eventManager,
+				interaction.client,
+				threadManager,
+				voiceChannelManager,
+				channel as TextChannel,
+				telemetry,
+			);
+		} else {
+			eventManager.removeSpectator(userEventId, targetUserId);
+		}
 
 		const threadId = eventManager.getThread(userEventId);
 		if (threadId) {
@@ -122,18 +132,17 @@ export async function handleKickCommand(
 			);
 		}
 
-		const timerData = eventManager.getTimer(userEventId);
 		const updatedParticipants = eventManager.getParticipants(userEventId);
 
-		if (timerData && updatedParticipants) {
-			eventManager.queueUpdate(userEventId);
-		}
+		eventManager.queueUpdate(userEventId);
 
 		telemetry?.trackUserKicked({
 			guildId: interaction.guild?.id || 'unknown',
 			eventId: message.id,
 			userId: interaction.user.id,
-			participants: Array.from(participants.values()),
+			participants: updatedParticipants
+				? Array.from(updatedParticipants.values())
+				: [],
 			channelId: interaction.channelId,
 			matchId: eventManager.getMatchId(userEventId) || 'unknown',
 			targetUserId: targetUserId,

@@ -8,6 +8,7 @@ import {
 
 vi.mock('../../utils/retry.js', () => ({
 	withRetryOrNull: vi.fn((fn) => fn()),
+	withRetry: vi.fn((fn) => fn()),
 	LOW_RETRY_OPTIONS: {},
 }));
 
@@ -18,6 +19,16 @@ vi.mock('../../utils/error-handler.js', () => ({
 		MEDIUM: 'MEDIUM',
 		HIGH: 'HIGH',
 	},
+}));
+
+vi.mock('../../utils/helpers.js', () => ({
+	getEmoteForRank: vi.fn(() => ''),
+}));
+
+vi.mock('../../utils/embed-utils.js', () => ({
+	createEventButtons: vi.fn(() => ({ components: [] })),
+	createEventStartedButtons: vi.fn(() => ({ components: [] })),
+	createRoleSelectMenu: vi.fn(() => ({ components: [] })),
 }));
 
 describe('EventManager', () => {
@@ -431,6 +442,205 @@ describe('EventManager', () => {
 
 			const queue = eventManager.getQueue('event1');
 			expect(queue).toEqual([]);
+		});
+	});
+
+	describe('ownership transfer', () => {
+		it('should transfer ownership to next participant', async () => {
+			const mockThreadManager = {
+				fetchThread: vi.fn().mockResolvedValue(null),
+				sendMessage: vi.fn().mockResolvedValue(true),
+			};
+
+			const participants: ParticipantMap = new Map([
+				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'Support', rank: null }],
+				['user3', { userId: 'user3', role: 'Tank', rank: null }],
+			]);
+			eventManager.setParticipants('event1', participants);
+			eventManager.setCreator('event1', 'owner1');
+
+			const newOwnerId = await eventManager.transferOwnership(
+				'event1',
+				'owner1',
+				mockThreadManager as never,
+			);
+
+			expect(newOwnerId).toBe('user2');
+			expect(eventManager.getCreator('event1')).toBe('user2');
+		});
+
+		it('should return null if only one participant', async () => {
+			const mockThreadManager = {
+				fetchThread: vi.fn().mockResolvedValue(null),
+				sendMessage: vi.fn().mockResolvedValue(true),
+			};
+
+			const participants: ParticipantMap = new Map([
+				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
+			]);
+			eventManager.setParticipants('event1', participants);
+			eventManager.setCreator('event1', 'owner1');
+
+			const newOwnerId = await eventManager.transferOwnership(
+				'event1',
+				'owner1',
+				mockThreadManager as never,
+			);
+
+			expect(newOwnerId).toBeNull();
+			expect(eventManager.getCreator('event1')).toBe('owner1');
+		});
+
+		it('should return null if no participants', async () => {
+			const mockThreadManager = {
+				fetchThread: vi.fn().mockResolvedValue(null),
+				sendMessage: vi.fn().mockResolvedValue(true),
+			};
+
+			const newOwnerId = await eventManager.transferOwnership(
+				'event1',
+				'owner1',
+				mockThreadManager as never,
+			);
+
+			expect(newOwnerId).toBeNull();
+		});
+
+		it('should send notification to thread when ownership transfers', async () => {
+			const mockThread = { id: 'thread1' };
+			const mockThreadManager = {
+				fetchThread: vi.fn().mockResolvedValue(mockThread),
+				sendMessage: vi.fn().mockResolvedValue(true),
+			};
+
+			const mockChannel = {
+				isTextBased: () => true,
+				threads: {},
+			};
+			(mockClient.channels.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+				mockChannel,
+			);
+
+			const participants: ParticipantMap = new Map([
+				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'Support', rank: null }],
+			]);
+			eventManager.setParticipants('event1', participants);
+			eventManager.setCreator('event1', 'owner1');
+			eventManager.setThread('event1', 'thread1');
+			eventManager.setChannelId('event1', 'channel1');
+
+			await eventManager.transferOwnership(
+				'event1',
+				'owner1',
+				mockThreadManager as never,
+			);
+
+			expect(mockThreadManager.sendMessage).toHaveBeenCalledWith(
+				mockThread,
+				expect.stringContaining('<@user2>'),
+			);
+		});
+
+		it('should track telemetry on ownership transfer', async () => {
+			const mockThreadManager = {
+				fetchThread: vi.fn().mockResolvedValue(null),
+				sendMessage: vi.fn().mockResolvedValue(true),
+			};
+			const mockTelemetry = {
+				trackOwnershipTransferred: vi.fn(),
+			};
+
+			const participants: ParticipantMap = new Map([
+				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'Support', rank: null }],
+			]);
+			eventManager.setParticipants('event1', participants);
+			eventManager.setCreator('event1', 'owner1');
+
+			await eventManager.transferOwnership(
+				'event1',
+				'owner1',
+				mockThreadManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockTelemetry.trackOwnershipTransferred).toHaveBeenCalledWith(
+				expect.objectContaining({
+					userId: 'owner1',
+					targetUserId: 'user2',
+				}),
+			);
+		});
+	});
+
+	describe('embed generation', () => {
+		it('should show crown emoji next to current owner in participant list', () => {
+			const mockUser = {
+				username: 'TestOwner',
+				displayAvatarURL: () => 'https://example.com/avatar.png',
+			};
+			(mockClient.users.cache as Map<string, unknown>).set('owner1', mockUser);
+
+			const participants: ParticipantMap = new Map([
+				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'Support', rank: null }],
+			]);
+			eventManager.setParticipants('event1', participants);
+			eventManager.setCreator('event1', 'owner1');
+			eventManager.setTimer('event1', {
+				startTime: Date.now(),
+				hasStarted: false,
+			});
+
+			const embed = eventManager.buildEmbed('event1');
+
+			expect(embed).not.toBeNull();
+			const participantField = embed?.data.fields?.find((f) =>
+				f.name?.includes('Participants'),
+			);
+			expect(participantField?.value).toContain('<@owner1> 👑');
+			expect(participantField?.value).toContain('<@user2>');
+			expect(participantField?.value).not.toContain('<@user2> 👑');
+		});
+
+		it('should move crown to new owner after transfer', async () => {
+			const mockUser = {
+				username: 'TestOwner',
+				displayAvatarURL: () => 'https://example.com/avatar.png',
+			};
+			(mockClient.users.cache as Map<string, unknown>).set('owner1', mockUser);
+			(mockClient.users.cache as Map<string, unknown>).set('user2', mockUser);
+
+			const mockThreadManager = {
+				fetchThread: vi.fn().mockResolvedValue(null),
+				sendMessage: vi.fn().mockResolvedValue(true),
+			};
+
+			const participants: ParticipantMap = new Map([
+				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'Support', rank: null }],
+			]);
+			eventManager.setParticipants('event1', participants);
+			eventManager.setCreator('event1', 'owner1');
+			eventManager.setTimer('event1', {
+				startTime: Date.now(),
+				hasStarted: true,
+			});
+
+			await eventManager.transferOwnership(
+				'event1',
+				'owner1',
+				mockThreadManager as never,
+			);
+
+			const embed = eventManager.buildEmbed('event1');
+			const participantField = embed?.data.fields?.find((f) =>
+				f.name?.includes('Participants'),
+			);
+			expect(participantField?.value).toContain('<@user2> 👑');
+			expect(participantField?.value).not.toContain('<@owner1> 👑');
 		});
 	});
 });

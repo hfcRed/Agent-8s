@@ -7,6 +7,7 @@ import {
 	handleFinishButton,
 	handleSignOutButton,
 	handleSignUpButton,
+	handleSpectateButton,
 	handleStartNowButton,
 } from '../../interactions/button-handlers.js';
 
@@ -97,6 +98,12 @@ describe('button-handlers', () => {
 			getQueue: vi.fn(() => []),
 			setTerminalState: vi.fn(),
 			queueUpdate: vi.fn(),
+			transferOwnership: vi.fn(),
+			isUserSpectating: vi.fn(() => false),
+			isSpectatorsFull: vi.fn(() => false),
+			getSpectatorsEnabled: vi.fn(() => true),
+			addSpectator: vi.fn(),
+			removeSpectator: vi.fn(),
 		};
 	}
 
@@ -123,6 +130,8 @@ describe('button-handlers', () => {
 			trackEventFinished: vi.fn(),
 			trackUserDropOut: vi.fn(),
 			trackUserDropIn: vi.fn(),
+			trackUserStartedSpectating: vi.fn(),
+			trackUserStoppedSpectating: vi.fn(),
 		};
 	}
 
@@ -479,6 +488,76 @@ describe('button-handlers', () => {
 				mockVoiceChannelManager.revokeAccessFromChannels,
 			).toHaveBeenCalled();
 		});
+
+		it('should allow owner to drop out when other participants exist', async () => {
+			const participants = new Map([
+				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['user456', { userId: 'user456', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('user123');
+			mockEventManager.transferOwnership = vi.fn().mockResolvedValue('user456');
+
+			await handleDropOutButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockEventManager.transferOwnership).toHaveBeenCalled();
+			expect(mockEventManager.removeParticipant).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+			);
+		});
+
+		it('should reject owner drop out when they are the only participant', async () => {
+			const participants = new Map([
+				['user123', { userId: 'user123', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('user123');
+
+			await handleDropOutButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockInteraction.followUp).toHaveBeenCalledWith({
+				content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+				flags: ['Ephemeral'],
+			});
+			expect(mockEventManager.removeParticipant).not.toHaveBeenCalled();
+		});
+
+		it('should reject if user is not signed up', async () => {
+			const participants = new Map([
+				['creator456', { userId: 'creator456', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('creator456');
+
+			await handleDropOutButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockInteraction.followUp).toHaveBeenCalledWith({
+				content: ERROR_MESSAGES.NOT_SIGNED_UP,
+				flags: ['Ephemeral'],
+			});
+		});
 	});
 
 	describe('handleDropInButton', () => {
@@ -562,6 +641,214 @@ describe('button-handlers', () => {
 				content: ERROR_MESSAGES.EVENT_FULL,
 				flags: ['Ephemeral'],
 			});
+		});
+	});
+
+	describe('handleSpectateButton', () => {
+		it('should add user as spectator when not a participant', async () => {
+			const participants = new Map([
+				['creator456', { userId: 'creator456', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('creator456');
+
+			await handleSpectateButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockEventManager.addSpectator).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+			);
+			expect(mockTelemetry.trackUserStartedSpectating).toHaveBeenCalled();
+		});
+
+		it('should reject if already spectating', async () => {
+			const participants = new Map();
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('creator456');
+			mockEventManager.isUserSpectating.mockReturnValue(true as never);
+
+			await handleSpectateButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockInteraction.followUp).toHaveBeenCalledWith({
+				content: ERROR_MESSAGES.SPECTATE_ALREADY_SPECTATING,
+				flags: ['Ephemeral'],
+			});
+		});
+
+		it('should reject if spectators are full', async () => {
+			const participants = new Map();
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('creator456');
+			mockEventManager.isSpectatorsFull.mockReturnValue(true as never);
+
+			await handleSpectateButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockInteraction.followUp).toHaveBeenCalledWith({
+				content: ERROR_MESSAGES.SPECTATE_FULL,
+				flags: ['Ephemeral'],
+			});
+		});
+
+		it('should allow non-owner participant to switch to spectator', async () => {
+			const participants = new Map([
+				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['creator456', { userId: 'creator456', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('creator456');
+
+			await handleSpectateButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockEventManager.addSpectator).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+			);
+			expect(mockEventManager.removeParticipant).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+			);
+			expect(mockTelemetry.trackUserDropOut).toHaveBeenCalled();
+			expect(mockTelemetry.trackUserStartedSpectating).toHaveBeenCalled();
+		});
+
+		it('should allow owner to switch to spectator when other participants exist', async () => {
+			const participants = new Map([
+				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['user456', { userId: 'user456', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('user123');
+			mockEventManager.transferOwnership = vi.fn().mockResolvedValue('user456');
+
+			await handleSpectateButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockEventManager.transferOwnership).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+				mockThreadManager,
+				mockTelemetry,
+			);
+			expect(mockEventManager.addSpectator).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+			);
+			expect(mockEventManager.removeParticipant).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+			);
+		});
+
+		it('should reject owner spectate when they are the only participant', async () => {
+			const participants = new Map([
+				['user123', { userId: 'user123', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('user123');
+
+			await handleSpectateButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockInteraction.followUp).toHaveBeenCalledWith({
+				content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+				flags: ['Ephemeral'],
+			});
+			expect(mockEventManager.removeSpectator).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+			);
+			expect(mockEventManager.removeParticipant).not.toHaveBeenCalled();
+		});
+
+		it('should revert spectator addition if ownership transfer fails', async () => {
+			const participants = new Map([
+				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['user456', { userId: 'user456', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('user123');
+			mockEventManager.transferOwnership = vi.fn().mockResolvedValue(null);
+
+			await handleSpectateButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockInteraction.followUp).toHaveBeenCalledWith({
+				content: ERROR_MESSAGES.SPECTATE_ERROR,
+				flags: ['Ephemeral'],
+			});
+			expect(mockEventManager.removeSpectator).toHaveBeenCalledWith(
+				'message123',
+				'user123',
+			);
+			expect(mockEventManager.removeParticipant).not.toHaveBeenCalled();
+		});
+
+		it('should grant thread and voice access for new spectators', async () => {
+			const participants = new Map([
+				['creator456', { userId: 'creator456', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.getCreator.mockReturnValue('creator456');
+			mockEventManager.getThread.mockReturnValue('thread123' as never);
+			mockEventManager.getVoiceChannels.mockReturnValue(['voice123'] as never);
+			mockInteraction.channel = { isTextBased: () => true } as never;
+
+			await handleSpectateButton(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockInteraction.message.client as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockVoiceChannelManager.grantAccessToChannels).toHaveBeenCalled();
 		});
 	});
 });

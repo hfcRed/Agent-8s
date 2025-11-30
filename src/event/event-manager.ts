@@ -3,12 +3,15 @@ import {
 	COLORS,
 	FIELD_NAMES,
 	MAX_PARTICIPANTS,
+	MAX_SPECTATORS,
 	PARTICIPANT_FIELD_NAME,
 	START_MESSAGES,
 	STATUS_MESSAGES,
+	SUCCESS_MESSAGES,
 	TIMINGS,
 	TITLES,
 } from '../constants.js';
+import type { ThreadManager } from '../managers/thread-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import {
 	createEventButtons,
@@ -59,9 +62,11 @@ export class EventManager {
 	private repingCooldowns = new Map<string, number>();
 	private repingMessages = new Map<string, string>();
 	private queues = new Map<string, string[]>();
+	private spectators = new Map<string, string[]>();
 
 	private casual = new Map<string, boolean>();
 	private info = new Map<string, string | undefined>();
+	private spectatorsEnabled = new Map<string, boolean>();
 	private updateTimeouts = new Map<string, NodeJS.Timeout>();
 	private terminalStates = new Map<string, TerminalStates>();
 
@@ -322,7 +327,17 @@ export class EventManager {
 	}
 
 	isUserInAnyEvent(userId: string) {
-		return this.userToEventIndex.has(userId);
+		if (this.userToEventIndex.has(userId)) return true;
+
+		for (const spectators of this.spectators.values()) {
+			if (spectators.includes(userId)) return true;
+		}
+
+		return false;
+	}
+
+	getUserEventId(userId: string) {
+		return this.userToEventIndex.get(userId);
 	}
 
 	getQueue(eventId: string) {
@@ -350,7 +365,7 @@ export class EventManager {
 		return queue.includes(userId);
 	}
 
-	removeNextFromQueue(eventId: string): string | undefined {
+	removeNextFromQueue(eventId: string) {
 		const queue = this.queues.get(eventId) || [];
 		const next = queue.shift();
 
@@ -384,6 +399,41 @@ export class EventManager {
 		this.queues.delete(eventId);
 	}
 
+	getSpectators(eventId: string) {
+		return this.spectators.get(eventId) || [];
+	}
+
+	addSpectator(eventId: string, userId: string) {
+		const spectators = this.spectators.get(eventId) || [];
+
+		if (spectators.length >= MAX_SPECTATORS || spectators.includes(userId))
+			return;
+
+		spectators.push(userId);
+		this.spectators.set(eventId, spectators);
+	}
+
+	removeSpectator(eventId: string, userId: string) {
+		const spectators = this.spectators.get(eventId) || [];
+		const filtered = spectators.filter((id) => id !== userId);
+
+		this.spectators.set(eventId, filtered);
+	}
+
+	isUserSpectating(eventId: string, userId: string) {
+		const spectators = this.spectators.get(eventId) || [];
+		return spectators.includes(userId);
+	}
+
+	isSpectatorsFull(eventId: string) {
+		const spectators = this.spectators.get(eventId) || [];
+		return spectators.length >= MAX_SPECTATORS;
+	}
+
+	deleteSpectators(eventId: string) {
+		this.spectators.delete(eventId);
+	}
+
 	clearAllEventData(eventId: string) {
 		this.deleteParticipants(eventId);
 		this.deleteCreator(eventId);
@@ -397,9 +447,11 @@ export class EventManager {
 		this.deleteRepingCooldown(eventId);
 		this.deleteRepingMessage(eventId);
 		this.deleteQueue(eventId);
+		this.deleteSpectators(eventId);
 
 		this.casual.delete(eventId);
 		this.info.delete(eventId);
+		this.spectatorsEnabled.delete(eventId);
 		this.terminalStates.delete(eventId);
 
 		const timeout = this.getTimeout(eventId);
@@ -415,9 +467,23 @@ export class EventManager {
 		}
 	}
 
-	setMessageData(eventId: string, casual: boolean, info?: string) {
+	setMessageData(
+		eventId: string,
+		casual: boolean,
+		spectators: boolean,
+		info?: string,
+	) {
 		this.casual.set(eventId, casual);
+		this.spectatorsEnabled.set(eventId, spectators);
 		this.info.set(eventId, info);
+	}
+
+	getSpectatorsEnabled(eventId: string) {
+		return this.spectatorsEnabled.get(eventId) ?? true;
+	}
+
+	setSpectatorsEnabled(eventId: string, enabled: boolean) {
+		this.spectatorsEnabled.set(eventId, enabled);
 	}
 
 	setTerminalState(
@@ -431,11 +497,12 @@ export class EventManager {
 		return this.terminalStates.get(eventId);
 	}
 
-	buildEmbed(eventId: string): EmbedBuilder | null {
+	buildEmbed(eventId: string) {
 		const participantMap = this.getParticipants(eventId);
 		const timerData = this.getTimer(eventId);
 		const creatorId = this.getCreator(eventId);
 		const queue = this.getQueue(eventId);
+		const spectators = this.getSpectators(eventId);
 		const casualMode = this.casual.get(eventId) ?? true;
 		const infoText = this.info.get(eventId);
 
@@ -490,7 +557,7 @@ export class EventManager {
 		const participantList = participants
 			.map(
 				(p) =>
-					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>`,
+					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>${p.userId === creatorId ? ' 👑' : ''}`,
 			)
 			.join('\n');
 		const roleList = participants
@@ -531,6 +598,17 @@ export class EventManager {
 			embed.setDescription(infoText);
 		}
 
+		if (spectators.length > 0) {
+			const spectatorsValue = spectators
+				.map((userId) => `- <@${userId}>`)
+				.join('\n');
+			embed.addFields({
+				name: FIELD_NAMES.SPECTATORS,
+				value: spectatorsValue,
+				inline: false,
+			});
+		}
+
 		if (queue.length > 0) {
 			const queueValue = queue.map((userId) => `- <@${userId}>`).join('\n');
 			embed.addFields({
@@ -550,13 +628,80 @@ export class EventManager {
 		if (!timerData || terminalState) return [];
 
 		if (timerData.hasStarted) {
-			return [createEventStartedButtons(), createRoleSelectMenu()];
+			const spectators = this.getSpectatorsEnabled(eventId);
+
+			return [...createEventStartedButtons(spectators), createRoleSelectMenu()];
 		}
 
 		const timeInMinutes = timerData.duration
 			? timerData.duration / TIMINGS.MINUTE_IN_MS
 			: undefined;
 		return [createEventButtons(timeInMinutes), createRoleSelectMenu()];
+	}
+
+	async transferOwnership(
+		eventId: string,
+		oldOwnerId: string,
+		threadManager: ThreadManager,
+		telemetry?: TelemetryService,
+	) {
+		const participants = this.getParticipants(eventId);
+		if (!participants || participants.size < 2) return null;
+
+		let newOwnerId: string | null = null;
+		for (const userId of participants.keys()) {
+			if (userId !== oldOwnerId) {
+				newOwnerId = userId;
+				break;
+			}
+		}
+		if (!newOwnerId) return null;
+
+		this.setCreator(eventId, newOwnerId);
+
+		await telemetry?.trackOwnershipTransferred({
+			guildId: this.getGuildId(eventId) || 'unknown',
+			eventId: eventId,
+			userId: oldOwnerId,
+			targetUserId: newOwnerId,
+			participants: Array.from(participants.values()),
+			channelId: this.getChannelId(eventId) || 'unknown',
+			matchId: this.getMatchId(eventId) || 'unknown',
+		});
+
+		const threadId = this.getThread(eventId);
+		const channelId = this.getChannelId(eventId);
+		if (!threadId || !channelId) return newOwnerId;
+
+		try {
+			const channel = await withRetryOrNull(
+				() => this.client.channels.fetch(channelId),
+				LOW_RETRY_OPTIONS,
+			);
+
+			if (channel?.isTextBased() && 'threads' in channel) {
+				const thread = await threadManager.fetchThread(
+					channel as Parameters<typeof threadManager.fetchThread>[0],
+					threadId,
+				);
+
+				if (thread) {
+					await threadManager.sendMessage(
+						thread,
+						SUCCESS_MESSAGES.OWNERSHIP_TRANSFERRED(newOwnerId),
+					);
+				}
+			}
+		} catch (error) {
+			handleError({
+				reason: 'Failed to send ownership transfer notification',
+				severity: ErrorSeverity.LOW,
+				error,
+				metadata: { eventId, newOwnerId },
+			});
+		}
+
+		return newOwnerId;
 	}
 
 	queueUpdate(eventId: string, immediate = false) {

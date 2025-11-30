@@ -294,6 +294,25 @@ export async function promoteNextFromQueue(
 		LOW_RETRY_OPTIONS,
 	);
 
+	const matchId = eventManager.getMatchId(messageId);
+	const telemetryData = {
+		guildId: guild.id,
+		eventId: messageId,
+		userId: nextUserId,
+		participants: Array.from(
+			(eventManager.getParticipants(messageId) || new Map()).values(),
+		),
+		channelId: channel.id,
+		matchId: matchId || 'unknown',
+	};
+
+	const wasSpectating = eventManager.isUserSpectating(messageId, nextUserId);
+	if (wasSpectating) {
+		eventManager.removeSpectator(messageId, nextUserId);
+
+		telemetry?.trackUserStoppedSpectating(telemetryData);
+	}
+
 	eventManager.addParticipant(messageId, nextUserId, {
 		userId: nextUserId,
 		role: WEAPON_ROLES[0],
@@ -302,31 +321,24 @@ export async function promoteNextFromQueue(
 
 	await eventManager.removeUserFromAllQueues(nextUserId, telemetry);
 
-	const threadId = eventManager.getThread(messageId);
-	if (threadId) {
-		const thread = await threadManager.fetchThread(channel, threadId);
-		if (thread) {
-			await threadManager.addMember(thread, nextUserId);
+	if (!wasSpectating) {
+		const threadId = eventManager.getThread(messageId);
+		if (threadId) {
+			const thread = await threadManager.fetchThread(channel, threadId);
+			if (thread) {
+				await threadManager.addMember(thread, nextUserId);
+			}
+		}
+
+		const voiceChannelIds = eventManager.getVoiceChannels(messageId);
+		if (voiceChannelIds) {
+			await voiceChannelManager.grantAccessToChannels(
+				appClient,
+				voiceChannelIds,
+				nextUserId,
+			);
 		}
 	}
 
-	const voiceChannelIds = eventManager.getVoiceChannels(messageId);
-	if (voiceChannelIds) {
-		await voiceChannelManager.grantAccessToChannels(
-			appClient,
-			voiceChannelIds,
-			nextUserId,
-		);
-	}
-
-	telemetry?.trackUserPromotedFromQueue({
-		guildId: guild.id,
-		eventId: messageId,
-		userId: nextUserId,
-		participants: Array.from(
-			(eventManager.getParticipants(messageId) || new Map()).values(),
-		),
-		channelId: channel.id,
-		matchId: eventManager.getMatchId(messageId) || 'unknown',
-	});
+	telemetry?.trackUserPromotedFromQueue(telemetryData);
 }

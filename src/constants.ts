@@ -9,6 +9,7 @@ export const DEFAULT_SCHEMA = 'public';
 export const DEFAULT_TABLE = 'telemetry_events';
 
 export const MAX_PARTICIPANTS = DEV ? 2 : 8;
+export const MAX_SPECTATORS = 2;
 export const MATCH_ID_LENGTH = 5;
 
 export const WEAPON_ROLES = [
@@ -51,6 +52,7 @@ export const FIELD_NAMES = {
 	ROLE: 'Role',
 	START: 'Start',
 	STATUS: 'Status',
+	SPECTATORS: 'Spectators',
 	QUEUE: 'Queue',
 } as const;
 
@@ -114,12 +116,15 @@ export const ERROR_MESSAGES = {
 		'Only the event creator or administrators can finish this event.',
 	CREATOR_CANNOT_SIGNOUT:
 		'The event creator cannot sign out. Please cancel or finish the event instead.',
+	OWNER_ONLY_PARTICIPANT:
+		'You are the only participant in this event. Please finish the event instead of dropping out.',
 	NO_BOT_PERMISSIONS: 'I do not have permission to interact in this channel.',
 	KICK_SELF: 'You cannot kick yourself from your own event.',
 
 	NOT_ENOUGH_PARTICIPANTS:
 		'Cannot start the event yet - not enough participants signed up.',
 	NO_EVENT_OWNED: "You don't own any active events.",
+	NOT_IN_EVENT: "You're not currently in any active events.",
 	REPING_EVENT_FULL: 'Your event is already full. No need to re-ping roles.',
 
 	CHANNEL_NOT_FOUND: 'Could not find the event channel.',
@@ -154,6 +159,19 @@ export const ERROR_MESSAGES = {
 	JOIN_QUEUE_ERROR: 'An error occurred while joining the queue.',
 	LEAVE_QUEUE_ERROR: 'An error occurred while leaving the queue.',
 
+	SPECTATE_ALREADY_SPECTATING: 'You are already spectating this event.',
+	SPECTATE_FULL: 'This event already has the maximum number of spectators.',
+	SPECTATE_NOT_SPECTATING: 'You are not spectating this event.',
+	SPECTATE_ERROR: 'An error occurred while starting to spectate.',
+	STOP_SPECTATE_ERROR: 'An error occurred while stopping spectating.',
+	TOGGLE_SPECTATORS_ERROR:
+		'An error occurred while toggling spectators for your event.',
+
+	DROPOUT_ALL_NOT_IN_EVENTS:
+		"You're not currently participating in, spectating, or queued for any events.",
+	DROPOUT_ALL_ERROR:
+		'An error occurred while processing your dropout-all request.',
+
 	KICK_NOT_PARTICIPANT: (userId: string) =>
 		`<@${userId}> is not signed up for your event.` as const,
 	REPING_COOLDOWN: (minutesLeft: number) =>
@@ -163,6 +181,13 @@ export const ERROR_MESSAGES = {
 export const SUCCESS_MESSAGES = {
 	KICK_SUCCESS: (userId: string) =>
 		`Successfully kicked <@${userId}> from your event.` as const,
+	OWNERSHIP_TRANSFERRED: (userId: string) =>
+		`⚠️ Event owner dropped out! <@${userId}> you are now the owner of this event.` as const,
+	SPECTATORS_ENABLED: 'Spectators are now **enabled** for your event.',
+	SPECTATORS_DISABLED:
+		'Spectators are now **disabled** for your event. All current spectators have been removed.',
+	DROPOUT_ALL_SUCCESS:
+		'Successfully removed you from all events, queues, and spectator lists.',
 } as const;
 
 export const PROCESSING_MESSAGES = {

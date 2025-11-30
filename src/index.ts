@@ -10,9 +10,11 @@ import {
 } from './client/discord-client.js';
 import { isInShutdownMode, setupShutdownHandlers } from './client/shutdown.js';
 import { handleCreateCommand } from './commands/create-command.js';
+import { handleDropoutAllCommand } from './commands/dropout-all-command.js';
 import { handleKickCommand } from './commands/kick-command.js';
 import { handleRepingCommand } from './commands/reping-command.js';
 import { handleStatusCommand } from './commands/status-command.js';
+import { handleToggleSpectatorsCommand } from './commands/toggle-spectators-command.js';
 import { ERROR_MESSAGES, TIMINGS } from './constants.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
 import { EventManager } from './event/event-manager.js';
@@ -25,7 +27,9 @@ import {
 	handleLeaveQueueButton,
 	handleSignOutButton,
 	handleSignUpButton,
+	handleSpectateButton,
 	handleStartNowButton,
+	handleStopSpectatingButton,
 } from './interactions/button-handlers.js';
 import { handleRoleSelection } from './interactions/menu-handlers.js';
 import { ThreadManager } from './managers/thread-manager.js';
@@ -73,6 +77,12 @@ const commands = [
 				.setDescription('Whether to ping casual roles.')
 				.setRequired(false),
 		)
+		.addBooleanOption((option) =>
+			option
+				.setName('spectators')
+				.setDescription('Whether to allow spectators for this event.')
+				.setRequired(false),
+		)
 		.addStringOption((option) =>
 			option
 				.setName('info')
@@ -93,6 +103,16 @@ const commands = [
 		.setDescription('Kick the selected user from your event.')
 		.addUserOption((option) =>
 			option.setName('user').setDescription('User to kick').setRequired(true),
+		)
+		.toJSON(),
+	new SlashCommandBuilder()
+		.setName('toggle-spectators')
+		.setDescription('Enable or disable spectators for your event.')
+		.toJSON(),
+	new SlashCommandBuilder()
+		.setName('dropout-all')
+		.setDescription(
+			'Remove yourself from all events, queues, and spectator lists.',
 		)
 		.toJSON(),
 ];
@@ -168,6 +188,23 @@ appClient.on('interactionCreate', async (interaction) => {
 					handleKickCommand(
 						interaction,
 						eventManager,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					),
+				togglespectators: () =>
+					handleToggleSpectatorsCommand(
+						interaction,
+						eventManager,
+						appClient,
+						threadManager,
+						voiceChannelManager,
+					),
+				dropoutall: () =>
+					handleDropoutAllCommand(
+						interaction,
+						eventManager,
+						appClient,
 						threadManager,
 						voiceChannelManager,
 						telemetry,
@@ -260,6 +297,24 @@ appClient.on('interactionCreate', async (interaction) => {
 					handleJoinQueueButton(interaction, eventManager, telemetry),
 				leavequeue: () =>
 					handleLeaveQueueButton(interaction, eventManager, telemetry),
+				spectate: () =>
+					handleSpectateButton(
+						interaction,
+						eventManager,
+						appClient,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					),
+				stopspectating: () =>
+					handleStopSpectatingButton(
+						interaction,
+						eventManager,
+						appClient,
+						threadManager,
+						voiceChannelManager,
+						telemetry,
+					),
 			};
 
 			const handler = buttonHandlers[interaction.customId];

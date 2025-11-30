@@ -145,11 +145,41 @@ describe('embed-utils', () => {
 	});
 
 	describe('createEventStartedButtons', () => {
-		it('should create three buttons for started events', () => {
-			const row = createEventStartedButtons();
+		it('should create two button rows for started events with spectate buttons enabled', () => {
+			const rows = createEventStartedButtons(true);
 
-			expect(row.components.length).toBe(5);
-			const customIds = row.components.map((c) => {
+			expect(rows.length).toBe(2);
+
+			// First row should have 5 buttons
+			expect(rows[0].components.length).toBe(5);
+			const row1CustomIds = rows[0].components.map((c) => {
+				const data = c.data as { custom_id?: string };
+				return data.custom_id;
+			});
+			expect(row1CustomIds).toContain('dropin');
+			expect(row1CustomIds).toContain('dropout');
+			expect(row1CustomIds).toContain('joinqueue');
+			expect(row1CustomIds).toContain('leavequeue');
+			expect(row1CustomIds).toContain('finish');
+
+			// Second row should have 2 spectate buttons
+			expect(rows[1].components.length).toBe(2);
+			const row2CustomIds = rows[1].components.map((c) => {
+				const data = c.data as { custom_id?: string };
+				return data.custom_id;
+			});
+			expect(row2CustomIds).toContain('spectate');
+			expect(row2CustomIds).toContain('stopspectating');
+		});
+
+		it('should create one button row when spectators are disabled', () => {
+			const rows = createEventStartedButtons(false);
+
+			expect(rows.length).toBe(1);
+
+			// Only row should have 5 buttons (no spectate buttons)
+			expect(rows[0].components.length).toBe(5);
+			const customIds = rows[0].components.map((c) => {
 				const data = c.data as { custom_id?: string };
 				return data.custom_id;
 			});
@@ -158,6 +188,14 @@ describe('embed-utils', () => {
 			expect(customIds).toContain('joinqueue');
 			expect(customIds).toContain('leavequeue');
 			expect(customIds).toContain('finish');
+			expect(customIds).not.toContain('spectate');
+			expect(customIds).not.toContain('stopspectating');
+		});
+
+		it('should default to spectators disabled when no parameter provided', () => {
+			const rows = createEventStartedButtons();
+
+			expect(rows.length).toBe(1);
 		});
 	});
 

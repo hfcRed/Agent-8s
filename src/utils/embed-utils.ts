@@ -32,7 +32,7 @@ export function createEventEmbed(
 	const embedFields = [
 		{
 			name: PARTICIPANT_FIELD_NAME(1),
-			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}>`,
+			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}> 👑`,
 			inline: true,
 		},
 		{
@@ -96,8 +96,8 @@ export function createEventButtons(timeInMinutes?: number) {
 	return new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons);
 }
 
-export function createEventStartedButtons() {
-	return new ActionRowBuilder<ButtonBuilder>().addComponents(
+export function createEventStartedButtons(spectators: boolean = false) {
+	const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()
 			.setEmoji('📝')
 			.setCustomId('dropin')
@@ -124,6 +124,23 @@ export function createEventStartedButtons() {
 			.setLabel('Finish Event')
 			.setStyle(ButtonStyle.Success),
 	);
+
+	if (!spectators) return [row1];
+
+	const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+		new ButtonBuilder()
+			.setEmoji('👁️')
+			.setCustomId('spectate')
+			.setLabel('Spectate')
+			.setStyle(ButtonStyle.Secondary),
+		new ButtonBuilder()
+			.setEmoji('🚫')
+			.setCustomId('stopspectating')
+			.setLabel('Stop Spectating')
+			.setStyle(ButtonStyle.Secondary),
+	);
+
+	return [row1, row2];
 }
 
 export function createRoleSelectMenu() {

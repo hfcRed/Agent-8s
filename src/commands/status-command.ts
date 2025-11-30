@@ -13,7 +13,7 @@ import { safeReplyToInteraction } from '../utils/helpers.js';
 const BOT_START_TIME = Date.now();
 const BOT_VERSION = getBotVersion();
 
-function getBotVersion(): string {
+function getBotVersion() {
 	try {
 		const versionPath = join(process.cwd(), '.version');
 		return readFileSync(versionPath, 'utf-8').trim();

@@ -397,20 +397,37 @@ export async function handleDropOutButton(
 
 		await interaction.deferUpdate();
 
-		if (userId === creatorId) {
-			await interaction.followUp({
-				content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
-				flags: ['Ephemeral'],
-			});
-			return;
-		}
-
 		if (!participantMap.has(userId)) {
 			await interaction.followUp({
 				content: ERROR_MESSAGES.NOT_SIGNED_UP,
 				flags: ['Ephemeral'],
 			});
 			return;
+		}
+
+		if (userId === creatorId) {
+			if (participantMap.size <= 1) {
+				await interaction.followUp({
+					content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
+
+			const newOwnerId = await eventManager.transferOwnership(
+				messageId,
+				userId,
+				threadManager,
+				telemetry,
+			);
+
+			if (!newOwnerId) {
+				await interaction.followUp({
+					content: ERROR_MESSAGES.DROP_OUT_ERROR,
+					flags: ['Ephemeral'],
+				});
+				return;
+			}
 		}
 
 		eventManager.removeParticipant(messageId, userId);
@@ -507,6 +524,22 @@ export async function handleDropInButton(
 			return;
 		}
 
+		const matchId = eventManager.getMatchId(messageId);
+		const telemetryData = {
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		};
+
+		const wasSpectating = eventManager.isUserSpectating(messageId, userId);
+		if (wasSpectating) {
+			eventManager.removeSpectator(messageId, userId);
+			telemetry?.trackUserStoppedSpectating(telemetryData);
+		}
+
 		eventManager.addParticipant(messageId, userId, {
 			userId: userId,
 			role: WEAPON_ROLES[0],
@@ -522,37 +555,31 @@ export async function handleDropInButton(
 			await eventManager.deleteRepingMessageIfExists(messageId, appClient);
 		}
 
-		const threadId = eventManager.getThread(messageId);
-		if (threadId) {
-			const channel = interaction.channel as TextChannel | null;
-			if (channel) {
-				const thread = await threadManager.fetchThread(channel, threadId);
-				if (thread) {
-					await threadManager.addMember(thread, userId);
+		if (!wasSpectating) {
+			const threadId = eventManager.getThread(messageId);
+			if (threadId) {
+				const channel = interaction.channel as TextChannel | null;
+				if (channel) {
+					const thread = await threadManager.fetchThread(channel, threadId);
+					if (thread) {
+						await threadManager.addMember(thread, userId);
+					}
 				}
 			}
-		}
 
-		const voiceChannelIds = eventManager.getVoiceChannels(messageId);
-		if (voiceChannelIds) {
-			await voiceChannelManager.grantAccessToChannels(
-				appClient,
-				voiceChannelIds,
-				userId,
-			);
+			const voiceChannelIds = eventManager.getVoiceChannels(messageId);
+			if (voiceChannelIds) {
+				await voiceChannelManager.grantAccessToChannels(
+					appClient,
+					voiceChannelIds,
+					userId,
+				);
+			}
 		}
 
 		eventManager.queueUpdate(messageId);
 
-		const matchId = eventManager.getMatchId(messageId);
-		telemetry?.trackUserDropIn({
-			guildId: interaction.guild?.id || 'unknown',
-			eventId: messageId,
-			userId: userId,
-			participants: Array.from(participantMap.values()),
-			channelId: interaction.channelId,
-			matchId: matchId || 'unknown',
-		});
+		telemetry?.trackUserDropIn(telemetryData);
 	} catch (error) {
 		handleError({
 			reason: 'Error handling drop in button',
@@ -717,5 +744,226 @@ export async function handleLeaveQueueButton(
 		});
 
 		await safeReplyToInteraction(interaction, ERROR_MESSAGES.LEAVE_QUEUE_ERROR);
+	}
+}
+
+export async function handleSpectateButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
+	telemetry?: TelemetryService,
+) {
+	try {
+		const enabled = eventManager.getSpectatorsEnabled(interaction.message.id);
+		if (!enabled) return;
+
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const creatorId = eventManager.getCreator(messageId);
+
+		if (!participantMap || !creatorId) return;
+
+		await interaction.deferUpdate();
+
+		if (eventManager.isUserSpectating(messageId, userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.SPECTATE_ALREADY_SPECTATING,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		if (eventManager.isUserInAnyEvent(userId) && !participantMap.has(userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		if (eventManager.isSpectatorsFull(messageId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.SPECTATE_FULL,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		const matchId = eventManager.getMatchId(messageId);
+		const telemetryData = {
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		};
+
+		eventManager.addSpectator(messageId, userId);
+
+		if (participantMap.has(userId)) {
+			if (userId === creatorId) {
+				if (participantMap.size <= 1) {
+					eventManager.removeSpectator(messageId, userId);
+					await interaction.followUp({
+						content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+						flags: ['Ephemeral'],
+					});
+					return;
+				}
+
+				const newOwnerId = await eventManager.transferOwnership(
+					messageId,
+					userId,
+					threadManager,
+					telemetry,
+				);
+
+				if (!newOwnerId) {
+					eventManager.removeSpectator(messageId, userId);
+					await interaction.followUp({
+						content: ERROR_MESSAGES.SPECTATE_ERROR,
+						flags: ['Ephemeral'],
+					});
+					return;
+				}
+			}
+
+			eventManager.removeParticipant(messageId, userId);
+
+			const channel = interaction.channel as TextChannel;
+			await promoteNextFromQueue(
+				messageId,
+				eventManager,
+				appClient,
+				threadManager,
+				voiceChannelManager,
+				channel,
+				telemetry,
+			);
+
+			eventManager.queueUpdate(messageId);
+
+			telemetry?.trackUserDropOut(telemetryData);
+			telemetry?.trackUserStartedSpectating(telemetryData);
+			return;
+		}
+
+		const threadId = eventManager.getThread(messageId);
+		if (threadId) {
+			const channel = interaction.channel as TextChannel | null;
+			if (channel) {
+				const thread = await threadManager.fetchThread(channel, threadId);
+				if (thread) {
+					await threadManager.addMember(thread, userId);
+				}
+			}
+		}
+
+		const voiceChannelIds = eventManager.getVoiceChannels(messageId);
+		if (voiceChannelIds) {
+			await voiceChannelManager.grantAccessToChannels(
+				appClient,
+				voiceChannelIds,
+				userId,
+			);
+		}
+
+		eventManager.queueUpdate(messageId);
+
+		telemetry?.trackUserStartedSpectating(telemetryData);
+	} catch (error) {
+		handleError({
+			reason: 'Error handling spectate button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
+		});
+
+		await safeReplyToInteraction(interaction, ERROR_MESSAGES.SPECTATE_ERROR);
+	}
+}
+
+export async function handleStopSpectatingButton(
+	interaction: ButtonInteraction,
+	eventManager: EventManager,
+	appClient: Client,
+	threadManager: ThreadManager,
+	voiceChannelManager: VoiceChannelManager,
+	telemetry?: TelemetryService,
+) {
+	try {
+		const messageId = interaction.message.id;
+		const userId = interaction.user.id;
+		const participantMap = eventManager.getParticipants(messageId);
+		const timerData = eventManager.getTimer(messageId);
+
+		if (!participantMap || !timerData) return;
+
+		await interaction.deferUpdate();
+
+		if (!eventManager.isUserSpectating(messageId, userId)) {
+			await interaction.followUp({
+				content: ERROR_MESSAGES.SPECTATE_NOT_SPECTATING,
+				flags: ['Ephemeral'],
+			});
+			return;
+		}
+
+		eventManager.removeSpectator(messageId, userId);
+
+		const threadId = eventManager.getThread(messageId);
+		if (threadId) {
+			const channel = interaction.channel as TextChannel | null;
+			if (channel) {
+				const thread = await threadManager.fetchThread(channel, threadId);
+				if (thread) {
+					await threadManager.removeMember(thread, userId);
+				}
+			}
+		}
+
+		const voiceChannelIds = eventManager.getVoiceChannels(messageId);
+		if (voiceChannelIds && interaction.guild) {
+			await voiceChannelManager.revokeAccessFromChannels(
+				appClient,
+				voiceChannelIds,
+				userId,
+				interaction.guild,
+			);
+		}
+
+		eventManager.queueUpdate(messageId);
+
+		const matchId = eventManager.getMatchId(messageId);
+		telemetry?.trackUserStoppedSpectating({
+			guildId: interaction.guild?.id || 'unknown',
+			eventId: messageId,
+			userId: userId,
+			participants: Array.from(participantMap.values()),
+			channelId: interaction.channelId,
+			matchId: matchId || 'unknown',
+		});
+	} catch (error) {
+		handleError({
+			reason: 'Error handling stop spectating button',
+			severity: ErrorSeverity.MEDIUM,
+			error,
+			metadata: {
+				userId: interaction.user.id,
+				messageId: interaction.message.id,
+			},
+		});
+
+		await safeReplyToInteraction(
+			interaction,
+			ERROR_MESSAGES.STOP_SPECTATE_ERROR,
+		);
 	}
 }

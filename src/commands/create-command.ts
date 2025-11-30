@@ -35,6 +35,7 @@ export async function handleCreateCommand(
 		}
 
 		const casual = !!interaction.options.getBoolean('casual', false);
+		const spectators = !!interaction.options.getBoolean('spectators', false);
 		const info = interaction.options.getString('info', false) ?? undefined;
 		const timeInMinutes =
 			interaction.options.getInteger('time', false) ?? undefined;
@@ -72,7 +73,7 @@ export async function handleCreateCommand(
 		eventManager.setCreator(message.id, interaction.user.id);
 		eventManager.setMatchId(message.id, matchId);
 		eventManager.setChannelId(message.id, message.channelId);
-		eventManager.setMessageData(message.id, casual, info);
+		eventManager.setMessageData(message.id, casual, spectators, info);
 
 		await eventManager.removeUserFromAllQueues(interaction.user.id, telemetry);
 

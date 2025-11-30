@@ -88,6 +88,8 @@ describe('kick-command', () => {
 			getVoiceChannels: vi.fn(),
 			getMatchId: vi.fn(() => 'match123'),
 			removeParticipant: vi.fn(),
+			removeSpectator: vi.fn(),
+			isUserSpectating: vi.fn(() => false),
 			getQueue: vi.fn(() => []),
 			queueUpdate: vi.fn(),
 		};
@@ -262,6 +264,31 @@ describe('kick-command', () => {
 
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
 				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+			});
+		});
+
+		it('should kick spectator if target is spectating', async () => {
+			const participants = new Map([
+				['user123', { userId: 'user123', role: 'None', rank: null }],
+			]);
+			mockEventManager.getParticipants.mockReturnValue(participants);
+			mockEventManager.isUserSpectating.mockReturnValue(true as never);
+
+			await handleKickCommand(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(mockEventManager.removeSpectator).toHaveBeenCalledWith(
+				'message123',
+				'target456',
+			);
+			expect(mockEventManager.removeParticipant).not.toHaveBeenCalled();
+			expect(mockInteraction.editReply).toHaveBeenCalledWith({
+				content: SUCCESS_MESSAGES.KICK_SUCCESS('target456'),
 			});
 		});
 	});

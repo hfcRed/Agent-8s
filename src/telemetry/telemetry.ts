@@ -178,11 +178,23 @@ export class TelemetryService {
 		await this.sendEvent('user_promoted_from_queue', data);
 	}
 
+	async trackOwnershipTransferred(data: TelemetryEventData) {
+		await this.sendEvent('ownership_transferred', data);
+	}
+
+	async trackUserStartedSpectating(data: TelemetryEventData) {
+		await this.sendEvent('user_started_spectating', data);
+	}
+
+	async trackUserStoppedSpectating(data: TelemetryEventData) {
+		await this.sendEvent('user_stopped_spectating', data);
+	}
+
 	async dispose() {
 		await this.recorder?.dispose();
 	}
 
-	getStatus(): TelemetryStatus {
+	getStatus() {
 		return {
 			remoteEnabled: this.remoteEnabled,
 			databaseEnabled: Boolean(this.recorder),
