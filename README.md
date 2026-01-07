@@ -6,7 +6,7 @@
 
 Discord bot for creating and managing 8s sessions for Splatoon
 
-<img width="683" height="384" alt="with-the-release-of-side-order-we-can-finally-decipher-the-v0-cl3wdi8op1lc1" src="https://github.com/user-attachments/assets/bb2eb7b0-d4af-4842-ae46-ccad5dd9f540" />
+<img width="667" height="653" alt="Agent 8s Bot in action" src="https://github.com/user-attachments/assets/6dda181c-df5e-4d4a-b959-df7af1a3e12f" />
 
 [![Generic badge](https://img.shields.io/badge/-Add_Bot_To_Server​-informational?style=for-the-badge)](https://discord.com/oauth2/authorize?client_id=1434173887888887908)
 
@@ -16,15 +16,16 @@ Discord bot for creating and managing 8s sessions for Splatoon
 
 ## Setting up the bot on the server
 
-Once you have added the bot to your server there are two things you have to set up:
+Once you have added the bot to your server there are two optional things you can set up:
 
-Under ``Server Settings > Integrations > Agent 8s > Channels`` disable ``All Channels`` and manually add the channels you would like the bot commands to be used in.  
-<img width="50%" alt="02-15-00-57-Discord" src="https://github.com/user-attachments/assets/5800db11-6451-4b4a-8b88-74cfb6a35f09" />
+Under ``Server Settings > Integrations > Agent 8s > Channels`` you can disable ``All Channels`` and manually add the channels you would like the bot commands to be used in.  
+<img width="50%" alt="channel setup" src="https://github.com/user-attachments/assets/5800db11-6451-4b4a-8b88-74cfb6a35f09" />
 
-Now create two new roles ``Comp 8s`` and ``Casual 8s``. These are the roles the bot will ping when a new event is created.  
-<img width="50%" alt="02-15-03-20-Discord" src="https://github.com/user-attachments/assets/69ce3f73-cef8-4a47-b262-48df0a5ac7b3" />
+You can create two new roles ``Comp 8s`` and ``Casual 8s``. These are the roles the bot will ping when a new event is created.  
+<img width="50%" alt="roles setup" src="https://github.com/user-attachments/assets/69ce3f73-cef8-4a47-b262-48df0a5ac7b3" />
 
-If you want to use the bot in a channel that is in a Private Category, make sure to add the bot user to the categories permissions with the "Add members or roles" button. The bot requires this to be able to create voice channels in the category.
+If you want to use the bot in a channel that is in a Private Category, make sure to add the bot user to the categories permissions with the "Add members or roles" button. The bot requires this to be able to create voice channels in the category.  
+<img width="50%" alt="private category setup" src="https://github.com/user-attachments/assets/937fc98a-250e-4b1e-9900-ec55cbeb84a5" />
 
 The bot can handle automatic deletion of all new messages in a channel that aren't commands. To enable this, add the bot to the channels permissions and give it the permission "Manage Messages". Messages of administrators will not be deleted.
 
@@ -92,7 +93,7 @@ The bot requires a handful of permissions to be granted when added to a server. 
 - **Send Messages in Threads**: Required to send messages in threads
 - **Create Private Threads**: Required to create new private threads
 - **Manage Threads**: Required to add/remove users from a thread and close and archive threads
-- **Mention @€veryone, @here, and All Roles**: Required to ping the casual and competitive roles
+- **Mention @everyone, @here, and All Roles**: Required to ping the casual and competitive roles
 - **Move Members**: Required to disconnect users from voice channels if kicked or dropped out
 
 ## Running locally
@@ -109,9 +110,9 @@ First, install these programs if you do not have them installed already:
 
 Go to Discords [developer dashboard](https://discord.com/developers/applications) and create a new application.
 
-Under ``Installation > Default Install Settings`` select the scopes ``applications.commands`` and ``bot`` and the permissions ``Create Private Threads``,``Manage Channels``, ``Manage Roles``,  ``Manage Threads``, ``Send Messages``, ``Send Messages in Threads``, and ``View Channels``.
+Under ``Installation > Default Install Settings`` select the scopes ``applications.commands`` and ``bot`` and the permissions ``Create Private Threads``,``Manage Channels``, ``Manage Roles``,  ``Manage Threads``, ``Mention Everyone``, ``Move Members``, ``Send Messages``, ``Send Messages in Threads``, and ``View Channels``.
 
-Under ``Bot > Privileged Gateway Intents`` enable ``Presence Intent``, ``Server Members Intent``, and ``Message Content Intent``.
+Under ``Bot > Privileged Gateway Intents`` enable ``Server Members Intent`` and ``Message Content Intent``.
 
 Under ``Bot > Token`` reset your token and copy paste it into the ``.env`` file.
 
