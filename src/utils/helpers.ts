@@ -14,9 +14,9 @@ import {
 	EXCALIBUR_GUILD_ID,
 	EXCALIBUR_RANKS,
 	PING_ROLE_NAMES,
-	PROCESSING_MESSAGES,
 } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
+import { resolveLocale, t } from '../i18n/index.js';
 import { ErrorSeverity, handleError } from './error-handler.js';
 
 export function isUserAdmin(member: GuildMember) {
@@ -130,7 +130,7 @@ export async function checkProcessingStates(
 		if (interaction) {
 			await safeReplyToInteraction(
 				interaction,
-				PROCESSING_MESSAGES.STILL_STARTING,
+				t(resolveLocale(interaction.locale)).processing.stillStarting,
 			);
 		}
 		return true;
@@ -139,7 +139,7 @@ export async function checkProcessingStates(
 		if (interaction) {
 			await safeReplyToInteraction(
 				interaction,
-				PROCESSING_MESSAGES.ALREADY_FINISHING,
+				t(resolveLocale(interaction.locale)).processing.alreadyFinishing,
 			);
 		}
 		return true;
@@ -149,7 +149,7 @@ export async function checkProcessingStates(
 		if (interaction) {
 			await safeReplyToInteraction(
 				interaction,
-				PROCESSING_MESSAGES.ALREADY_CANCELLING,
+				t(resolveLocale(interaction.locale)).processing.alreadyCancelling,
 			);
 		}
 		return true;
@@ -159,7 +159,7 @@ export async function checkProcessingStates(
 		if (interaction) {
 			await safeReplyToInteraction(
 				interaction,
-				PROCESSING_MESSAGES.CLEANING_UP,
+				t(resolveLocale(interaction.locale)).processing.cleaningUp,
 			);
 		}
 		return true;

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleDropoutAllCommand } from '../../commands/dropout-all-command.js';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 
 vi.mock('../../utils/error-handler.js', () => ({
 	handleError: vi.fn(),
@@ -67,8 +67,8 @@ describe('dropout-all-command', () => {
 
 	function createMockEventManager() {
 		const participants = new Map([
-			['user123', { userId: 'user123', role: 'None', rank: null }],
-			['user456', { userId: 'user456', role: 'Tank', rank: null }],
+			['user123', { userId: 'user123', role: 'none', rank: null }],
+			['user456', { userId: 'user456', role: 'support', rank: null }],
 		]);
 
 		return {
@@ -145,7 +145,7 @@ describe('dropout-all-command', () => {
 			);
 
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.DROPOUT_ALL_NOT_IN_EVENTS,
+				content: t('en').errors.dropoutAllNotInEvents,
 			});
 		});
 
@@ -171,7 +171,7 @@ describe('dropout-all-command', () => {
 			);
 			expect(mockTelemetry.trackEventCancelled).toHaveBeenCalled();
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: SUCCESS_MESSAGES.DROPOUT_ALL_SUCCESS,
+				content: t('en').success.dropoutAllSuccess,
 			});
 		});
 
@@ -193,13 +193,13 @@ describe('dropout-all-command', () => {
 			);
 			expect(mockTelemetry.trackUserDropOut).toHaveBeenCalled();
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: SUCCESS_MESSAGES.DROPOUT_ALL_SUCCESS,
+				content: t('en').success.dropoutAllSuccess,
 			});
 		});
 
 		it('should remove user from all queues', async () => {
 			const participantsMap = new Map([
-				['other123', { userId: 'other123', role: 'None', rank: null }],
+				['other123', { userId: 'other123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getAllParticipants.mockReturnValue([
 				['event789', participantsMap],
@@ -224,13 +224,13 @@ describe('dropout-all-command', () => {
 			);
 			expect(mockTelemetry.trackUserLeftQueue).toHaveBeenCalled();
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: SUCCESS_MESSAGES.DROPOUT_ALL_SUCCESS,
+				content: t('en').success.dropoutAllSuccess,
 			});
 		});
 
 		it('should remove user from all spectator lists', async () => {
 			const participantsMap = new Map([
-				['other123', { userId: 'other123', role: 'None', rank: null }],
+				['other123', { userId: 'other123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getAllParticipants.mockReturnValue([
 				['event789', participantsMap],
@@ -252,13 +252,13 @@ describe('dropout-all-command', () => {
 			);
 			expect(mockTelemetry.trackUserStoppedSpectating).toHaveBeenCalled();
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: SUCCESS_MESSAGES.DROPOUT_ALL_SUCCESS,
+				content: t('en').success.dropoutAllSuccess,
 			});
 		});
 
 		it('should remove thread access when spectating', async () => {
 			const participantsMap = new Map([
-				['other123', { userId: 'other123', role: 'None', rank: null }],
+				['other123', { userId: 'other123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getAllParticipants.mockReturnValue([
 				['event789', participantsMap],
@@ -280,7 +280,7 @@ describe('dropout-all-command', () => {
 
 		it('should revoke voice channel access when spectating', async () => {
 			const participantsMap = new Map([
-				['other123', { userId: 'other123', role: 'None', rank: null }],
+				['other123', { userId: 'other123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getAllParticipants.mockReturnValue([
 				['event789', participantsMap],
@@ -307,7 +307,7 @@ describe('dropout-all-command', () => {
 			mockEventManager.userOwnsEvent.mockReturnValue('ownedEvent' as never);
 
 			const participantsMap = new Map([
-				['other123', { userId: 'other123', role: 'None', rank: null }],
+				['other123', { userId: 'other123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getAllParticipants.mockReturnValue([
 				['queuedEvent', participantsMap],
@@ -332,7 +332,7 @@ describe('dropout-all-command', () => {
 				'user123',
 			);
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: SUCCESS_MESSAGES.DROPOUT_ALL_SUCCESS,
+				content: t('en').success.dropoutAllSuccess,
 			});
 		});
 

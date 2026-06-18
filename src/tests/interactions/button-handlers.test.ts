@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ERROR_MESSAGES, MAX_PARTICIPANTS } from '../../constants.js';
+import { MAX_PARTICIPANTS } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 import {
 	handleCancelButton,
 	handleDropInButton,
@@ -72,7 +73,7 @@ describe('button-handlers', () => {
 
 	function createMockEventManager() {
 		const participants = new Map([
-			['user123', { userId: 'user123', role: 'None', rank: null }],
+			['user123', { userId: 'user123', role: 'none', rank: null }],
 		]);
 		return {
 			getParticipants: vi.fn(() => participants),
@@ -170,7 +171,7 @@ describe('button-handlers', () => {
 			for (let i = 0; i < MAX_PARTICIPANTS; i++) {
 				participants.set(`user${i}`, {
 					userId: `user${i}`,
-					role: 'None',
+					role: 'none',
 					rank: null,
 				});
 			}
@@ -185,7 +186,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.EVENT_FULL,
+				content: t('en').errors.eventFull,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -202,7 +203,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: t('en').errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -258,7 +259,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
+				content: t('en').errors.creatorCannotSignout,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -325,7 +326,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.CREATOR_ONLY_CANCEL,
+				content: t('en').errors.creatorOnlyCancel,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -350,7 +351,7 @@ describe('button-handlers', () => {
 			for (let i = 0; i < MAX_PARTICIPANTS; i++) {
 				participants.set(`user${i}`, {
 					userId: `user${i}`,
-					role: 'None',
+					role: 'none',
 					rank: null,
 				});
 			}
@@ -382,14 +383,14 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.CREATOR_ONLY_START,
+				content: t('en').errors.creatorOnlyStart,
 				flags: ['Ephemeral'],
 			});
 		});
 
 		it('should reject if not enough participants', async () => {
 			const participants = new Map([
-				['user1', { userId: 'user1', role: 'None', rank: null }],
+				['user1', { userId: 'user1', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 
@@ -403,7 +404,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.NOT_ENOUGH_PARTICIPANTS,
+				content: t('en').errors.notEnoughParticipants,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -491,8 +492,8 @@ describe('button-handlers', () => {
 
 		it('should allow owner to drop out when other participants exist', async () => {
 			const participants = new Map([
-				['user123', { userId: 'user123', role: 'None', rank: null }],
-				['user456', { userId: 'user456', role: 'None', rank: null }],
+				['user123', { userId: 'user123', role: 'none', rank: null }],
+				['user456', { userId: 'user456', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.getCreator.mockReturnValue('user123');
@@ -516,7 +517,7 @@ describe('button-handlers', () => {
 
 		it('should reject owner drop out when they are the only participant', async () => {
 			const participants = new Map([
-				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['user123', { userId: 'user123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.getCreator.mockReturnValue('user123');
@@ -531,7 +532,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+				content: t('en').errors.ownerOnlyParticipant,
 				flags: ['Ephemeral'],
 			});
 			expect(mockEventManager.removeParticipant).not.toHaveBeenCalled();
@@ -539,7 +540,7 @@ describe('button-handlers', () => {
 
 		it('should reject if user is not signed up', async () => {
 			const participants = new Map([
-				['creator456', { userId: 'creator456', role: 'None', rank: null }],
+				['creator456', { userId: 'creator456', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.getCreator.mockReturnValue('creator456');
@@ -554,7 +555,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.NOT_SIGNED_UP,
+				content: t('en').errors.notSignedUp,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -598,7 +599,7 @@ describe('button-handlers', () => {
 
 		it('should reject if already in event', async () => {
 			const participants = new Map([
-				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['user123', { userId: 'user123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 
@@ -612,7 +613,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: t('en').errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -622,7 +623,7 @@ describe('button-handlers', () => {
 			for (let i = 0; i < MAX_PARTICIPANTS; i++) {
 				participants.set(`user${i}`, {
 					userId: `user${i}`,
-					role: 'None',
+					role: 'none',
 					rank: null,
 				});
 			}
@@ -638,7 +639,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.EVENT_FULL,
+				content: t('en').errors.eventFull,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -647,7 +648,7 @@ describe('button-handlers', () => {
 	describe('handleSpectateButton', () => {
 		it('should add user as spectator when not a participant', async () => {
 			const participants = new Map([
-				['creator456', { userId: 'creator456', role: 'None', rank: null }],
+				['creator456', { userId: 'creator456', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.getCreator.mockReturnValue('creator456');
@@ -684,7 +685,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.SPECTATE_ALREADY_SPECTATING,
+				content: t('en').errors.spectateAlreadySpectating,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -705,15 +706,15 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.SPECTATE_FULL,
+				content: t('en').errors.spectateFull,
 				flags: ['Ephemeral'],
 			});
 		});
 
 		it('should allow non-owner participant to switch to spectator', async () => {
 			const participants = new Map([
-				['user123', { userId: 'user123', role: 'None', rank: null }],
-				['creator456', { userId: 'creator456', role: 'None', rank: null }],
+				['user123', { userId: 'user123', role: 'none', rank: null }],
+				['creator456', { userId: 'creator456', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.getCreator.mockReturnValue('creator456');
@@ -741,8 +742,8 @@ describe('button-handlers', () => {
 
 		it('should allow owner to switch to spectator when other participants exist', async () => {
 			const participants = new Map([
-				['user123', { userId: 'user123', role: 'None', rank: null }],
-				['user456', { userId: 'user456', role: 'None', rank: null }],
+				['user123', { userId: 'user123', role: 'none', rank: null }],
+				['user456', { userId: 'user456', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.getCreator.mockReturnValue('user123');
@@ -775,7 +776,7 @@ describe('button-handlers', () => {
 
 		it('should reject owner spectate when they are the only participant', async () => {
 			const participants = new Map([
-				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['user123', { userId: 'user123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.getCreator.mockReturnValue('user123');
@@ -790,7 +791,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+				content: t('en').errors.ownerOnlyParticipant,
 				flags: ['Ephemeral'],
 			});
 			expect(mockEventManager.removeSpectator).toHaveBeenCalledWith(
@@ -802,8 +803,8 @@ describe('button-handlers', () => {
 
 		it('should revert spectator addition if ownership transfer fails', async () => {
 			const participants = new Map([
-				['user123', { userId: 'user123', role: 'None', rank: null }],
-				['user456', { userId: 'user456', role: 'None', rank: null }],
+				['user123', { userId: 'user123', role: 'none', rank: null }],
+				['user456', { userId: 'user456', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.getCreator.mockReturnValue('user123');
@@ -819,7 +820,7 @@ describe('button-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.SPECTATE_ERROR,
+				content: t('en').errors.spectateError,
 				flags: ['Ephemeral'],
 			});
 			expect(mockEventManager.removeSpectator).toHaveBeenCalledWith(
@@ -831,7 +832,7 @@ describe('button-handlers', () => {
 
 		it('should grant thread and voice access for new spectators', async () => {
 			const participants = new Map([
-				['creator456', { userId: 'creator456', role: 'None', rank: null }],
+				['creator456', { userId: 'creator456', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.getCreator.mockReturnValue('creator456');

@@ -1,4 +1,4 @@
-import { GuildMember, SlashCommandBuilder } from 'discord.js';
+import { GuildMember, Locale, SlashCommandBuilder } from 'discord.js';
 import dotenv from 'dotenv';
 import {
 	createDiscordClient,
@@ -15,9 +15,10 @@ import { handleKickCommand } from './commands/kick-command.js';
 import { handleRepingCommand } from './commands/reping-command.js';
 import { handleStatusCommand } from './commands/status-command.js';
 import { handleToggleSpectatorsCommand } from './commands/toggle-spectators-command.js';
-import { ERROR_MESSAGES, TIMINGS } from './constants.js';
+import { TIMINGS } from './constants.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
 import { EventManager } from './event/event-manager.js';
+import { resolveLocale, t } from './i18n/index.js';
 import {
 	handleCancelButton,
 	handleDropInButton,
@@ -58,15 +59,22 @@ if (!botToken) {
 const telemetryUrl = process.env.TELEMETRY_URL;
 const telemetryToken = process.env.TELEMETRY_TOKEN;
 
+const enCommands = t('en').commands;
+const jaCommands = t('ja').commands;
+
+const jaDescription = (text: string) => ({ [Locale.Japanese]: text });
+
 const commands = [
 	new SlashCommandBuilder()
 		.setName('create')
-		.setDescription('Create a new 8s event.')
+		.setDescription(enCommands.create.description)
+		.setDescriptionLocalizations(jaDescription(jaCommands.create.description))
 		.addIntegerOption((option) =>
 			option
 				.setName('time')
-				.setDescription(
-					'Time in minutes before the event starts. If not specified, event starts when 8 players sign up.',
+				.setDescription(enCommands.create.options.time)
+				.setDescriptionLocalizations(
+					jaDescription(jaCommands.create.options.time),
 				)
 				.setRequired(false)
 				.setMinValue(1),
@@ -74,45 +82,67 @@ const commands = [
 		.addBooleanOption((option) =>
 			option
 				.setName('casual')
-				.setDescription('Whether to ping casual roles.')
+				.setDescription(enCommands.create.options.casual)
+				.setDescriptionLocalizations(
+					jaDescription(jaCommands.create.options.casual),
+				)
 				.setRequired(false),
 		)
 		.addBooleanOption((option) =>
 			option
 				.setName('spectators')
-				.setDescription('Whether to allow spectators for this event.')
+				.setDescription(enCommands.create.options.spectators)
+				.setDescriptionLocalizations(
+					jaDescription(jaCommands.create.options.spectators),
+				)
 				.setRequired(false),
 		)
 		.addStringOption((option) =>
 			option
 				.setName('info')
-				.setDescription('Add a description to the event.')
+				.setDescription(enCommands.create.options.info)
+				.setDescriptionLocalizations(
+					jaDescription(jaCommands.create.options.info),
+				)
 				.setRequired(false),
 		)
 		.toJSON(),
 	new SlashCommandBuilder()
 		.setName('status')
-		.setDescription('Display bot status and statistics.')
+		.setDescription(enCommands.status.description)
+		.setDescriptionLocalizations(jaDescription(jaCommands.status.description))
 		.toJSON(),
 	new SlashCommandBuilder()
 		.setName('re-ping')
-		.setDescription('Re-ping the roles for your event.')
+		.setDescription(enCommands.reping.description)
+		.setDescriptionLocalizations(jaDescription(jaCommands.reping.description))
 		.toJSON(),
 	new SlashCommandBuilder()
 		.setName('kick')
-		.setDescription('Kick the selected user from your event.')
+		.setDescription(enCommands.kick.description)
+		.setDescriptionLocalizations(jaDescription(jaCommands.kick.description))
 		.addUserOption((option) =>
-			option.setName('user').setDescription('User to kick').setRequired(true),
+			option
+				.setName('user')
+				.setDescription(enCommands.kick.options.user)
+				.setDescriptionLocalizations(
+					jaDescription(jaCommands.kick.options.user),
+				)
+				.setRequired(true),
 		)
 		.toJSON(),
 	new SlashCommandBuilder()
 		.setName('toggle-spectators')
-		.setDescription('Enable or disable spectators for your event.')
+		.setDescription(enCommands.toggleSpectators.description)
+		.setDescriptionLocalizations(
+			jaDescription(jaCommands.toggleSpectators.description),
+		)
 		.toJSON(),
 	new SlashCommandBuilder()
 		.setName('dropout-all')
-		.setDescription(
-			'Remove yourself from all events, queues, and spectator lists.',
+		.setDescription(enCommands.dropoutAll.description)
+		.setDescriptionLocalizations(
+			jaDescription(jaCommands.dropoutAll.description),
 		)
 		.toJSON(),
 ];
@@ -134,11 +164,12 @@ appClient.on('interactionCreate', async (interaction) => {
 	if (!interaction.isRepliable()) return;
 
 	const userId = interaction.user.id;
+	const dict = t(resolveLocale(interaction.locale));
 
 	try {
 		if (isInShutdownMode()) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.SHUTDOWN_WARNING,
+				content: dict.errors.shutdownWarning,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -154,7 +185,7 @@ appClient.on('interactionCreate', async (interaction) => {
 
 		if (!isValidInteraction) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.NO_BOT_PERMISSIONS,
+				content: dict.errors.noBotPermissions,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -162,7 +193,7 @@ appClient.on('interactionCreate', async (interaction) => {
 
 		if (lockedUsers.has(userId)) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.ACTION_IN_PROGRESS,
+				content: dict.errors.actionInProgress,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -336,7 +367,7 @@ appClient.on('interactionCreate', async (interaction) => {
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.UNEXPECTED_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.unexpectedError);
 	} finally {
 		lockedUsers.delete(userId);
 	}

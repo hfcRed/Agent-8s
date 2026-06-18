@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleCreateCommand } from '../../commands/create-command.js';
-import { ERROR_MESSAGES } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 
 vi.mock('../../utils/embed-utils.js', () => ({
 	createEventButtons: vi.fn(() => ({ components: [] })),
@@ -77,6 +77,7 @@ describe('create-command', () => {
 			setParticipants: vi.fn(),
 			setGuildId: vi.fn(),
 			setMessageData: vi.fn(),
+			setLocale: vi.fn(),
 			getParticipants: vi.fn(() => new Map()),
 			removeUserFromAllQueues: vi.fn().mockResolvedValue(undefined),
 		};
@@ -110,11 +111,11 @@ describe('create-command', () => {
 			);
 
 			expect(mockInteraction.reply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: t('en').errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 			expect(mockInteraction.reply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: t('en').errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 		});

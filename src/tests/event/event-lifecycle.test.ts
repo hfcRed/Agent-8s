@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FIELD_NAMES, STATUS_MESSAGES } from '../../constants.js';
 import {
 	cleanupEvent,
 	createEventStartTimeout,
 	startEvent,
 } from '../../event/event-lifecycle.js';
+import { t } from '../../i18n/index.js';
 
 vi.mock('../../utils/error-handler.js', () => ({
 	handleError: vi.fn(),
@@ -44,7 +44,9 @@ describe('event-lifecycle', () => {
 					data: {
 						title: 'Event',
 						color: 0x00ff00,
-						fields: [{ name: FIELD_NAMES.STATUS, value: STATUS_MESSAGES.OPEN }],
+						fields: [
+							{ name: t('en').fields.status, value: t('en').status.open },
+						],
 					},
 				},
 			],
@@ -62,8 +64,8 @@ describe('event-lifecycle', () => {
 
 	function createMockEventManager() {
 		const participants = new Map([
-			['user1', { userId: 'user1', role: 'Tank', rank: null }],
-			['user2', { userId: 'user2', role: 'DPS', rank: null }],
+			['user1', { userId: 'user1', role: 'midline', rank: null }],
+			['user2', { userId: 'user2', role: 'slayer', rank: null }],
 		]);
 
 		return {
@@ -79,6 +81,7 @@ describe('event-lifecycle', () => {
 			getVoiceChannels: vi.fn(),
 			getChannelId: vi.fn(() => 'channel123'),
 			getGuildId: vi.fn(() => 'guild123'),
+			getLocale: vi.fn(() => 'en'),
 			getTimeout: vi.fn(),
 			getAllTimers: vi.fn(() => []),
 			setProcessing: vi.fn(),
@@ -159,7 +162,7 @@ describe('event-lifecycle', () => {
 	describe('startEvent', () => {
 		it('should start event and create resources', async () => {
 			const participants = new Map([
-				['user1', { userId: 'user1', role: 'Tank', rank: null }],
+				['user1', { userId: 'user1', role: 'midline' as const, rank: null }],
 			]);
 
 			await startEvent(
@@ -240,8 +243,8 @@ describe('event-lifecycle', () => {
 
 		it('should add members to thread', async () => {
 			const participants = new Map([
-				['user1', { userId: 'user1', role: 'Tank', rank: null }],
-				['user2', { userId: 'user2', role: 'DPS', rank: null }],
+				['user1', { userId: 'user1', role: 'midline' as const, rank: null }],
+				['user2', { userId: 'user2', role: 'slayer' as const, rank: null }],
 			]);
 
 			await startEvent(
@@ -262,7 +265,7 @@ describe('event-lifecycle', () => {
 
 		it('should track event start with telemetry', async () => {
 			const participants = new Map([
-				['user1', { userId: 'user1', role: 'Tank', rank: null }],
+				['user1', { userId: 'user1', role: 'midline' as const, rank: null }],
 			]);
 
 			await startEvent(

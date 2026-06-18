@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleRepingCommand } from '../../commands/reping-command.js';
-import { ERROR_MESSAGES, TIMINGS } from '../../constants.js';
+import { TIMINGS } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 
 vi.mock('../../utils/error-handler.js', () => ({
 	handleError: vi.fn(),
@@ -60,7 +61,7 @@ describe('reping-command', () => {
 
 	function createMockEventManager() {
 		const participants = new Map([
-			['user123', { userId: 'user123', role: 'None', rank: null }],
+			['user123', { userId: 'user123', role: 'none', rank: null }],
 		]);
 
 		return {
@@ -69,6 +70,8 @@ describe('reping-command', () => {
 			getRepingCooldown: vi.fn(),
 			getChannelId: vi.fn(() => 'channel123'),
 			getMatchId: vi.fn(() => 'match123'),
+			getCasual: vi.fn(() => false),
+			getLocale: vi.fn(() => 'en'),
 			deleteRepingMessageIfExists: vi.fn().mockResolvedValue(undefined),
 			setRepingMessage: vi.fn(),
 			setRepingCooldown: vi.fn(),
@@ -114,7 +117,7 @@ describe('reping-command', () => {
 			);
 
 			expect(mockReply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.NOT_IN_EVENT,
+				content: t('en').errors.notInEvent,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -145,14 +148,14 @@ describe('reping-command', () => {
 			const mockReply = vi.fn().mockResolvedValue(undefined);
 			mockInteraction.reply = mockReply;
 			const participants = new Map([
-				['user1', { userId: 'user1', role: 'None', rank: null }],
-				['user2', { userId: 'user2', role: 'Tank', rank: null }],
-				['user3', { userId: 'user3', role: 'DPS', rank: null }],
-				['user4', { userId: 'user4', role: 'Healer', rank: null }],
-				['user5', { userId: 'user5', role: 'None', rank: null }],
-				['user6', { userId: 'user6', role: 'None', rank: null }],
-				['user7', { userId: 'user7', role: 'None', rank: null }],
-				['user8', { userId: 'user8', role: 'None', rank: null }],
+				['user1', { userId: 'user1', role: 'none', rank: null }],
+				['user2', { userId: 'user2', role: 'slayer', rank: null }],
+				['user3', { userId: 'user3', role: 'support', rank: null }],
+				['user4', { userId: 'user4', role: 'midline', rank: null }],
+				['user5', { userId: 'user5', role: 'none', rank: null }],
+				['user6', { userId: 'user6', role: 'none', rank: null }],
+				['user7', { userId: 'user7', role: 'none', rank: null }],
+				['user8', { userId: 'user8', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 
@@ -163,7 +166,7 @@ describe('reping-command', () => {
 			);
 
 			expect(mockReply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.REPING_EVENT_FULL,
+				content: t('en').errors.repingEventFull,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -208,7 +211,7 @@ describe('reping-command', () => {
 			);
 
 			expect(mockReply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+				content: t('en').errors.channelNotFound,
 				flags: ['Ephemeral'],
 			});
 		});

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-	COLORS,
-	FIELD_NAMES,
-	PARTICIPANT_FIELD_NAME,
-	WEAPON_ROLES,
-} from '../../constants.js';
+import { COLORS, ROLE_KEYS } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 import {
 	createEventButtons,
 	createEventEmbed,
@@ -22,6 +18,7 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				true,
+				'en',
 			);
 
 			expect(embed.data.author?.name).toBe('TestUser');
@@ -33,7 +30,7 @@ describe('embed-utils', () => {
 
 			const fields = embed.data.fields || [];
 			expect(fields.length).toBe(4);
-			expect(fields[0].name).toBe(PARTICIPANT_FIELD_NAME(1));
+			expect(fields[0].name).toBe(t('en').fields.participantsCount(1));
 			expect(fields[0].value).toContain('123456789');
 		});
 
@@ -45,6 +42,7 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				false,
+				'en',
 			);
 
 			expect(embed.data.title).toContain('Competitive');
@@ -58,11 +56,12 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				true,
+				'en',
 				10,
 			);
 
 			const fields = embed.data.fields || [];
-			const startField = fields.find((f) => f.name === FIELD_NAMES.START);
+			const startField = fields.find((f) => f.name === t('en').fields.start);
 			expect(startField?.value).toContain('<t:');
 		});
 
@@ -74,6 +73,7 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				true,
+				'en',
 				undefined,
 				'Custom event info',
 			);
@@ -89,17 +89,18 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				true,
+				'en',
 			);
 
 			const fields = embed.data.fields || [];
-			const roleField = fields.find((f) => f.name === FIELD_NAMES.ROLE);
-			expect(roleField?.value).toContain(WEAPON_ROLES[0]);
+			const roleField = fields.find((f) => f.name === t('en').fields.role);
+			expect(roleField?.value).toContain(t('en').roles.none);
 		});
 	});
 
 	describe('createEventButtons', () => {
 		it('should create basic buttons without timer', () => {
-			const row = createEventButtons();
+			const row = createEventButtons('en');
 
 			expect(row.components.length).toBe(3);
 			const customIds = row.components.map((c) => {
@@ -112,7 +113,7 @@ describe('embed-utils', () => {
 		});
 
 		it('should include start now button when timer is provided', () => {
-			const row = createEventButtons(15);
+			const row = createEventButtons('en', 15);
 
 			expect(row.components.length).toBe(4);
 			const customIds = row.components.map((c) => {
@@ -123,7 +124,7 @@ describe('embed-utils', () => {
 		});
 
 		it('should have correct button styles', () => {
-			const row = createEventButtons();
+			const row = createEventButtons('en');
 
 			const signupButton = row.components.find((c) => {
 				const data = c.data as { custom_id?: string };
@@ -146,7 +147,7 @@ describe('embed-utils', () => {
 
 	describe('createEventStartedButtons', () => {
 		it('should create two button rows for started events with spectate buttons enabled', () => {
-			const rows = createEventStartedButtons(true);
+			const rows = createEventStartedButtons('en', true);
 
 			expect(rows.length).toBe(2);
 
@@ -173,7 +174,7 @@ describe('embed-utils', () => {
 		});
 
 		it('should create one button row when spectators are disabled', () => {
-			const rows = createEventStartedButtons(false);
+			const rows = createEventStartedButtons('en', false);
 
 			expect(rows.length).toBe(1);
 
@@ -193,7 +194,7 @@ describe('embed-utils', () => {
 		});
 
 		it('should default to spectators disabled when no parameter provided', () => {
-			const rows = createEventStartedButtons();
+			const rows = createEventStartedButtons('en');
 
 			expect(rows.length).toBe(1);
 		});
@@ -201,15 +202,15 @@ describe('embed-utils', () => {
 
 	describe('createRoleSelectMenu', () => {
 		it('should create select menu with all weapon roles', () => {
-			const row = createRoleSelectMenu();
+			const row = createRoleSelectMenu('en');
 
 			const selectMenu = row.components[0];
 			expect(selectMenu.data.custom_id).toBe('select');
-			expect(selectMenu.options.length).toBe(WEAPON_ROLES.length);
+			expect(selectMenu.options.length).toBe(ROLE_KEYS.length);
 		});
 
 		it('should have placeholder text', () => {
-			const row = createRoleSelectMenu();
+			const row = createRoleSelectMenu('en');
 
 			const selectMenu = row.components[0];
 			expect(selectMenu.data.placeholder).toBeTruthy();

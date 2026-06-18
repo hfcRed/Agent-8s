@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleStatusCommand } from '../../commands/status-command.js';
-import { ERROR_MESSAGES } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 
 vi.mock('../../utils/helpers.js', () => ({
 	safeReplyToInteraction: vi.fn(),
@@ -141,7 +141,7 @@ describe('status-command', () => {
 
 			expect(safeReplyToInteraction).toHaveBeenCalledWith(
 				mockInteraction,
-				ERROR_MESSAGES.STATUS_ERROR,
+				t('en').errors.statusError,
 			);
 		});
 	});

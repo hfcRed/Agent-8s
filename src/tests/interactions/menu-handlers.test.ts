@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ERROR_MESSAGES } from '../../constants.js';
+import { DEFAULT_ROLE_KEY } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 import { handleRoleSelection } from '../../interactions/menu-handlers.js';
 
 vi.mock('../../utils/error-handler.js', () => ({
@@ -27,12 +28,12 @@ describe('menu-handlers', () => {
 				id: 'message123',
 				embeds: [{ data: { fields: [] } }],
 			},
-			values: ['Tank'],
+			values: ['slayer'],
 			component: {
 				options: [
-					{ value: 'Tank', label: 'Tank' },
-					{ value: 'DPS', label: 'DPS' },
-					{ value: 'Healer', label: 'Healer' },
+					{ value: 'slayer', label: t('en').roles.slayer },
+					{ value: 'midline', label: t('en').roles.midline },
+					{ value: 'support', label: t('en').roles.support },
 				],
 			},
 			deferUpdate: vi.fn().mockResolvedValue(undefined),
@@ -43,7 +44,7 @@ describe('menu-handlers', () => {
 
 	function createMockEventManager() {
 		const participants = new Map([
-			['user123', { userId: 'user123', role: 'None', rank: null }],
+			['user123', { userId: 'user123', role: DEFAULT_ROLE_KEY, rank: null }],
 		]);
 
 		return {
@@ -75,7 +76,7 @@ describe('menu-handlers', () => {
 				'user123',
 				expect.objectContaining({
 					userId: 'user123',
-					role: 'Tank',
+					role: 'slayer',
 				}),
 			);
 			expect(mockEventManager.queueUpdate).toHaveBeenCalledWith('message123');
@@ -91,13 +92,13 @@ describe('menu-handlers', () => {
 			);
 
 			expect(mockInteraction.followUp).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.NOT_SIGNED_UP,
+				content: t('en').errors.notSignedUp,
 				flags: ['Ephemeral'],
 			});
 		});
 
 		it('should handle different role selections', async () => {
-			mockInteraction.values = ['Healer'];
+			mockInteraction.values = ['support'];
 
 			await handleRoleSelection(
 				mockInteraction as never,
@@ -108,13 +109,13 @@ describe('menu-handlers', () => {
 				'message123',
 				'user123',
 				expect.objectContaining({
-					role: 'Healer',
+					role: 'support',
 				}),
 			);
 		});
 
-		it('should use label from selected option', async () => {
-			mockInteraction.values = ['DPS'];
+		it('should use role key from selected option value', async () => {
+			mockInteraction.values = ['midline'];
 
 			await handleRoleSelection(
 				mockInteraction as never,
@@ -125,7 +126,7 @@ describe('menu-handlers', () => {
 				'message123',
 				'user123',
 				expect.objectContaining({
-					role: 'DPS',
+					role: 'midline',
 				}),
 			);
 		});

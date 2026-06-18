@@ -1,11 +1,12 @@
 import type { Client, Guild, Message, TextChannel } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
 import {
+	DEFAULT_ROLE_KEY,
 	MATCH_ID_LENGTH,
 	MAX_PARTICIPANTS,
 	TIMINGS,
-	WEAPON_ROLES,
 } from '../constants.js';
+import { t } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -45,11 +46,13 @@ export async function startEvent(
 
 		eventManager.queueUpdate(message.id);
 
+		const locale = eventManager.getLocale(message.id);
 		const participants = Array.from(participantMap.values());
 		const channel = message.channel as TextChannel;
 		const thread = await threadManager.createEventThread(
 			channel,
 			shortId || 'unknown',
+			locale,
 		);
 
 		const voiceChannels = await voiceChannelManager.createEventVoiceChannels(
@@ -58,6 +61,7 @@ export async function startEvent(
 			participants.map((p) => p.userId),
 			shortId || 'unknown',
 			appClient,
+			locale,
 		);
 		eventManager.setVoiceChannels(message.id, voiceChannels);
 
@@ -71,7 +75,9 @@ export async function startEvent(
 
 			await threadManager.sendMessage(
 				thread,
-				`**Voice Channels Created**\n\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+				t(locale).channels.voiceChannelsCreated(
+					voiceChannels.map((channelId) => `<#${channelId}>`).join('\n'),
+				),
 			);
 
 			await threadManager.addMembers(
@@ -315,7 +321,7 @@ export async function promoteNextFromQueue(
 
 	eventManager.addParticipant(messageId, nextUserId, {
 		userId: nextUserId,
-		role: WEAPON_ROLES[0],
+		role: DEFAULT_ROLE_KEY,
 		rank: getExcaliburRankOfUser(guild.id, member),
 	});
 

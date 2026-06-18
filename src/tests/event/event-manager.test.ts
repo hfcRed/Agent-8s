@@ -47,7 +47,7 @@ describe('EventManager', () => {
 	describe('participant management', () => {
 		it('should store and retrieve participants', () => {
 			const participants: ParticipantMap = new Map([
-				['user1', { userId: 'user1', role: 'Slayer', rank: null }],
+				['user1', { userId: 'user1', role: 'slayer', rank: null }],
 			]);
 
 			eventManager.setParticipants('event1', participants);
@@ -62,7 +62,7 @@ describe('EventManager', () => {
 
 			eventManager.addParticipant('event1', 'user1', {
 				userId: 'user1',
-				role: 'Support',
+				role: 'support',
 				rank: null,
 			});
 
@@ -72,7 +72,7 @@ describe('EventManager', () => {
 
 		it('should remove participant', () => {
 			const participants: ParticipantMap = new Map([
-				['user1', { userId: 'user1', role: 'Slayer', rank: null }],
+				['user1', { userId: 'user1', role: 'slayer', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 
@@ -84,7 +84,7 @@ describe('EventManager', () => {
 
 		it('should track user-to-event index', () => {
 			const participants: ParticipantMap = new Map([
-				['user1', { userId: 'user1', role: 'Slayer', rank: null }],
+				['user1', { userId: 'user1', role: 'slayer', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 
@@ -94,12 +94,12 @@ describe('EventManager', () => {
 
 		it('should update index when participants change', () => {
 			const participants: ParticipantMap = new Map([
-				['user1', { userId: 'user1', role: 'Slayer', rank: null }],
+				['user1', { userId: 'user1', role: 'slayer', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 
 			const newParticipants: ParticipantMap = new Map([
-				['user2', { userId: 'user2', role: 'Support', rank: null }],
+				['user2', { userId: 'user2', role: 'support', rank: null }],
 			]);
 			eventManager.setParticipants('event1', newParticipants);
 
@@ -277,7 +277,7 @@ describe('EventManager', () => {
 	describe('clearAllEventData', () => {
 		it('should clear all data associated with event', () => {
 			const participants: ParticipantMap = new Map([
-				['user1', { userId: 'user1', role: 'Slayer', rank: null }],
+				['user1', { userId: 'user1', role: 'slayer', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 			eventManager.setCreator('event1', 'creator-123');
@@ -453,9 +453,9 @@ describe('EventManager', () => {
 			};
 
 			const participants: ParticipantMap = new Map([
-				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
-				['user2', { userId: 'user2', role: 'Support', rank: null }],
-				['user3', { userId: 'user3', role: 'Tank', rank: null }],
+				['owner1', { userId: 'owner1', role: 'slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'support', rank: null }],
+				['user3', { userId: 'user3', role: 'backline', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 			eventManager.setCreator('event1', 'owner1');
@@ -477,7 +477,7 @@ describe('EventManager', () => {
 			};
 
 			const participants: ParticipantMap = new Map([
-				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
+				['owner1', { userId: 'owner1', role: 'slayer', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 			eventManager.setCreator('event1', 'owner1');
@@ -523,8 +523,8 @@ describe('EventManager', () => {
 			);
 
 			const participants: ParticipantMap = new Map([
-				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
-				['user2', { userId: 'user2', role: 'Support', rank: null }],
+				['owner1', { userId: 'owner1', role: 'slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'support', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 			eventManager.setCreator('event1', 'owner1');
@@ -553,8 +553,8 @@ describe('EventManager', () => {
 			};
 
 			const participants: ParticipantMap = new Map([
-				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
-				['user2', { userId: 'user2', role: 'Support', rank: null }],
+				['owner1', { userId: 'owner1', role: 'slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'support', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 			eventManager.setCreator('event1', 'owner1');
@@ -584,8 +584,8 @@ describe('EventManager', () => {
 			(mockClient.users.cache as Map<string, unknown>).set('owner1', mockUser);
 
 			const participants: ParticipantMap = new Map([
-				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
-				['user2', { userId: 'user2', role: 'Support', rank: null }],
+				['owner1', { userId: 'owner1', role: 'slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'support', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 			eventManager.setCreator('event1', 'owner1');
@@ -619,8 +619,8 @@ describe('EventManager', () => {
 			};
 
 			const participants: ParticipantMap = new Map([
-				['owner1', { userId: 'owner1', role: 'Slayer', rank: null }],
-				['user2', { userId: 'user2', role: 'Support', rank: null }],
+				['owner1', { userId: 'owner1', role: 'slayer', rank: null }],
+				['user2', { userId: 'user2', role: 'support', rank: null }],
 			]);
 			eventManager.setParticipants('event1', participants);
 			eventManager.setCreator('event1', 'owner1');

@@ -1,6 +1,7 @@
 import type { GuildMember, StringSelectMenuInteraction } from 'discord.js';
-import { ERROR_MESSAGES } from '../constants.js';
+import { DEFAULT_ROLE_KEY, ROLE_KEYS, type RoleKey } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
+import { resolveLocale, t } from '../i18n/index.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	getExcaliburRankOfUser,
@@ -11,6 +12,8 @@ export async function handleRoleSelection(
 	interaction: StringSelectMenuInteraction,
 	eventManager: EventManager,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -22,18 +25,18 @@ export async function handleRoleSelection(
 
 		if (!participantMap.has(userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.NOT_SIGNED_UP,
+				content: dict.errors.notSignedUp,
 				flags: ['Ephemeral'],
 			});
 			return;
 		}
 
 		const selectedValue = interaction.values[0];
-		const component = interaction.component;
-		const selectedOption = component.options.find(
-			(option) => option.value === selectedValue,
-		);
-		const selectedRole = selectedOption?.label || selectedValue;
+		const selectedRole: RoleKey = (ROLE_KEYS as readonly string[]).includes(
+			selectedValue,
+		)
+			? (selectedValue as RoleKey)
+			: DEFAULT_ROLE_KEY;
 
 		eventManager.addParticipant(messageId, userId, {
 			userId: userId,
@@ -60,6 +63,6 @@ export async function handleRoleSelection(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.ROLE_UPDATE_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.roleUpdateError);
 	}
 }
