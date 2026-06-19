@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ChatInputCommandInteraction, GuildMember } from 'discord.js';
+import type { GuildConfigStore } from '../config/guild-config-store.js';
 import { DEFAULT_ROLE_KEY, TIMINGS } from '../constants.js';
 import { createEventStartTimeout } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
@@ -25,6 +26,7 @@ export async function handleCreateCommand(
 	threadManager: ThreadManager,
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
+	guildConfig?: GuildConfigStore,
 ) {
 	const dict = t(resolveLocale(interaction.locale));
 
@@ -37,7 +39,10 @@ export async function handleCreateCommand(
 			return;
 		}
 
-		const locale = resolveLocale(interaction.guildLocale);
+		const configuredLocale = interaction.guildId
+			? guildConfig?.getLocale(interaction.guildId)
+			: undefined;
+		const locale = configuredLocale ?? resolveLocale(interaction.guildLocale);
 
 		const casual = !!interaction.options.getBoolean('casual', false);
 		const spectators = !!interaction.options.getBoolean('spectators', false);

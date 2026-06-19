@@ -29,6 +29,8 @@ If you want to use the bot in a channel that is in a Private Category, make sure
 
 The bot can handle automatic deletion of all new messages in a channel that aren't commands. To enable this, add the bot to the channels permissions and give it the permission "Manage Messages". Messages of administrators will not be deleted.
 
+By default the bot uses English for shared event messages. Server admins can change this with the ``/set-language`` command — see [Languages](#languages).
+
 ## Using the bot
 
 ### Bot commands
@@ -64,6 +66,10 @@ Remove yourself from all events, queues, and spectator lists. If you own an even
 
 Display bot status and statistics.
 
+#### ``/set-language``
+
+Set the language the bot uses for this servers shared event messages (English or Japanese). Requires the Manage Server permission. See [Languages](#languages).
+
 ### Event lifecycle
 
 Users can use the ``Sign Up`` and ``Sign Out`` buttons to enter or exit the event. The creator of the event can also cancel it anytime before it starts. If a time is specified, the creator of the event can also manually start the event before the time is up.
@@ -81,6 +87,18 @@ If the owner of an event drops out after the event has started, ownership is tra
 Admins can cancel and finish events at any point, even if they are not part of the event.
 
 Should an event not start because not enough players are found, or the event is not manually finished, the bot will automatically close and archive the event after 24 hours.
+
+## Languages
+
+Agent 8s is available in **English** and **Japanese**, and is built so more languages can be added.
+
+- **Shared event content** — the sign-up embed, its buttons, the weapon role menu, the voice channel and thread names, and re-ping messages are shown in the servers language, so everyone in the event sees the same thing.
+- **Private replies** that only you can see (errors and confirmations) use your own Discord client language, so they always match the language you use Discord in, regardless of the servers setting.
+- Command descriptions are localized automatically by Discord based on your client language, command names stay in English.
+
+### Setting your server's language
+
+Server admins can use the ``/set-language`` command (requires the Manage Server permission) to pick the language used for shared event messages. The choice is saved per server and applies to events created afterwards.
 
 ## Permission scopes
 
@@ -135,8 +153,9 @@ To start testing locally you can use the following commands:
 - `NODE_ENV` (required): The environment the bot is running in (development or production)
 - `TELEMETRY_URL` and `TELEMETRY_TOKEN` (optional): enable forwarding lifecycle telemetry to an external HTTP endpoint.
 - `METRICS_PORT` (optional, defaults to `9464`): port exposing the Prometheus `/metrics` endpoint.
-- `DATABASE_URL` (optional): PostgreSQL connection string used to persist match lifecycle data to the `telemetry_events` table.
-- `DATABASE_SCHEMA` and `TELEMETRY_EVENTS_TABLE` (optional, default to `public.telemetry_events`): override where lifecycle rows are stored; both values must be valid PostgreSQL identifiers.
+- `DATABASE_URL` (optional): PostgreSQL connection string. Persists match lifecycle data to the `telemetry_events` table and per-server settings (such as the language chosen via `/set-language`) to the `guild_config` table. Without it, `/set-language` is unavailable and the bot falls back to the server's Discord locale (see [Languages](#languages)).
+- `DATABASE_SCHEMA` (optional, defaults to `public`): schema that holds both the `telemetry_events` and `guild_config` tables; must be a valid PostgreSQL identifier.
+- `TELEMETRY_EVENTS_TABLE` (optional, defaults to `telemetry_events`): override the lifecycle events table name; must be a valid PostgreSQL identifier.
 
 ## Running with Docker
 

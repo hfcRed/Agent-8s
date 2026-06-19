@@ -141,6 +141,11 @@ export const ja: Dictionary = {
 			'現在、どのイベント・待機列・観戦リストにも参加していません。',
 		dropoutAllError: '一括離脱リクエストの処理中にエラーが発生しました。',
 
+		adminOnly: 'このコマンドを使用するにはサーバー管理者である必要があります。',
+		configUnavailable:
+			'データベースが設定されていないため、サーバー設定を利用できません。',
+		setLanguageError: 'サーバーの言語の更新中にエラーが発生しました。',
+
 		kickNotParticipant: (userId: string) =>
 			`<@${userId}> はあなたのイベントに参加していません。`,
 		repingCooldown: (minutesLeft: number) =>
@@ -155,6 +160,7 @@ export const ja: Dictionary = {
 			'あなたのイベントの観戦を**無効**にしました。現在の観戦者は全員削除されました。',
 		dropoutAllSuccess:
 			'すべてのイベント・待機列・観戦リストからあなたを削除しました。',
+		languageSet: 'サーバーの言語を更新しました。',
 	},
 
 	ownership: {
@@ -219,6 +225,12 @@ export const ja: Dictionary = {
 		dropoutAll: {
 			description:
 				'すべてのイベント・待機列・観戦リストからあなたを削除します。',
+		},
+		setLanguage: {
+			description: 'このサーバーで Bot が使用する言語を設定します。',
+			options: {
+				language: '共有イベントメッセージに使用する言語。',
+			},
 		},
 	},
 };

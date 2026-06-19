@@ -152,6 +152,11 @@ export const en = {
 		dropoutAllError:
 			'An error occurred while processing your dropout-all request.',
 
+		adminOnly: 'You need to be a server administrator to use this command.',
+		configUnavailable:
+			'Server configuration is unavailable because no database is configured.',
+		setLanguageError: 'An error occurred while updating the server language.',
+
 		kickNotParticipant: (userId: string) =>
 			`<@${userId}> is not signed up for your event.`,
 		repingCooldown: (minutesLeft: number) =>
@@ -167,6 +172,7 @@ export const en = {
 			'Spectators are now **disabled** for your event. All current spectators have been removed.',
 		dropoutAllSuccess:
 			'Successfully removed you from all events, queues, and spectator lists.',
+		languageSet: 'Server language updated.',
 	},
 
 	// Posted to the shared event thread, addressed to the new owner
@@ -239,6 +245,12 @@ export const en = {
 		dropoutAll: {
 			description:
 				'Remove yourself from all events, queues, and spectator lists.',
+		},
+		setLanguage: {
+			description: 'Set the language the bot uses for this server.',
+			options: {
+				language: 'The language to use for shared event messages.',
+			},
 		},
 	},
 };

@@ -1,4 +1,5 @@
 import type { Client } from 'discord.js';
+import type { GuildConfigStore } from '../config/guild-config-store.js';
 import { AUTHOR_ID, TIMESTAMP, TIMINGS } from '../constants.js';
 import { cleanupEvent } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
@@ -23,6 +24,7 @@ export async function gracefulShutdown(
 	threadManager: ThreadManager,
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
+	guildConfig?: GuildConfigStore,
 ) {
 	if (isShuttingDown) {
 		console.log('Shutdown already in progress...');
@@ -117,6 +119,12 @@ export async function gracefulShutdown(
 			console.log('Telemetry connections closed');
 		}
 
+		if (guildConfig) {
+			console.log('Closing guild config store...');
+			await guildConfig.dispose();
+			console.log('Guild config store closed');
+		}
+
 		console.log('Stopping metrics server...');
 		await stopMetricsServer();
 		console.log('Metrics server stopped');
@@ -180,6 +188,7 @@ export async function gracefulShutdown(
 				threadManager,
 				voiceChannelManager,
 				telemetry,
+				guildConfig,
 			);
 		} else {
 			throw error;
@@ -193,6 +202,7 @@ export function setupShutdownHandlers(
 	threadManager: ThreadManager,
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
+	guildConfig?: GuildConfigStore,
 ) {
 	process.on(
 		'SIGINT',
@@ -204,6 +214,7 @@ export function setupShutdownHandlers(
 				threadManager,
 				voiceChannelManager,
 				telemetry,
+				guildConfig,
 			),
 	);
 	process.on(
@@ -216,6 +227,7 @@ export function setupShutdownHandlers(
 				threadManager,
 				voiceChannelManager,
 				telemetry,
+				guildConfig,
 			),
 	);
 

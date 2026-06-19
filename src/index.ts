@@ -1,4 +1,9 @@
-import { GuildMember, Locale, SlashCommandBuilder } from 'discord.js';
+import {
+	GuildMember,
+	Locale,
+	PermissionFlagsBits,
+	SlashCommandBuilder,
+} from 'discord.js';
 import dotenv from 'dotenv';
 import {
 	createDiscordClient,
@@ -13,12 +18,14 @@ import { handleCreateCommand } from './commands/create-command.js';
 import { handleDropoutAllCommand } from './commands/dropout-all-command.js';
 import { handleKickCommand } from './commands/kick-command.js';
 import { handleRepingCommand } from './commands/reping-command.js';
+import { handleSetLanguageCommand } from './commands/set-language-command.js';
 import { handleStatusCommand } from './commands/status-command.js';
 import { handleToggleSpectatorsCommand } from './commands/toggle-spectators-command.js';
+import { GuildConfigStore } from './config/guild-config-store.js';
 import { TIMINGS } from './constants.js';
 import { cleanupStaleEvents } from './event/event-lifecycle.js';
 import { EventManager } from './event/event-manager.js';
-import { resolveLocale, t } from './i18n/index.js';
+import { LOCALE_NAMES, LOCALES, resolveLocale, t } from './i18n/index.js';
 import {
 	handleCancelButton,
 	handleDropInButton,
@@ -145,9 +152,36 @@ const commands = [
 			jaDescription(jaCommands.dropoutAll.description),
 		)
 		.toJSON(),
+	new SlashCommandBuilder()
+		.setName('set-language')
+		.setDescription(enCommands.setLanguage.description)
+		.setDescriptionLocalizations(
+			jaDescription(jaCommands.setLanguage.description),
+		)
+		.setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+		.addStringOption((option) =>
+			option
+				.setName('language')
+				.setDescription(enCommands.setLanguage.options.language)
+				.setDescriptionLocalizations(
+					jaDescription(jaCommands.setLanguage.options.language),
+				)
+				.setRequired(true)
+				.addChoices(
+					...LOCALES.map((locale) => ({
+						name: LOCALE_NAMES[locale],
+						value: locale,
+					})),
+				),
+		)
+		.toJSON(),
 ];
 
 const telemetry = initializeTelemetry(telemetryUrl, telemetryToken);
+const databaseUrl = process.env.DATABASE_URL;
+const guildConfig = databaseUrl
+	? new GuildConfigStore(databaseUrl, { schema: process.env.DATABASE_SCHEMA })
+	: undefined;
 const threadManager = new ThreadManager();
 const voiceChannelManager = new VoiceChannelManager();
 const appClient = createDiscordClient();
@@ -157,6 +191,7 @@ const lockedUsers = new Set<string>();
 loginClient(appClient, botToken).then();
 
 appClient.once('clientReady', async () => {
+	await guildConfig?.initialize();
 	await registerCommands(appClient, botToken, commands);
 });
 
@@ -214,6 +249,7 @@ appClient.on('interactionCreate', async (interaction) => {
 						threadManager,
 						voiceChannelManager,
 						telemetry,
+						guildConfig,
 					),
 				kick: () =>
 					handleKickCommand(
@@ -240,6 +276,7 @@ appClient.on('interactionCreate', async (interaction) => {
 						voiceChannelManager,
 						telemetry,
 					),
+				setlanguage: () => handleSetLanguageCommand(interaction, guildConfig),
 			};
 
 			const handler =
@@ -393,6 +430,7 @@ setupShutdownHandlers(
 	threadManager,
 	voiceChannelManager,
 	telemetry,
+	guildConfig,
 );
 
 setInterval(
