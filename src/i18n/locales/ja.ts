@@ -176,8 +176,8 @@ export const ja: Dictionary = {
 	},
 
 	reping: {
-		message: (rolePing: string, missing: number, url: string) =>
-			`${rolePing}\n${url} のメンバーを **+${missing}** 人募集中`,
+		lookingFor: (missing: number, url: string) =>
+			`${url} のメンバーを **+${missing}** 人募集中`,
 	},
 
 	statusCommand: {

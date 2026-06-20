@@ -192,8 +192,8 @@ export const en = {
 
 	// Public re-ping message posted to the channel (server/event locale)
 	reping: {
-		message: (rolePing: string, missing: number, url: string) =>
-			`${rolePing}\nLooking for **+${missing}** for ${url}`,
+		lookingFor: (missing: number, url: string) =>
+			`Looking for **+${missing}** for ${url}`,
 	},
 
 	// /status command embed (ephemeral, user locale). Dynamic values such as

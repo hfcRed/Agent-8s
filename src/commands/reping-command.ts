@@ -1,6 +1,7 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { MAX_PARTICIPANTS, TIMINGS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
+import { getEventDictionary } from '../i18n/bilingual.js';
 import { resolveLocale, t } from '../i18n/index.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
@@ -123,12 +124,13 @@ export async function handleRepingCommand(
 		const guildId = interaction.guildId;
 		const messageUrl = `https://discord.com/channels/${guildId}/${channelId}/${userEventId}`;
 
+		const eventDict = getEventDictionary(
+			eventManager.getLocale(userEventId),
+			eventManager.getSecondLocale(userEventId),
+		);
+
 		const reply = await interaction.reply({
-			content: t(eventManager.getLocale(userEventId)).reping.message(
-				rolePing,
-				missingPlayers,
-				messageUrl,
-			),
+			content: `${rolePing}\n${eventDict.reping.lookingFor(missingPlayers, messageUrl)}`,
 		});
 
 		const repingMessage = await withRetry(

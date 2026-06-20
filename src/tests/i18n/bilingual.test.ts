@@ -43,6 +43,16 @@ describe('getEventDictionary', () => {
 			expect(combined).not.toContain(') (');
 		});
 
+		it('puts the re-ping sentence and ownership notice on a new line', () => {
+			expect(dict.reping.lookingFor(3, 'https://x')).toBe(
+				`${t('en').reping.lookingFor(3, 'https://x')}\n(${t('ja').reping.lookingFor(3, 'https://x')})`,
+			);
+
+			const ownership = dict.ownership.transferred('123');
+			expect(ownership).toContain('\n(');
+			expect(ownership).toContain(t('ja').ownership.transferred('123'));
+		});
+
 		it('keeps the same dictionary shape as a single locale', () => {
 			expect(Object.keys(dict)).toEqual(Object.keys(t('en')));
 		});

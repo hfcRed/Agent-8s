@@ -7,7 +7,7 @@ import {
 	TIMINGS,
 } from '../constants.js';
 import { getEventDictionary } from '../i18n/bilingual.js';
-import { DEFAULT_LOCALE, type Locale, t } from '../i18n/index.js';
+import { DEFAULT_LOCALE, type Locale } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import {
@@ -732,7 +732,10 @@ export class EventManager {
 				if (thread) {
 					await threadManager.sendMessage(
 						thread,
-						t(this.getLocale(eventId)).ownership.transferred(newOwnerId),
+						getEventDictionary(
+							this.getLocale(eventId),
+							this.getSecondLocale(eventId),
+						).ownership.transferred(newOwnerId),
 					);
 				}
 			}

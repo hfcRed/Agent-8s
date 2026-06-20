@@ -72,6 +72,7 @@ describe('reping-command', () => {
 			getMatchId: vi.fn(() => 'match123'),
 			getCasual: vi.fn(() => false),
 			getLocale: vi.fn(() => 'en'),
+			getSecondLocale: vi.fn(() => undefined),
 			deleteRepingMessageIfExists: vi.fn().mockResolvedValue(undefined),
 			setRepingMessage: vi.fn(),
 			setRepingCooldown: vi.fn(),

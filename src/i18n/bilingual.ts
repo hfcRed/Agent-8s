@@ -1,7 +1,12 @@
 import { type Locale, t } from './index.js';
 import type { Dictionary } from './types.js';
 
-const MULTILINE_GROUPS = new Set<keyof Dictionary>(['status', 'start']);
+const MULTILINE_GROUPS = new Set<keyof Dictionary>([
+	'status',
+	'start',
+	'reping',
+	'ownership',
+]);
 
 function combine(primary: string, secondary: string, multiline: boolean) {
 	if (primary === secondary) return primary;
