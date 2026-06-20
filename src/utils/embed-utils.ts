@@ -7,6 +7,7 @@ import {
 	StringSelectMenuOptionBuilder,
 } from 'discord.js';
 import { COLORS, DEFAULT_ROLE_KEY, ROLE_KEYS, TIMINGS } from '../constants.js';
+import { isBilingual } from '../i18n/bilingual.js';
 import type { Dictionary } from '../i18n/index.js';
 import { getEmoteForRank } from './helpers.js';
 
@@ -25,7 +26,7 @@ export function createEventEmbed(
 	const embedFields = [
 		{
 			name: dict.fields.participantsCount(1),
-			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}> 👑`,
+			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}> 👑${isBilingual(dict) ? '\n' : ''}`,
 			inline: true,
 		},
 		{
@@ -142,11 +143,12 @@ export function createRoleSelectMenu(dict: Dictionary) {
 		.setCustomId('select')
 		.setPlaceholder(dict.select.placeholder)
 		.addOptions(
-			ROLE_KEYS.map((key) =>
-				new StringSelectMenuOptionBuilder()
-					.setLabel(dict.roles[key])
-					.setValue(key),
-			),
+			ROLE_KEYS.map((key) => {
+				const [primary, secondary] = dict.roles[key].split('\n- ');
+				return new StringSelectMenuOptionBuilder()
+					.setLabel(secondary ? `${primary} (${secondary})` : primary)
+					.setValue(key);
+			}),
 		);
 
 	return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);

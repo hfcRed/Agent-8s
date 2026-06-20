@@ -6,7 +6,7 @@ import {
 	type RoleKey,
 	TIMINGS,
 } from '../constants.js';
-import { getEventDictionary } from '../i18n/bilingual.js';
+import { getEventDictionary, isBilingual } from '../i18n/bilingual.js';
 import { DEFAULT_LOCALE, type Locale } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -587,10 +587,11 @@ export class EventManager {
 			startMessage = dict.start.atTime(startTimestamp);
 		}
 
+		const participantSuffix = isBilingual(dict) ? '\n' : '';
 		const participantList = participants
 			.map(
 				(p) =>
-					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>${p.userId === creatorId ? ' 👑' : ''}`,
+					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>${p.userId === creatorId ? ' 👑' : ''}${participantSuffix}`,
 			)
 			.join('\n');
 		const roleList = participants

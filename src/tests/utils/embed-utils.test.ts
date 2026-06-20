@@ -109,7 +109,6 @@ describe('embed-utils', () => {
 				getEventDictionary('en', 'ja'),
 			);
 
-			// Title is inline-combined: "[Casual] 8s Sign Up (【カジュアル】8s 募集)"
 			expect(embed.data.title).toContain('Casual');
 			expect(embed.data.title).toContain('募集');
 
@@ -117,9 +116,18 @@ describe('embed-utils', () => {
 			const statusField = fields.find(
 				(f) => f.value === t('en').status.open || f.value?.includes('Open'),
 			);
-			// Status is a multi-line field value, so the second language is on a new line.
-			expect(statusField?.value).toContain('\n(');
+
+			expect(statusField?.value).toContain('\n');
 			expect(statusField?.value).toContain('募集中');
+
+			const roleField = fields.find((f) => f.value?.includes('None'));
+			expect(roleField?.value).toContain('\n- ');
+			expect(roleField?.value).toContain('なし');
+
+			const participantField = fields.find((f) =>
+				f.value?.includes('123456789'),
+			);
+			expect(participantField?.value).toContain('\n- ');
 		});
 	});
 
@@ -252,19 +260,18 @@ describe('embed-utils', () => {
 			expect(selectMenu.data.placeholder).toBeTruthy();
 		});
 
-		it('keeps option values as stable keys while labels go bilingual', () => {
+		it('keeps select values as stable keys and shows both languages inline', () => {
 			const row = createRoleSelectMenu(getEventDictionary('en', 'ja'));
 
 			const selectMenu = row.components[0];
 			const slayer = selectMenu.options.find(
 				(o) => (o.data as { value?: string }).value === 'slayer',
 			);
-			// Value stays the stable key; label is bilingual.
+
 			expect((slayer?.data as { value?: string }).value).toBe('slayer');
-			expect((slayer?.data as { label?: string }).label).toContain('Slayer');
-			expect((slayer?.data as { label?: string }).label).toContain(
-				'スレイヤー',
-			);
+			const label = (slayer?.data as { label?: string }).label;
+			expect(label).toBe('🔪 Slayer (🔪 スレイヤー)');
+			expect(label).not.toContain('\n');
 		});
 	});
 });

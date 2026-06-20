@@ -23,15 +23,18 @@ describe('getEventDictionary', () => {
 
 		it('appends the secondary on a new line for multi-line field values', () => {
 			expect(dict.status.open).toBe(
-				`${t('en').status.open}\n(${t('ja').status.open})`,
+				`${t('en').status.open}\n${t('ja').status.open}`,
 			);
-			expect(dict.status.open).toContain('\n(');
+			expect(dict.status.open).toContain('\n');
+		});
+
+		it('renders weapon roles as a second list item', () => {
+			expect(dict.roles.slayer).toBe('🔪 Slayer\n- 🔪 スレイヤー');
 		});
 
 		it('combines interpolated (function) leaves', () => {
-			expect(dict.roles.slayer).toBe('🔪 Slayer (🔪 スレイヤー)');
 			expect(dict.fields.participantsCount(3)).toBe(
-				'Participants (3) (参加者 (3))',
+				'Participants (3)\n参加者 (3)',
 			);
 		});
 
@@ -45,11 +48,11 @@ describe('getEventDictionary', () => {
 
 		it('puts the re-ping sentence and ownership notice on a new line', () => {
 			expect(dict.reping.lookingFor(3, 'https://x')).toBe(
-				`${t('en').reping.lookingFor(3, 'https://x')}\n(${t('ja').reping.lookingFor(3, 'https://x')})`,
+				`${t('en').reping.lookingFor(3, 'https://x')}\n${t('ja').reping.lookingFor(3, 'https://x')}`,
 			);
 
 			const ownership = dict.ownership.transferred('123');
-			expect(ownership).toContain('\n(');
+			expect(ownership).toContain('\n');
 			expect(ownership).toContain(t('ja').ownership.transferred('123'));
 		});
 
