@@ -13,8 +13,8 @@ export const ja: Dictionary = {
 	},
 
 	titles: {
-		casual: '【カジュアル】8s 募集',
-		competitive: '【コンペ】8s 募集',
+		casual: '[カジュアル] 8s 募集',
+		competitive: '[コンペ] 8s 募集',
 	},
 
 	status: {
