@@ -4,6 +4,7 @@ import type { GuildConfigStore } from '../config/guild-config-store.js';
 import { DEFAULT_ROLE_KEY, TIMINGS } from '../constants.js';
 import { createEventStartTimeout } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
+import { getEventDictionary } from '../i18n/bilingual.js';
 import { resolveLocale, t } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
@@ -44,6 +45,15 @@ export async function handleCreateCommand(
 			: undefined;
 		const locale = configuredLocale ?? resolveLocale(interaction.guildLocale);
 
+		const configuredSecondLocale = interaction.guildId
+			? guildConfig?.getSecondLocale(interaction.guildId)
+			: undefined;
+		const secondLocale =
+			configuredSecondLocale && configuredSecondLocale !== locale
+				? configuredSecondLocale
+				: undefined;
+		const eventDict = getEventDictionary(locale, secondLocale);
+
 		const casual = !!interaction.options.getBoolean('casual', false);
 		const spectators = !!interaction.options.getBoolean('spectators', false);
 		const info = interaction.options.getString('info', false) ?? undefined;
@@ -51,8 +61,8 @@ export async function handleCreateCommand(
 			interaction.options.getInteger('time', false) ?? undefined;
 		const startTime = Date.now();
 
-		const buttonRow = createEventButtons(locale, timeInMinutes);
-		const selectRow = createRoleSelectMenu(locale);
+		const buttonRow = createEventButtons(eventDict, timeInMinutes);
+		const selectRow = createRoleSelectMenu(eventDict);
 
 		const rankId = getExcaliburRankOfUser(
 			interaction.guild?.id,
@@ -66,7 +76,7 @@ export async function handleCreateCommand(
 			interaction.user.displayAvatarURL(),
 			interaction.user.id,
 			casual,
-			locale,
+			eventDict,
 			timeInMinutes,
 			info,
 		);
@@ -86,6 +96,9 @@ export async function handleCreateCommand(
 		eventManager.setChannelId(message.id, message.channelId);
 		eventManager.setMessageData(message.id, casual, spectators, info);
 		eventManager.setLocale(message.id, locale);
+		if (secondLocale) {
+			eventManager.setSecondLocale(message.id, secondLocale);
+		}
 
 		await eventManager.removeUserFromAllQueues(interaction.user.id, telemetry);
 

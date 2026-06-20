@@ -174,6 +174,21 @@ const commands = [
 					})),
 				),
 		)
+		.addStringOption((option) =>
+			option
+				.setName('language_second')
+				.setDescription(enCommands.setLanguage.options.languageSecond)
+				.setDescriptionLocalizations(
+					jaDescription(jaCommands.setLanguage.options.languageSecond),
+				)
+				.setRequired(false)
+				.addChoices(
+					...LOCALES.map((locale) => ({
+						name: LOCALE_NAMES[locale],
+						value: locale,
+					})),
+				),
+		)
 		.toJSON(),
 ];
 

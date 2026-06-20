@@ -84,7 +84,7 @@ describe('GuildConfigStore', () => {
 				String(sql).includes('ON CONFLICT'),
 			);
 			expect(upsert).toBeDefined();
-			expect(upsert?.[1]).toEqual(['guild123', 'ja']);
+			expect(upsert?.[1]).toEqual(['guild123', 'ja', null]);
 
 			expect(store.getLocale('guild123')).toBe('ja');
 		});
@@ -95,6 +95,52 @@ describe('GuildConfigStore', () => {
 
 			await store.setLocale('guild123', 'ja');
 			expect(store.getLocale('guild123')).toBe('ja');
+		});
+	});
+
+	describe('second locale', () => {
+		it('persists and caches a distinct second locale', async () => {
+			await store.setLocale('guild123', 'en', 'ja');
+
+			const upsert = mockQuery.mock.calls.find(([sql]) =>
+				String(sql).includes('ON CONFLICT'),
+			);
+			expect(upsert?.[1]).toEqual(['guild123', 'en', 'ja']);
+			expect(store.getSecondLocale('guild123')).toBe('ja');
+		});
+
+		it('stores null when the second locale equals the primary', async () => {
+			await store.setLocale('guild123', 'en', 'en');
+
+			const upsert = mockQuery.mock.calls.find(([sql]) =>
+				String(sql).includes('ON CONFLICT'),
+			);
+			expect(upsert?.[1]).toEqual(['guild123', 'en', null]);
+			expect(store.getSecondLocale('guild123')).toBeUndefined();
+		});
+
+		it('clears a previously set second locale', async () => {
+			await store.setLocale('guild123', 'en', 'ja');
+			expect(store.getSecondLocale('guild123')).toBe('ja');
+
+			await store.setLocale('guild123', 'en');
+			expect(store.getSecondLocale('guild123')).toBeUndefined();
+		});
+
+		it('loads second locales from the database, ignoring unsupported ones', async () => {
+			mockQuery.mockResolvedValue({
+				rows: [
+					{ guild_id: 'g1', locale: 'en', locale_second: 'ja' },
+					{ guild_id: 'g2', locale: 'ja', locale_second: null },
+					{ guild_id: 'g3', locale: 'en', locale_second: 'fr' },
+				],
+			});
+
+			await store.initialize();
+
+			expect(store.getSecondLocale('g1')).toBe('ja');
+			expect(store.getSecondLocale('g2')).toBeUndefined();
+			expect(store.getSecondLocale('g3')).toBeUndefined();
 		});
 	});
 
@@ -158,7 +204,11 @@ describe('GuildConfigStore', () => {
 				([sql]) => typeof sql === 'string' && sql.includes('INSERT'),
 			);
 			expect(insertCall?.[0]).toContain('$1');
-			expect(insertCall?.[1]).toEqual(["'; DROP TABLE guild_config; --", 'ja']);
+			expect(insertCall?.[1]).toEqual([
+				"'; DROP TABLE guild_config; --",
+				'ja',
+				null,
+			]);
 		});
 	});
 });

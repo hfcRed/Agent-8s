@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COLORS, ROLE_KEYS } from '../../constants.js';
+import { getEventDictionary } from '../../i18n/bilingual.js';
 import { t } from '../../i18n/index.js';
 import {
 	createEventButtons,
@@ -18,7 +19,7 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				true,
-				'en',
+				t('en'),
 			);
 
 			expect(embed.data.author?.name).toBe('TestUser');
@@ -42,7 +43,7 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				false,
-				'en',
+				t('en'),
 			);
 
 			expect(embed.data.title).toContain('Competitive');
@@ -56,7 +57,7 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				true,
-				'en',
+				t('en'),
 				10,
 			);
 
@@ -73,7 +74,7 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				true,
-				'en',
+				t('en'),
 				undefined,
 				'Custom event info',
 			);
@@ -89,18 +90,42 @@ describe('embed-utils', () => {
 				'https://example.com/avatar.png',
 				'123456789',
 				true,
-				'en',
+				t('en'),
 			);
 
 			const fields = embed.data.fields || [];
 			const roleField = fields.find((f) => f.name === t('en').fields.role);
 			expect(roleField?.value).toContain(t('en').roles.none);
 		});
+
+		it('renders both languages when a bilingual dictionary is used', () => {
+			const embed = createEventEmbed(
+				null,
+				null,
+				'TestUser',
+				'https://example.com/avatar.png',
+				'123456789',
+				true,
+				getEventDictionary('en', 'ja'),
+			);
+
+			// Title is inline-combined: "[Casual] 8s Sign Up (【カジュアル】8s 募集)"
+			expect(embed.data.title).toContain('Casual');
+			expect(embed.data.title).toContain('募集');
+
+			const fields = embed.data.fields || [];
+			const statusField = fields.find(
+				(f) => f.value === t('en').status.open || f.value?.includes('Open'),
+			);
+			// Status is a multi-line field value, so the second language is on a new line.
+			expect(statusField?.value).toContain('\n(');
+			expect(statusField?.value).toContain('募集中');
+		});
 	});
 
 	describe('createEventButtons', () => {
 		it('should create basic buttons without timer', () => {
-			const row = createEventButtons('en');
+			const row = createEventButtons(t('en'));
 
 			expect(row.components.length).toBe(3);
 			const customIds = row.components.map((c) => {
@@ -113,7 +138,7 @@ describe('embed-utils', () => {
 		});
 
 		it('should include start now button when timer is provided', () => {
-			const row = createEventButtons('en', 15);
+			const row = createEventButtons(t('en'), 15);
 
 			expect(row.components.length).toBe(4);
 			const customIds = row.components.map((c) => {
@@ -124,7 +149,7 @@ describe('embed-utils', () => {
 		});
 
 		it('should have correct button styles', () => {
-			const row = createEventButtons('en');
+			const row = createEventButtons(t('en'));
 
 			const signupButton = row.components.find((c) => {
 				const data = c.data as { custom_id?: string };
@@ -143,11 +168,22 @@ describe('embed-utils', () => {
 			expect(signoutButton?.data.style).toBe(4);
 			expect(cancelButton?.data.style).toBe(2);
 		});
+
+		it('combines both languages inline on button labels', () => {
+			const row = createEventButtons(getEventDictionary('en', 'ja'));
+
+			const signupButton = row.components.find((c) => {
+				const data = c.data as { custom_id?: string };
+				return data.custom_id === 'signup';
+			});
+			const label = (signupButton?.data as { label?: string }).label;
+			expect(label).toBe('Sign Up (参加)');
+		});
 	});
 
 	describe('createEventStartedButtons', () => {
 		it('should create two button rows for started events with spectate buttons enabled', () => {
-			const rows = createEventStartedButtons('en', true);
+			const rows = createEventStartedButtons(t('en'), true);
 
 			expect(rows.length).toBe(2);
 
@@ -174,7 +210,7 @@ describe('embed-utils', () => {
 		});
 
 		it('should create one button row when spectators are disabled', () => {
-			const rows = createEventStartedButtons('en', false);
+			const rows = createEventStartedButtons(t('en'), false);
 
 			expect(rows.length).toBe(1);
 
@@ -194,7 +230,7 @@ describe('embed-utils', () => {
 		});
 
 		it('should default to spectators disabled when no parameter provided', () => {
-			const rows = createEventStartedButtons('en');
+			const rows = createEventStartedButtons(t('en'));
 
 			expect(rows.length).toBe(1);
 		});
@@ -202,7 +238,7 @@ describe('embed-utils', () => {
 
 	describe('createRoleSelectMenu', () => {
 		it('should create select menu with all weapon roles', () => {
-			const row = createRoleSelectMenu('en');
+			const row = createRoleSelectMenu(t('en'));
 
 			const selectMenu = row.components[0];
 			expect(selectMenu.data.custom_id).toBe('select');
@@ -210,10 +246,25 @@ describe('embed-utils', () => {
 		});
 
 		it('should have placeholder text', () => {
-			const row = createRoleSelectMenu('en');
+			const row = createRoleSelectMenu(t('en'));
 
 			const selectMenu = row.components[0];
 			expect(selectMenu.data.placeholder).toBeTruthy();
+		});
+
+		it('keeps option values as stable keys while labels go bilingual', () => {
+			const row = createRoleSelectMenu(getEventDictionary('en', 'ja'));
+
+			const selectMenu = row.components[0];
+			const slayer = selectMenu.options.find(
+				(o) => (o.data as { value?: string }).value === 'slayer',
+			);
+			// Value stays the stable key; label is bilingual.
+			expect((slayer?.data as { value?: string }).value).toBe('slayer');
+			expect((slayer?.data as { label?: string }).label).toContain('Slayer');
+			expect((slayer?.data as { label?: string }).label).toContain(
+				'スレイヤー',
+			);
 		});
 	});
 });

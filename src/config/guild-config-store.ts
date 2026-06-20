@@ -21,6 +21,7 @@ export class GuildConfigStore {
 	private pool: Pool;
 	private initialized = false;
 	private localeCache = new Map<string, Locale>();
+	private secondLocaleCache = new Map<string, Locale>();
 
 	constructor(connectionString: string, options: GuildConfigStoreOptions = {}) {
 		this.schemaName = this.resolveIdentifier(options.schema, DEFAULT_SCHEMA);
@@ -50,22 +51,34 @@ export class GuildConfigStore {
 		return this.localeCache.get(guildId);
 	}
 
-	async setLocale(guildId: string, locale: Locale) {
+	getSecondLocale(guildId: string): Locale | undefined {
+		return this.secondLocaleCache.get(guildId);
+	}
+
+	async setLocale(guildId: string, locale: Locale, secondLocale?: Locale) {
 		await this.ensureSchema();
+
+		const second =
+			secondLocale && secondLocale !== locale ? secondLocale : null;
 
 		await withRetry(
 			() =>
 				this.pool.query(
-					`INSERT INTO ${this.tableReference} (guild_id, locale, updated_at)
-					VALUES ($1, $2, NOW())
+					`INSERT INTO ${this.tableReference} (guild_id, locale, locale_second, updated_at)
+					VALUES ($1, $2, $3, NOW())
 					ON CONFLICT (guild_id)
-					DO UPDATE SET locale = EXCLUDED.locale, updated_at = NOW()`,
-					[guildId, locale],
+					DO UPDATE SET locale = EXCLUDED.locale, locale_second = EXCLUDED.locale_second, updated_at = NOW()`,
+					[guildId, locale, second],
 				),
 			DATABASE_RETRY_OPTIONS,
 		);
 
 		this.localeCache.set(guildId, locale);
+		if (second) {
+			this.secondLocaleCache.set(guildId, second);
+		} else {
+			this.secondLocaleCache.delete(guildId);
+		}
 	}
 
 	async dispose() {
@@ -75,16 +88,24 @@ export class GuildConfigStore {
 	private async loadAll() {
 		const result = await withRetry(
 			() =>
-				this.pool.query<{ guild_id: string; locale: string }>(
-					`SELECT guild_id, locale FROM ${this.tableReference}`,
+				this.pool.query<{
+					guild_id: string;
+					locale: string;
+					locale_second: string | null;
+				}>(
+					`SELECT guild_id, locale, locale_second FROM ${this.tableReference}`,
 				),
 			DATABASE_RETRY_OPTIONS,
 		);
 
 		this.localeCache.clear();
+		this.secondLocaleCache.clear();
 		for (const row of result.rows) {
 			if (isLocale(row.locale)) {
 				this.localeCache.set(row.guild_id, row.locale);
+			}
+			if (row.locale_second && isLocale(row.locale_second)) {
+				this.secondLocaleCache.set(row.guild_id, row.locale_second);
 			}
 		}
 	}
@@ -106,6 +127,7 @@ export class GuildConfigStore {
 				CREATE TABLE IF NOT EXISTS ${this.tableReference} (
 					guild_id TEXT PRIMARY KEY,
 					locale TEXT NOT NULL,
+					locale_second TEXT,
 					updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 				);
 			`),

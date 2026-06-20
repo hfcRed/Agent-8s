@@ -6,6 +6,7 @@ import {
 	type RoleKey,
 	TIMINGS,
 } from '../constants.js';
+import { getEventDictionary } from '../i18n/bilingual.js';
 import { DEFAULT_LOCALE, type Locale, t } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -66,6 +67,7 @@ export class EventManager {
 	private updateTimeouts = new Map<string, NodeJS.Timeout>();
 	private terminalStates = new Map<string, TerminalStates>();
 	private locales = new Map<string, Locale>();
+	private secondLocales = new Map<string, Locale>();
 
 	constructor(private client: Client) {}
 
@@ -451,6 +453,7 @@ export class EventManager {
 		this.spectatorsEnabled.delete(eventId);
 		this.terminalStates.delete(eventId);
 		this.locales.delete(eventId);
+		this.secondLocales.delete(eventId);
 
 		const timeout = this.getTimeout(eventId);
 		if (timeout) {
@@ -500,6 +503,18 @@ export class EventManager {
 		this.locales.delete(eventId);
 	}
 
+	getSecondLocale(eventId: string) {
+		return this.secondLocales.get(eventId);
+	}
+
+	setSecondLocale(eventId: string, locale: Locale) {
+		this.secondLocales.set(eventId, locale);
+	}
+
+	deleteSecondLocale(eventId: string) {
+		this.secondLocales.delete(eventId);
+	}
+
 	setTerminalState(
 		eventId: string,
 		state: 'cancelled' | 'finished' | 'expired' | 'shutdown',
@@ -530,7 +545,10 @@ export class EventManager {
 		const participantCount = participants.length;
 
 		const terminalState = this.getTerminalState(eventId);
-		const dict = t(this.getLocale(eventId));
+		const dict = getEventDictionary(
+			this.getLocale(eventId),
+			this.getSecondLocale(eventId),
+		);
 
 		let color: string = COLORS.OPEN;
 		let status: string = dict.status.open;
@@ -642,14 +660,17 @@ export class EventManager {
 
 		if (!timerData || terminalState) return [];
 
-		const locale = this.getLocale(eventId);
+		const dict = getEventDictionary(
+			this.getLocale(eventId),
+			this.getSecondLocale(eventId),
+		);
 
 		if (timerData.hasStarted) {
 			const spectators = this.getSpectatorsEnabled(eventId);
 
 			return [
-				...createEventStartedButtons(locale, spectators),
-				createRoleSelectMenu(locale),
+				...createEventStartedButtons(dict, spectators),
+				createRoleSelectMenu(dict),
 			];
 		}
 
@@ -657,8 +678,8 @@ export class EventManager {
 			? timerData.duration / TIMINGS.MINUTE_IN_MS
 			: undefined;
 		return [
-			createEventButtons(locale, timeInMinutes),
-			createRoleSelectMenu(locale),
+			createEventButtons(dict, timeInMinutes),
+			createRoleSelectMenu(dict),
 		];
 	}
 

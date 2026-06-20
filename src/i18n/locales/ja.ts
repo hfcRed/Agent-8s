@@ -230,6 +230,8 @@ export const ja: Dictionary = {
 			description: 'このサーバーで Bot が使用する言語を設定します。',
 			options: {
 				language: '共有イベントメッセージに使用する言語。',
+				languageSecond:
+					'最初の言語と並べて括弧内に表示する任意の 2 つ目の言語。',
 			},
 		},
 	},

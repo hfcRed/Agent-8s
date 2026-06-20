@@ -250,6 +250,8 @@ export const en = {
 			description: 'Set the language the bot uses for this server.',
 			options: {
 				language: 'The language to use for shared event messages.',
+				languageSecond:
+					'Optional second language shown in brackets alongside the first.',
 			},
 		},
 	},

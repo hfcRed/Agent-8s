@@ -7,7 +7,7 @@ import {
 	StringSelectMenuOptionBuilder,
 } from 'discord.js';
 import { COLORS, DEFAULT_ROLE_KEY, ROLE_KEYS, TIMINGS } from '../constants.js';
-import { type Locale, t } from '../i18n/index.js';
+import type { Dictionary } from '../i18n/index.js';
 import { getEmoteForRank } from './helpers.js';
 
 export function createEventEmbed(
@@ -17,11 +17,10 @@ export function createEventEmbed(
 	avatarUrl: string,
 	userId: string,
 	casual: boolean,
-	locale: Locale,
+	dict: Dictionary,
 	timeInMinutes?: number,
 	info?: string,
 ) {
-	const dict = t(locale);
 	const startTime = Date.now();
 	const embedFields = [
 		{
@@ -56,8 +55,7 @@ export function createEventEmbed(
 	return embed;
 }
 
-export function createEventButtons(locale: Locale, timeInMinutes?: number) {
-	const dict = t(locale);
+export function createEventButtons(dict: Dictionary, timeInMinutes?: number) {
 	const buttons = [
 		new ButtonBuilder()
 			.setEmoji('📝')
@@ -90,10 +88,9 @@ export function createEventButtons(locale: Locale, timeInMinutes?: number) {
 }
 
 export function createEventStartedButtons(
-	locale: Locale,
+	dict: Dictionary,
 	spectators: boolean = false,
 ) {
-	const dict = t(locale);
 	const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()
 			.setEmoji('📝')
@@ -140,8 +137,7 @@ export function createEventStartedButtons(
 	return [row1, row2];
 }
 
-export function createRoleSelectMenu(locale: Locale) {
-	const dict = t(locale);
+export function createRoleSelectMenu(dict: Dictionary) {
 	const select = new StringSelectMenuBuilder()
 		.setCustomId('select')
 		.setPlaceholder(dict.select.placeholder)
