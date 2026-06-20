@@ -67,7 +67,6 @@ function buildBilingualDictionary(primary: Dictionary, secondary: Dictionary) {
 }
 
 export function getEventDictionary(primary: Locale, secondary?: Locale) {
-	return buildBilingualDictionary(t('en'), t('ja'));
 	if (!secondary || secondary === primary) return t(primary);
 	return buildBilingualDictionary(t(primary), t(secondary));
 }
