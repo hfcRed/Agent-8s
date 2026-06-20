@@ -3,10 +3,11 @@ import { EmbedBuilder } from 'discord.js';
 import {
 	DEFAULT_ROLE_KEY,
 	MATCH_ID_LENGTH,
+	MAX_EVENT_LIFETIME_HOURS,
 	MAX_PARTICIPANTS,
 	TIMINGS,
 } from '../constants.js';
-import { t } from '../i18n/index.js';
+import { getEventDictionary } from '../i18n/bilingual.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -73,11 +74,16 @@ export async function startEvent(
 				EmbedBuilder.from(message.embeds[0]),
 			);
 
+			const eventDict = getEventDictionary(
+				locale,
+				eventManager.getSecondLocale(message.id),
+			);
+			const channelMentions = voiceChannels
+				.map((channelId) => `<#${channelId}>`)
+				.join('\n');
 			await threadManager.sendMessage(
 				thread,
-				t(locale).channels.voiceChannelsCreated(
-					voiceChannels.map((channelId) => `<#${channelId}>`).join('\n'),
-				),
+				`${eventDict.channels.voiceChannelsCreated}\n\n${channelMentions}`,
 			);
 
 			await threadManager.addMembers(
@@ -175,7 +181,7 @@ export async function cleanupStaleEvents(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const MAX_EVENT_LIFETIME = TIMINGS.HOUR_IN_MS * 8;
+	const MAX_EVENT_LIFETIME = TIMINGS.HOUR_IN_MS * MAX_EVENT_LIFETIME_HOURS;
 	const now = Date.now();
 
 	for (const [messageId, timerData] of eventManager.getAllTimers()) {

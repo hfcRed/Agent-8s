@@ -25,7 +25,7 @@ export const en = {
 		started: '✅ Event Started!',
 		cancelled: '❌ Event cancelled',
 		finished: '🏁 Event Finished',
-		expired: '⏰ Event Expired (6h timeout)',
+		expired: (hours: number) => `⏰ Event Expired (${hours}h timeout)`,
 		shutdown: '⚠️ Event closed due to bot shutdown!',
 	},
 
@@ -77,8 +77,7 @@ export const en = {
 		teamA: '🔵 Team A',
 		teamB: '🔴 Team B',
 		thread: (shortId: string) => `8s Event - ${shortId}`,
-		voiceChannelsCreated: (channelMentions: string) =>
-			`**Voice Channels Created**\n\n${channelMentions}`,
+		voiceChannelsCreated: '**Voice Channels Created**',
 	},
 
 	// Ephemeral replies to the acting user (user locale)
@@ -192,8 +191,7 @@ export const en = {
 
 	// Public re-ping message posted to the channel (server/event locale)
 	reping: {
-		lookingFor: (missing: number, url: string) =>
-			`Looking for **+${missing}** for ${url}`,
+		lookingFor: (missing: number) => `Looking for **+${missing}**`,
 	},
 
 	// /status command embed (ephemeral, user locale). Dynamic values such as
@@ -213,6 +211,10 @@ export const en = {
 		telemetryHttpDb: '✅ HTTP/DB',
 		telemetryHttp: '✅ HTTP',
 		telemetryDb: '✅ DB',
+		database: '🗄️ Config Database',
+		databaseConnected: '✅ Connected',
+		databaseDisconnected: '❌ Disconnected',
+		databaseNotConfigured: '➖ Not configured',
 	},
 
 	// Slash command + option descriptions. Names stay English and live in

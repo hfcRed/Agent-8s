@@ -47,6 +47,10 @@ export class GuildConfigStore {
 		}
 	}
 
+	isConnected() {
+		return this.initialized;
+	}
+
 	getLocale(guildId: string): Locale | undefined {
 		return this.localeCache.get(guildId);
 	}

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GuildConfigStore } from '../../config/guild-config-store.js';
+import { TIMINGS } from '../../constants.js';
 
 const { mockQuery, mockEnd } = vi.hoisted(() => {
 	const mockQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 0 });
@@ -148,6 +149,31 @@ describe('GuildConfigStore', () => {
 		it('closes the pool', async () => {
 			await store.dispose();
 			expect(mockEnd).toHaveBeenCalled();
+		});
+	});
+
+	describe('connection status', () => {
+		it('reports connected after a successful initialize', async () => {
+			await store.initialize();
+			expect(store.isConnected()).toBe(true);
+		});
+
+		it('reports disconnected, then retries and reconnects', async () => {
+			vi.useFakeTimers();
+			try {
+				mockQuery.mockRejectedValue(new Error('db down'));
+
+				await store.initialize();
+				expect(store.isConnected()).toBe(false);
+
+				// DB recovers; the scheduled retry rehydrates the cache.
+				mockQuery.mockResolvedValue({ rows: [], rowCount: 0 });
+				await vi.advanceTimersByTimeAsync(TIMINGS.GUILD_CONFIG_RETRY_MS);
+
+				expect(store.isConnected()).toBe(true);
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 

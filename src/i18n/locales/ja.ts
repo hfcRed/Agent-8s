@@ -23,7 +23,7 @@ export const ja: Dictionary = {
 		started: '✅ イベント開始！',
 		cancelled: '❌ イベントは中止されました',
 		finished: '🏁 イベント終了',
-		expired: '⏰ イベント期限切れ（6時間経過）',
+		expired: (hours: number) => `⏰ イベント期限切れ（${hours}時間経過）`,
 		shutdown: '⚠️ Bot のシャットダウンによりイベントが終了しました！',
 	},
 
@@ -68,8 +68,7 @@ export const ja: Dictionary = {
 		teamA: '🔵 チーム A',
 		teamB: '🔴 チーム B',
 		thread: (shortId: string) => `8s イベント - ${shortId}`,
-		voiceChannelsCreated: (channelMentions: string) =>
-			`**ボイスチャンネルを作成しました**\n\n${channelMentions}`,
+		voiceChannelsCreated: '**ボイスチャンネルを作成しました**',
 	},
 
 	errors: {
@@ -176,8 +175,7 @@ export const ja: Dictionary = {
 	},
 
 	reping: {
-		lookingFor: (missing: number, url: string) =>
-			`${url} のメンバーを **+${missing}** 人募集中`,
+		lookingFor: (missing: number) => `**+${missing}** 人募集中`,
 	},
 
 	statusCommand: {
@@ -195,6 +193,10 @@ export const ja: Dictionary = {
 		telemetryHttpDb: '✅ HTTP/DB',
 		telemetryHttp: '✅ HTTP',
 		telemetryDb: '✅ DB',
+		database: '🗄️ 設定データベース',
+		databaseConnected: '✅ 接続済み',
+		databaseDisconnected: '❌ 切断',
+		databaseNotConfigured: '➖ 未設定',
 	},
 
 	commands: {

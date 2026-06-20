@@ -68,7 +68,7 @@ Display bot status and statistics.
 
 #### ``/set-language``
 
-Set the language the bot uses for this servers shared event messages (English or Japanese). Requires the Manage Server permission. See [Languages](#languages).
+Set the language the bot uses for this server's shared event messages (English or Japanese). You can optionally pick a second language to show alongside the first. Requires the Manage Server permission. See [Languages](#languages).
 
 ### Event lifecycle
 
@@ -86,7 +86,7 @@ If the owner of an event drops out after the event has started, ownership is tra
 
 Admins can cancel and finish events at any point, even if they are not part of the event.
 
-Should an event not start because not enough players are found, or the event is not manually finished, the bot will automatically close and archive the event after 24 hours.
+Should an event not start because not enough players are found, or the event is not manually finished, the bot will automatically close and archive the event after 8 hours.
 
 ## Languages
 
@@ -99,6 +99,10 @@ Agent 8s is available in **English** and **Japanese**, and is built so more lang
 ### Setting your server's language
 
 Server admins can use the ``/set-language`` command (requires the Manage Server permission) to pick the language used for shared event messages. The choice is saved per server and applies to events created afterwards.
+
+### Showing two languages at once
+
+``/set-language`` also takes an optional second language. When set, shared event content is shown in both languages.
 
 ## Permission scopes
 

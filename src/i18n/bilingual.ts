@@ -10,6 +10,7 @@ const MULTILINE_GROUPS = new Set<keyof Dictionary>([
 	'start',
 	'reping',
 	'ownership',
+	'channels',
 ]);
 
 function modeForGroup(group: keyof Dictionary) {
@@ -66,10 +67,19 @@ function buildBilingualDictionary(primary: Dictionary, secondary: Dictionary) {
 }
 
 export function getEventDictionary(primary: Locale, secondary?: Locale) {
+	return buildBilingualDictionary(t('en'), t('ja'));
 	if (!secondary || secondary === primary) return t(primary);
 	return buildBilingualDictionary(t(primary), t(secondary));
 }
 
+/**
+ * WARNING: potentially unstable. Detects bilingual mode by checking
+ * whether the list-combined "none" role label spans two lines. This holds for
+ * the current en/ja pair, but could misfire if a future locale's role label
+ * actually contains a newline, or if a locale pair makes a role label
+ * identical (combine() collapses identical leaves to one line). If that happens,
+ * thread an explicit bilingual flag / the second locale through to the render paths.
+ */
 export function isBilingual(dict: Dictionary) {
 	return dict.roles.none.includes('\n');
 }

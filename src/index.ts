@@ -259,7 +259,13 @@ appClient.on('interactionCreate', async (interaction) => {
 		if (interaction.isChatInputCommand()) {
 			const commandHandlers: Record<string, () => Promise<void>> = {
 				reping: () => handleRepingCommand(interaction, eventManager, telemetry),
-				status: () => handleStatusCommand(interaction, eventManager, telemetry),
+				status: () =>
+					handleStatusCommand(
+						interaction,
+						eventManager,
+						telemetry,
+						guildConfig,
+					),
 				create: () =>
 					handleCreateCommand(
 						interaction,

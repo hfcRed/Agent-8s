@@ -1,6 +1,7 @@
 import { type Client, EmbedBuilder } from 'discord.js';
 import {
 	COLORS,
+	MAX_EVENT_LIFETIME_HOURS,
 	MAX_PARTICIPANTS,
 	MAX_SPECTATORS,
 	type RoleKey,
@@ -565,7 +566,7 @@ export class EventManager {
 					break;
 				case 'expired':
 					color = COLORS.CANCELLED;
-					status = dict.status.expired;
+					status = dict.status.expired(MAX_EVENT_LIFETIME_HOURS);
 					break;
 				case 'shutdown':
 					color = COLORS.CANCELLED;

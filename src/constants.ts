@@ -12,6 +12,7 @@ export const DEFAULT_GUILD_CONFIG_TABLE = 'guild_config';
 export const MAX_PARTICIPANTS = DEV ? 2 : 8;
 export const MAX_SPECTATORS = 2;
 export const MATCH_ID_LENGTH = 5;
+export const MAX_EVENT_LIFETIME_HOURS = 8;
 
 export const ROLE_KEYS = [
 	'none',
@@ -39,6 +40,7 @@ export const TIMINGS = {
 	SHUTDOWN_EVENT_CLEANUP_DELAY_MS: 2000,
 	REPING_COOLDOWN_MS: 15 * 60 * 1000,
 	MESSAGE_UPDATE_DEBOUNCE_MS: 300,
+	GUILD_CONFIG_RETRY_MS: 30 * 1000,
 } as const;
 
 export const TIME_UNITS = {

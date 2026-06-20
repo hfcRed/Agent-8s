@@ -130,7 +130,7 @@ export async function handleRepingCommand(
 		);
 
 		const reply = await interaction.reply({
-			content: `${rolePing}\n${eventDict.reping.lookingFor(missingPlayers, messageUrl)}`,
+			content: `${rolePing} ${messageUrl}\n${eventDict.reping.lookingFor(missingPlayers)}`,
 		});
 
 		const repingMessage = await withRetry(

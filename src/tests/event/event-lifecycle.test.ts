@@ -82,6 +82,7 @@ describe('event-lifecycle', () => {
 			getChannelId: vi.fn(() => 'channel123'),
 			getGuildId: vi.fn(() => 'guild123'),
 			getLocale: vi.fn(() => 'en'),
+			getSecondLocale: vi.fn(() => undefined),
 			getTimeout: vi.fn(),
 			getAllTimers: vi.fn(() => []),
 			setProcessing: vi.fn(),

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import type { GuildConfigStore } from '../config/guild-config-store.js';
 import { COLORS, TIME_UNITS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
 import { type Dictionary, resolveLocale, t } from '../i18n/index.js';
@@ -27,6 +28,7 @@ export async function handleStatusCommand(
 	interaction: ChatInputCommandInteraction,
 	eventManager: EventManager,
 	telemetry?: TelemetryService,
+	guildConfig?: GuildConfigStore,
 ) {
 	const dict = t(resolveLocale(interaction.locale));
 
@@ -77,6 +79,11 @@ export async function handleStatusCommand(
 				{
 					name: dict.statusCommand.telemetry,
 					value: formatTelemetryStatus(dict, telemetry?.getStatus?.()),
+					inline: true,
+				},
+				{
+					name: dict.statusCommand.database,
+					value: formatConfigDatabaseStatus(dict, guildConfig),
 					inline: true,
 				},
 				{
@@ -154,4 +161,14 @@ function formatTelemetryStatus(dict: Dictionary, status?: TelemetryStatus) {
 	if (status.remoteEnabled) return dict.statusCommand.telemetryHttp;
 	if (status.databaseEnabled) return dict.statusCommand.telemetryDb;
 	return dict.statusCommand.telemetryDisabled;
+}
+
+function formatConfigDatabaseStatus(
+	dict: Dictionary,
+	guildConfig?: GuildConfigStore,
+) {
+	if (!guildConfig) return dict.statusCommand.databaseNotConfigured;
+	return guildConfig.isConnected()
+		? dict.statusCommand.databaseConnected
+		: dict.statusCommand.databaseDisconnected;
 }

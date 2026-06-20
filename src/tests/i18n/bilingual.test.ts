@@ -47,8 +47,8 @@ describe('getEventDictionary', () => {
 		});
 
 		it('puts the re-ping sentence and ownership notice on a new line', () => {
-			expect(dict.reping.lookingFor(3, 'https://x')).toBe(
-				`${t('en').reping.lookingFor(3, 'https://x')}\n${t('ja').reping.lookingFor(3, 'https://x')}`,
+			expect(dict.reping.lookingFor(3)).toBe(
+				`${t('en').reping.lookingFor(3)}\n${t('ja').reping.lookingFor(3)}`,
 			);
 
 			const ownership = dict.ownership.transferred('123');
