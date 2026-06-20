@@ -6,7 +6,8 @@ export const DEV = process.env.NODE_ENV === 'development';
 export const AUTHOR_ID = process.env.AUTHOR_ID;
 export const DEFAULT_METRICS_PORT = 9464;
 export const DEFAULT_SCHEMA = 'public';
-export const DEFAULT_TABLE = 'telemetry_events';
+export const DEFAULT_TELEMETRY_EVENTS_TABLE = 'telemetry_events';
+export const DEFAULT_GUILD_CONFIG_TABLE = 'guild_config';
 
 export const MAX_PARTICIPANTS = DEV ? 2 : 8;
 export const MAX_SPECTATORS = 2;

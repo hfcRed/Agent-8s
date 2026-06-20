@@ -156,6 +156,7 @@ To start testing locally you can use the following commands:
 - `DATABASE_URL` (optional): PostgreSQL connection string. Persists match lifecycle data to the `telemetry_events` table and per-server settings (such as the language chosen via `/set-language`) to the `guild_config` table. Without it, `/set-language` is unavailable and the bot falls back to the server's Discord locale (see [Languages](#languages)).
 - `DATABASE_SCHEMA` (optional, defaults to `public`): schema that holds both the `telemetry_events` and `guild_config` tables; must be a valid PostgreSQL identifier.
 - `TELEMETRY_EVENTS_TABLE` (optional, defaults to `telemetry_events`): override the lifecycle events table name; must be a valid PostgreSQL identifier.
+- `GUILD_CONFIG_TABLE` (optional, defaults to `guild_config`): override the per-server config table name; must be a valid PostgreSQL identifier.
 
 ## Running with Docker
 
@@ -189,7 +190,7 @@ docker run --rm --env-file .env agent-8s
 - Metric names are prefixed with `agent8s_{env}`, where `env` is `prod` when `NODE_ENV=production` and `dev` otherwise: `agent8s_{env}_interactions_total{type}`, `agent8s_{env}_errors_total{reason,severity}`, `agent8s_{env}_telemetry_events_forwarded_total{event,guild,channel}`, and `agent8s_{env}_telemetry_events_failed_total{event,guild,channel}`.
 - Guild and channel labels fall back to `unknown` whenever the IDs cannot be resolved (for example, when telemetry is triggered outside a guild context).
 - The metrics endpoint is available even when remote telemetry is disabled, allowing local scraping without forwarding events.
-- Provide `DATABASE_URL` (and optional `DATABASE_SCHEMA`/`TELEMETRY_EVENTS_TABLE`) to persist lifecycle events in PostgreSQL. The bot prepares the target schema/table on startup and records match UUIDs, guild/channel IDs, user/participant identifiers, payload JSON, and timestamps for each lifecycle hook.
+- Provide `DATABASE_URL` (and optional `DATABASE_SCHEMA`/`TELEMETRY_EVENTS_TABLE`/`GUILD_CONFIG_TABLE`) to persist lifecycle events and per-server config in PostgreSQL. The bot prepares the target schema/tables on startup and records match UUIDs, guild/channel IDs, user/participant identifiers, payload JSON, and timestamps for each lifecycle hook.
 
 ## Task shortcuts
 

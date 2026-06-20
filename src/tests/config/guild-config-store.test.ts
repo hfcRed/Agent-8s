@@ -104,4 +104,61 @@ describe('GuildConfigStore', () => {
 			expect(mockEnd).toHaveBeenCalled();
 		});
 	});
+
+	describe('identifier configuration', () => {
+		it('uses the configured table name', async () => {
+			const customStore = new GuildConfigStore(
+				'postgresql://localhost:5432/test',
+				{ schema: 'my_schema', table: 'my_guild_config' },
+			);
+
+			await customStore.initialize();
+
+			const createTableCall = mockQuery.mock.calls.find(
+				([sql]) => typeof sql === 'string' && sql.includes('CREATE TABLE'),
+			);
+			expect(createTableCall?.[0]).toContain('"my_schema"."my_guild_config"');
+		});
+
+		it('falls back to the default table for invalid identifiers', async () => {
+			const customStore = new GuildConfigStore(
+				'postgresql://localhost:5432/test',
+				{ table: 'invalid-table!' },
+			);
+
+			await customStore.initialize();
+
+			const createTableCall = mockQuery.mock.calls.find(
+				([sql]) => typeof sql === 'string' && sql.includes('CREATE TABLE'),
+			);
+			expect(createTableCall?.[0]).toContain('"guild_config"');
+		});
+	});
+
+	describe('SQL injection protection', () => {
+		it('quotes identifiers properly', async () => {
+			const customStore = new GuildConfigStore(
+				'postgresql://localhost:5432/test',
+				{ schema: 'my_schema', table: 'my_table' },
+			);
+
+			await customStore.initialize();
+
+			const createTableCall = mockQuery.mock.calls.find(
+				([sql]) => typeof sql === 'string' && sql.includes('CREATE TABLE'),
+			);
+			expect(createTableCall?.[0]).toContain('"my_schema"');
+			expect(createTableCall?.[0]).toContain('"my_table"');
+		});
+
+		it('uses parameterized queries for data', async () => {
+			await store.setLocale("'; DROP TABLE guild_config; --", 'ja');
+
+			const insertCall = mockQuery.mock.calls.find(
+				([sql]) => typeof sql === 'string' && sql.includes('INSERT'),
+			);
+			expect(insertCall?.[0]).toContain('$1');
+			expect(insertCall?.[1]).toEqual(["'; DROP TABLE guild_config; --", 'ja']);
+		});
+	});
 });

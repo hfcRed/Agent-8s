@@ -180,7 +180,10 @@ const commands = [
 const telemetry = initializeTelemetry(telemetryUrl, telemetryToken);
 const databaseUrl = process.env.DATABASE_URL;
 const guildConfig = databaseUrl
-	? new GuildConfigStore(databaseUrl, { schema: process.env.DATABASE_SCHEMA })
+	? new GuildConfigStore(databaseUrl, {
+			schema: process.env.DATABASE_SCHEMA,
+			table: process.env.GUILD_CONFIG_TABLE,
+		})
 	: undefined;
 const threadManager = new ThreadManager();
 const voiceChannelManager = new VoiceChannelManager();

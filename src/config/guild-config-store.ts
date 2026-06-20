@@ -1,13 +1,12 @@
 import { Pool } from 'pg';
-import { DEFAULT_SCHEMA } from '../constants.js';
+import { DEFAULT_GUILD_CONFIG_TABLE, DEFAULT_SCHEMA } from '../constants.js';
 import { isLocale, type Locale } from '../i18n/index.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { DATABASE_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
 
-const GUILD_CONFIG_TABLE = 'guild_config';
-
 interface GuildConfigStoreOptions {
 	schema?: string;
+	table?: string;
 }
 
 /**
@@ -17,6 +16,7 @@ interface GuildConfigStoreOptions {
  */
 export class GuildConfigStore {
 	private readonly schemaName: string;
+	private readonly tableName: string;
 	private readonly tableReference: string;
 	private pool: Pool;
 	private initialized = false;
@@ -24,7 +24,11 @@ export class GuildConfigStore {
 
 	constructor(connectionString: string, options: GuildConfigStoreOptions = {}) {
 		this.schemaName = this.resolveIdentifier(options.schema, DEFAULT_SCHEMA);
-		this.tableReference = `${this.quoteIdentifier(this.schemaName)}.${this.quoteIdentifier(GUILD_CONFIG_TABLE)}`;
+		this.tableName = this.resolveIdentifier(
+			options.table,
+			DEFAULT_GUILD_CONFIG_TABLE,
+		);
+		this.tableReference = `${this.quoteIdentifier(this.schemaName)}.${this.quoteIdentifier(this.tableName)}`;
 		this.pool = new Pool({ connectionString });
 	}
 
@@ -37,7 +41,7 @@ export class GuildConfigStore {
 				reason: 'Failed to initialize guild config store',
 				severity: ErrorSeverity.MEDIUM,
 				error,
-				metadata: { schema: this.schemaName, table: GUILD_CONFIG_TABLE },
+				metadata: { schema: this.schemaName, table: this.tableName },
 			});
 		}
 	}
