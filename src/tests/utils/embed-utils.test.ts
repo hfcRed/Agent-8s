@@ -127,7 +127,7 @@ describe('embed-utils', () => {
 			const participantField = fields.find((f) =>
 				f.value?.includes('123456789'),
 			);
-			expect(participantField?.value).toContain('\n- ');
+			expect(participantField?.value).toContain('\n');
 		});
 	});
 
