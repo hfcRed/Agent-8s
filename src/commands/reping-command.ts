@@ -1,12 +1,8 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
-import {
-	ERROR_MESSAGES,
-	MAX_PARTICIPANTS,
-	REPING_MESSAGE,
-	TIMINGS,
-	TITLES,
-} from '../constants.js';
+import { MAX_PARTICIPANTS, TIMINGS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
+import { getEventDictionary } from '../i18n/bilingual.js';
+import { resolveLocale, t } from '../i18n/index.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
@@ -21,13 +17,15 @@ export async function handleRepingCommand(
 	eventManager: EventManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const userId = interaction.user.id;
 		const userEventId = eventManager.getUserEventId(userId);
 
 		if (!userEventId) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.NOT_IN_EVENT,
+				content: dict.errors.notInEvent,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -51,7 +49,7 @@ export async function handleRepingCommand(
 				const remainingMinutes = Math.ceil(remainingMs / 60000);
 
 				await interaction.reply({
-					content: ERROR_MESSAGES.REPING_COOLDOWN(remainingMinutes),
+					content: dict.errors.repingCooldown(remainingMinutes),
 					flags: ['Ephemeral'],
 				});
 				return;
@@ -61,7 +59,7 @@ export async function handleRepingCommand(
 		const channelId = eventManager.getChannelId(userEventId);
 		if (!channelId) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+				content: dict.errors.channelNotFound,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -74,7 +72,7 @@ export async function handleRepingCommand(
 
 		if (!channel || !channel.isTextBased()) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
+				content: dict.errors.channelNoAccess,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -87,14 +85,15 @@ export async function handleRepingCommand(
 
 		if (!message || !message.embeds[0]) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.MESSAGE_NOT_FOUND,
+				content: dict.errors.messageNotFound,
 				flags: ['Ephemeral'],
 			});
 			return;
 		}
 
-		const embedTitle = message.embeds[0].title;
-		const isCasual = embedTitle?.includes(TITLES.CASUAL_PREFIX) ?? false;
+		// Read the casual/competitive flag from authoritative event state rather
+		// than parsing the (localized) embed title.
+		const isCasual = eventManager.getCasual(userEventId);
 
 		const participants = eventManager.getParticipants(userEventId);
 		const currentCount = participants?.size ?? 0;
@@ -102,7 +101,7 @@ export async function handleRepingCommand(
 
 		if (currentCount === MAX_PARTICIPANTS) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.REPING_EVENT_FULL,
+				content: dict.errors.repingEventFull,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -111,7 +110,7 @@ export async function handleRepingCommand(
 		const rolePing = getPingsForServer(interaction, isCasual);
 		if (!rolePing) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.ROLE_NOT_FOUND,
+				content: dict.errors.roleNotFound,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -125,8 +124,13 @@ export async function handleRepingCommand(
 		const guildId = interaction.guildId;
 		const messageUrl = `https://discord.com/channels/${guildId}/${channelId}/${userEventId}`;
 
+		const eventDict = getEventDictionary(
+			eventManager.getLocale(userEventId),
+			eventManager.getSecondLocale(userEventId),
+		);
+
 		const reply = await interaction.reply({
-			content: REPING_MESSAGE(rolePing, missingPlayers, messageUrl),
+			content: `${rolePing} ${messageUrl}\n${eventDict.reping.lookingFor(missingPlayers)}`,
 		});
 
 		const repingMessage = await withRetry(
@@ -156,6 +160,6 @@ export async function handleRepingCommand(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.REPING_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.repingError);
 	}
 }

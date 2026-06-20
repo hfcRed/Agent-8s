@@ -4,17 +4,14 @@ import type {
 	GuildMember,
 	TextChannel,
 } from 'discord.js';
-import {
-	ERROR_MESSAGES,
-	MAX_PARTICIPANTS,
-	WEAPON_ROLES,
-} from '../constants.js';
+import { DEFAULT_ROLE_KEY, MAX_PARTICIPANTS } from '../constants.js';
 import {
 	cleanupEvent,
 	promoteNextFromQueue,
 	startEvent,
 } from '../event/event-lifecycle.js';
 import type { EventManager, ParticipantMap } from '../event/event-manager.js';
+import { resolveLocale, t } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -32,6 +29,8 @@ export async function handleSignUpButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -47,7 +46,7 @@ export async function handleSignUpButton(
 			!participantMap.has(userId)
 		) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.EVENT_FULL,
+				content: dict.errors.eventFull,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -55,7 +54,7 @@ export async function handleSignUpButton(
 
 		if (eventManager.isUserInAnyEvent(userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: dict.errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -63,7 +62,7 @@ export async function handleSignUpButton(
 
 		eventManager.addParticipant(messageId, userId, {
 			userId: userId,
-			role: WEAPON_ROLES[0],
+			role: DEFAULT_ROLE_KEY,
 			rank: getExcaliburRankOfUser(
 				interaction.guild?.id,
 				interaction.member as GuildMember,
@@ -102,7 +101,7 @@ export async function handleSignUpButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.SIGN_UP_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.signUpError);
 	}
 }
 
@@ -113,6 +112,8 @@ export async function handleSignOutButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -126,7 +127,7 @@ export async function handleSignOutButton(
 
 		if (userId === creatorId) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.CREATOR_CANNOT_SIGNOUT,
+				content: dict.errors.creatorCannotSignout,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -164,7 +165,7 @@ export async function handleSignOutButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.SIGN_OUT_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.signOutError);
 	}
 }
 
@@ -176,6 +177,8 @@ export async function handleCancelButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -191,7 +194,7 @@ export async function handleCancelButton(
 
 		if (!isCreator && !isAdmin) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.CREATOR_ONLY_CANCEL,
+				content: dict.errors.creatorOnlyCancel,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -240,7 +243,7 @@ export async function handleCancelButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.CANCEL_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.cancelError);
 	}
 }
 
@@ -252,6 +255,8 @@ export async function handleStartNowButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -264,7 +269,7 @@ export async function handleStartNowButton(
 
 		if (userId !== creatorId) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.CREATOR_ONLY_START,
+				content: dict.errors.creatorOnlyStart,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -272,7 +277,7 @@ export async function handleStartNowButton(
 
 		if (participantMap.size !== MAX_PARTICIPANTS) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.NOT_ENOUGH_PARTICIPANTS,
+				content: dict.errors.notEnoughParticipants,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -298,7 +303,7 @@ export async function handleStartNowButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.START_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.startError);
 	}
 }
 
@@ -310,6 +315,8 @@ export async function handleFinishButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -325,7 +332,7 @@ export async function handleFinishButton(
 
 		if (!isCreator && !isAdmin) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.CREATOR_ONLY_FINISH,
+				content: dict.errors.creatorOnlyFinish,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -374,7 +381,7 @@ export async function handleFinishButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.FINISH_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.finishError);
 	}
 }
 
@@ -386,6 +393,8 @@ export async function handleDropOutButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -399,7 +408,7 @@ export async function handleDropOutButton(
 
 		if (!participantMap.has(userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.NOT_SIGNED_UP,
+				content: dict.errors.notSignedUp,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -408,7 +417,7 @@ export async function handleDropOutButton(
 		if (userId === creatorId) {
 			if (participantMap.size <= 1) {
 				await interaction.followUp({
-					content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+					content: dict.errors.ownerOnlyParticipant,
 					flags: ['Ephemeral'],
 				});
 				return;
@@ -423,7 +432,7 @@ export async function handleDropOutButton(
 
 			if (!newOwnerId) {
 				await interaction.followUp({
-					content: ERROR_MESSAGES.DROP_OUT_ERROR,
+					content: dict.errors.dropOutError,
 					flags: ['Ephemeral'],
 				});
 				return;
@@ -486,7 +495,7 @@ export async function handleDropOutButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.DROP_OUT_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.dropOutError);
 	}
 }
 
@@ -498,6 +507,8 @@ export async function handleDropInButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -510,7 +521,7 @@ export async function handleDropInButton(
 
 		if (participantMap.has(userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: dict.errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -518,7 +529,7 @@ export async function handleDropInButton(
 
 		if (participantMap.size >= MAX_PARTICIPANTS) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.EVENT_FULL,
+				content: dict.errors.eventFull,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -542,7 +553,7 @@ export async function handleDropInButton(
 
 		eventManager.addParticipant(messageId, userId, {
 			userId: userId,
-			role: WEAPON_ROLES[0],
+			role: DEFAULT_ROLE_KEY,
 			rank: getExcaliburRankOfUser(
 				interaction.guild?.id,
 				interaction.member as GuildMember,
@@ -591,7 +602,7 @@ export async function handleDropInButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.DROP_IN_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.dropInError);
 	}
 }
 
@@ -634,6 +645,8 @@ export async function handleJoinQueueButton(
 	eventManager: EventManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -646,7 +659,7 @@ export async function handleJoinQueueButton(
 
 		if (participantMap.size < MAX_PARTICIPANTS) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.QUEUE_EVENT_NOT_FULL,
+				content: dict.errors.queueEventNotFull,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -654,7 +667,7 @@ export async function handleJoinQueueButton(
 
 		if (eventManager.isUserInQueue(messageId, userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.QUEUE_ALREADY_IN_QUEUE,
+				content: dict.errors.queueAlreadyInQueue,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -662,7 +675,7 @@ export async function handleJoinQueueButton(
 
 		if (eventManager.isUserInAnyEvent(userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.QUEUE_ALREADY_PARTICIPATING,
+				content: dict.errors.queueAlreadyParticipating,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -692,7 +705,7 @@ export async function handleJoinQueueButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.JOIN_QUEUE_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.joinQueueError);
 	}
 }
 
@@ -701,6 +714,8 @@ export async function handleLeaveQueueButton(
 	eventManager: EventManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -713,7 +728,7 @@ export async function handleLeaveQueueButton(
 
 		if (!eventManager.isUserInQueue(messageId, userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.QUEUE_NOT_IN_QUEUE,
+				content: dict.errors.queueNotInQueue,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -743,7 +758,7 @@ export async function handleLeaveQueueButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.LEAVE_QUEUE_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.leaveQueueError);
 	}
 }
 
@@ -755,6 +770,8 @@ export async function handleSpectateButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const enabled = eventManager.getSpectatorsEnabled(interaction.message.id);
 		if (!enabled) return;
@@ -770,7 +787,7 @@ export async function handleSpectateButton(
 
 		if (eventManager.isUserSpectating(messageId, userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.SPECTATE_ALREADY_SPECTATING,
+				content: dict.errors.spectateAlreadySpectating,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -778,7 +795,7 @@ export async function handleSpectateButton(
 
 		if (eventManager.isUserInAnyEvent(userId) && !participantMap.has(userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: dict.errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -786,7 +803,7 @@ export async function handleSpectateButton(
 
 		if (eventManager.isSpectatorsFull(messageId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.SPECTATE_FULL,
+				content: dict.errors.spectateFull,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -809,7 +826,7 @@ export async function handleSpectateButton(
 				if (participantMap.size <= 1) {
 					eventManager.removeSpectator(messageId, userId);
 					await interaction.followUp({
-						content: ERROR_MESSAGES.OWNER_ONLY_PARTICIPANT,
+						content: dict.errors.ownerOnlyParticipant,
 						flags: ['Ephemeral'],
 					});
 					return;
@@ -825,7 +842,7 @@ export async function handleSpectateButton(
 				if (!newOwnerId) {
 					eventManager.removeSpectator(messageId, userId);
 					await interaction.followUp({
-						content: ERROR_MESSAGES.SPECTATE_ERROR,
+						content: dict.errors.spectateError,
 						flags: ['Ephemeral'],
 					});
 					return;
@@ -886,7 +903,7 @@ export async function handleSpectateButton(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.SPECTATE_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.spectateError);
 	}
 }
 
@@ -898,6 +915,8 @@ export async function handleStopSpectatingButton(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		const messageId = interaction.message.id;
 		const userId = interaction.user.id;
@@ -910,7 +929,7 @@ export async function handleStopSpectatingButton(
 
 		if (!eventManager.isUserSpectating(messageId, userId)) {
 			await interaction.followUp({
-				content: ERROR_MESSAGES.SPECTATE_NOT_SPECTATING,
+				content: dict.errors.spectateNotSpectating,
 				flags: ['Ephemeral'],
 			});
 			return;
@@ -961,9 +980,6 @@ export async function handleStopSpectatingButton(
 			},
 		});
 
-		await safeReplyToInteraction(
-			interaction,
-			ERROR_MESSAGES.STOP_SPECTATE_ERROR,
-		);
+		await safeReplyToInteraction(interaction, dict.errors.stopSpectateError);
 	}
 }

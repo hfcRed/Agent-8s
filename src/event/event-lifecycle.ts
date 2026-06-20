@@ -1,11 +1,13 @@
 import type { Client, Guild, Message, TextChannel } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
 import {
+	DEFAULT_ROLE_KEY,
 	MATCH_ID_LENGTH,
+	MAX_EVENT_LIFETIME_HOURS,
 	MAX_PARTICIPANTS,
 	TIMINGS,
-	WEAPON_ROLES,
 } from '../constants.js';
+import { getEventDictionary } from '../i18n/bilingual.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -45,11 +47,13 @@ export async function startEvent(
 
 		eventManager.queueUpdate(message.id);
 
+		const locale = eventManager.getLocale(message.id);
 		const participants = Array.from(participantMap.values());
 		const channel = message.channel as TextChannel;
 		const thread = await threadManager.createEventThread(
 			channel,
 			shortId || 'unknown',
+			locale,
 		);
 
 		const voiceChannels = await voiceChannelManager.createEventVoiceChannels(
@@ -58,6 +62,7 @@ export async function startEvent(
 			participants.map((p) => p.userId),
 			shortId || 'unknown',
 			appClient,
+			locale,
 		);
 		eventManager.setVoiceChannels(message.id, voiceChannels);
 
@@ -69,9 +74,16 @@ export async function startEvent(
 				EmbedBuilder.from(message.embeds[0]),
 			);
 
+			const eventDict = getEventDictionary(
+				locale,
+				eventManager.getSecondLocale(message.id),
+			);
+			const channelMentions = voiceChannels
+				.map((channelId) => `<#${channelId}>`)
+				.join('\n');
 			await threadManager.sendMessage(
 				thread,
-				`**Voice Channels Created**\n\n${voiceChannels.map((channelId) => `<#${channelId}>`).join('\n')}`,
+				`${eventDict.channels.voiceChannelsCreated}\n\n${channelMentions}`,
 			);
 
 			await threadManager.addMembers(
@@ -169,7 +181,7 @@ export async function cleanupStaleEvents(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
-	const MAX_EVENT_LIFETIME = TIMINGS.HOUR_IN_MS * 8;
+	const MAX_EVENT_LIFETIME = TIMINGS.HOUR_IN_MS * MAX_EVENT_LIFETIME_HOURS;
 	const now = Date.now();
 
 	for (const [messageId, timerData] of eventManager.getAllTimers()) {
@@ -315,7 +327,7 @@ export async function promoteNextFromQueue(
 
 	eventManager.addParticipant(messageId, nextUserId, {
 		userId: nextUserId,
-		role: WEAPON_ROLES[0],
+		role: DEFAULT_ROLE_KEY,
 		rank: getExcaliburRankOfUser(guild.id, member),
 	});
 

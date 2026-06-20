@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleKickCommand } from '../../commands/kick-command.js';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 
 vi.mock('../../utils/error-handler.js', () => ({
 	handleError: vi.fn(),
@@ -71,8 +71,8 @@ describe('kick-command', () => {
 
 	function createMockEventManager() {
 		const participants = new Map([
-			['user123', { userId: 'user123', role: 'None', rank: null }],
-			['target456', { userId: 'target456', role: 'Tank', rank: null }],
+			['user123', { userId: 'user123', role: 'none', rank: null }],
+			['target456', { userId: 'target456', role: 'slayer', rank: null }],
 		]);
 
 		return {
@@ -140,7 +140,7 @@ describe('kick-command', () => {
 				'target456',
 			);
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: SUCCESS_MESSAGES.KICK_SUCCESS('target456'),
+				content: t('en').success.kickSuccess('target456'),
 			});
 		});
 
@@ -156,7 +156,7 @@ describe('kick-command', () => {
 			);
 
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.NO_EVENT_OWNED,
+				content: t('en').errors.noEventOwned,
 			});
 		});
 
@@ -175,13 +175,13 @@ describe('kick-command', () => {
 			);
 
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.KICK_SELF,
+				content: t('en').errors.kickSelf,
 			});
 		});
 
 		it('should reject if target not in event', async () => {
 			const participants = new Map([
-				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['user123', { userId: 'user123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 
@@ -194,7 +194,7 @@ describe('kick-command', () => {
 			);
 
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.KICK_NOT_PARTICIPANT('target456'),
+				content: t('en').errors.kickNotParticipant('target456'),
 			});
 		});
 
@@ -263,13 +263,13 @@ describe('kick-command', () => {
 			);
 
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+				content: t('en').errors.channelNotFound,
 			});
 		});
 
 		it('should kick spectator if target is spectating', async () => {
 			const participants = new Map([
-				['user123', { userId: 'user123', role: 'None', rank: null }],
+				['user123', { userId: 'user123', role: 'none', rank: null }],
 			]);
 			mockEventManager.getParticipants.mockReturnValue(participants);
 			mockEventManager.isUserSpectating.mockReturnValue(true as never);
@@ -288,7 +288,7 @@ describe('kick-command', () => {
 			);
 			expect(mockEventManager.removeParticipant).not.toHaveBeenCalled();
 			expect(mockInteraction.editReply).toHaveBeenCalledWith({
-				content: SUCCESS_MESSAGES.KICK_SUCCESS('target456'),
+				content: t('en').success.kickSuccess('target456'),
 			});
 		});
 	});

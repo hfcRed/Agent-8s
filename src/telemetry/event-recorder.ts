@@ -1,5 +1,8 @@
 import { Pool } from 'pg';
-import { DEFAULT_SCHEMA, DEFAULT_TABLE } from '../constants.js';
+import {
+	DEFAULT_SCHEMA,
+	DEFAULT_TELEMETRY_EVENTS_TABLE,
+} from '../constants.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import { DATABASE_RETRY_OPTIONS, withRetry } from '../utils/retry.js';
 import type { TelemetryEventData } from './telemetry.js';
@@ -21,7 +24,10 @@ export class EventRecorder {
 
 	constructor(connectionString: string, options: EventRecorderOptions = {}) {
 		this.schemaName = this.resolveIdentifier(options.schema, DEFAULT_SCHEMA);
-		this.tableName = this.resolveIdentifier(options.table, DEFAULT_TABLE);
+		this.tableName = this.resolveIdentifier(
+			options.table,
+			DEFAULT_TELEMETRY_EVENTS_TABLE,
+		);
 		this.tableReference = `${this.quoteIdentifier(this.schemaName)}.${this.quoteIdentifier(this.tableName)}`;
 		this.pool = new Pool({ connectionString });
 	}

@@ -5,7 +5,7 @@ import {
 	ThreadAutoArchiveDuration,
 	type ThreadChannel,
 } from 'discord.js';
-import { THREAD_NAME } from '../constants.js';
+import { type Locale, t } from '../i18n/index.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	LOW_RETRY_OPTIONS,
@@ -18,12 +18,16 @@ import {
  * Provides an interface for creating, managing, and interacting with threads.
  */
 export class ThreadManager {
-	async createEventThread(channel: TextChannel, shortId: string) {
+	async createEventThread(
+		channel: TextChannel,
+		shortId: string,
+		locale: Locale,
+	) {
 		try {
 			const thread = await withRetry(
 				() =>
 					channel.threads.create({
-						name: THREAD_NAME(shortId),
+						name: t(locale).channels.thread(shortId),
 						autoArchiveDuration: ThreadAutoArchiveDuration.OneHour,
 						type: ChannelType.PrivateThread,
 						invitable: false,

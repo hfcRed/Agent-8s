@@ -61,6 +61,7 @@ describe('VoiceChannelManager', () => {
 				['user1', 'user2'],
 				'ABC12',
 				client,
+				'en',
 			);
 
 			expect(result).toEqual(['voice-1', 'voice-2', 'voice-3']);
@@ -102,6 +103,7 @@ describe('VoiceChannelManager', () => {
 				['user1'],
 				'ABC12',
 				client,
+				'en',
 			);
 
 			expect(result.length).toBe(2);
@@ -140,6 +142,7 @@ describe('VoiceChannelManager', () => {
 				['user1', 'user2', 'user3'],
 				'ABC12',
 				client,
+				'en',
 			);
 
 			const callArgs = createSpy.mock.calls[0][0];

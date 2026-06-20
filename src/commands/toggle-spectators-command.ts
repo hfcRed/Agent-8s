@@ -3,8 +3,8 @@ import type {
 	Client,
 	TextChannel,
 } from 'discord.js';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
+import { resolveLocale, t } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
@@ -21,6 +21,8 @@ export async function handleToggleSpectatorsCommand(
 	threadManager: ThreadManager,
 	voiceChannelManager: VoiceChannelManager,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		await interaction.deferReply({ flags: ['Ephemeral'] });
 
@@ -29,7 +31,7 @@ export async function handleToggleSpectatorsCommand(
 
 		if (!userEventId) {
 			await interaction.editReply({
-				content: ERROR_MESSAGES.NO_EVENT_OWNED,
+				content: dict.errors.noEventOwned,
 			});
 			return;
 		}
@@ -90,8 +92,8 @@ export async function handleToggleSpectatorsCommand(
 
 		await interaction.editReply({
 			content: newState
-				? SUCCESS_MESSAGES.SPECTATORS_ENABLED
-				: SUCCESS_MESSAGES.SPECTATORS_DISABLED,
+				? dict.success.spectatorsEnabled
+				: dict.success.spectatorsDisabled,
 		});
 	} catch (error) {
 		handleError({
@@ -106,7 +108,7 @@ export async function handleToggleSpectatorsCommand(
 
 		await safeReplyToInteraction(
 			interaction,
-			ERROR_MESSAGES.TOGGLE_SPECTATORS_ERROR,
+			dict.errors.toggleSpectatorsError,
 		);
 	}
 }

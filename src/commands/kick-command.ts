@@ -1,7 +1,7 @@
 import type { ChatInputCommandInteraction, TextChannel } from 'discord.js';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants.js';
 import { promoteNextFromQueue } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
+import { resolveLocale, t } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -19,6 +19,8 @@ export async function handleKickCommand(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		await interaction.deferReply({ flags: ['Ephemeral'] });
 
@@ -27,7 +29,7 @@ export async function handleKickCommand(
 
 		if (!userEventId) {
 			await interaction.editReply({
-				content: ERROR_MESSAGES.NO_EVENT_OWNED,
+				content: dict.errors.noEventOwned,
 			});
 			return;
 		}
@@ -44,7 +46,7 @@ export async function handleKickCommand(
 
 		if (targetUserId === userId) {
 			await interaction.editReply({
-				content: ERROR_MESSAGES.KICK_SELF,
+				content: dict.errors.kickSelf,
 			});
 			return;
 		}
@@ -58,7 +60,7 @@ export async function handleKickCommand(
 
 		if (!isParticipant && !isSpectator) {
 			await interaction.editReply({
-				content: ERROR_MESSAGES.KICK_NOT_PARTICIPANT(targetUserId),
+				content: dict.errors.kickNotParticipant(targetUserId),
 			});
 			return;
 		}
@@ -66,7 +68,7 @@ export async function handleKickCommand(
 		const channelId = eventManager.getChannelId(userEventId);
 		if (!channelId) {
 			await interaction.editReply({
-				content: ERROR_MESSAGES.CHANNEL_NOT_FOUND,
+				content: dict.errors.channelNotFound,
 			});
 			return;
 		}
@@ -78,7 +80,7 @@ export async function handleKickCommand(
 
 		if (!channel || !channel.isTextBased()) {
 			await interaction.editReply({
-				content: ERROR_MESSAGES.CHANNEL_NO_ACCESS,
+				content: dict.errors.channelNoAccess,
 			});
 			return;
 		}
@@ -90,7 +92,7 @@ export async function handleKickCommand(
 
 		if (!message) {
 			await interaction.editReply({
-				content: ERROR_MESSAGES.MESSAGE_NOT_FOUND,
+				content: dict.errors.messageNotFound,
 			});
 			return;
 		}
@@ -149,7 +151,7 @@ export async function handleKickCommand(
 		});
 
 		await interaction.editReply({
-			content: SUCCESS_MESSAGES.KICK_SUCCESS(targetUserId),
+			content: dict.success.kickSuccess(targetUserId),
 		});
 	} catch (error) {
 		handleError({
@@ -162,6 +164,6 @@ export async function handleKickCommand(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.KICK_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.kickError);
 	}
 }

@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
-import { COLORS, ERROR_MESSAGES, TIME_UNITS } from '../constants.js';
+import type { GuildConfigStore } from '../config/guild-config-store.js';
+import { COLORS, TIME_UNITS } from '../constants.js';
 import type { EventManager } from '../event/event-manager.js';
+import { type Dictionary, resolveLocale, t } from '../i18n/index.js';
 import type {
 	TelemetryService,
 	TelemetryStatus,
@@ -26,7 +28,10 @@ export async function handleStatusCommand(
 	interaction: ChatInputCommandInteraction,
 	eventManager: EventManager,
 	telemetry?: TelemetryService,
+	guildConfig?: GuildConfigStore,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		await interaction.deferReply({ flags: ['Ephemeral'] });
 
@@ -44,50 +49,55 @@ export async function handleStatusCommand(
 
 		const embed = new EmbedBuilder()
 			.setColor(COLORS.STATUS)
-			.setTitle('Bot Status')
+			.setTitle(dict.statusCommand.title)
 			.addFields(
 				{
-					name: '📦 Version',
+					name: dict.statusCommand.version,
 					value: BOT_VERSION,
 					inline: true,
 				},
 				{
-					name: '🟢 Node.js',
+					name: dict.statusCommand.node,
 					value: nodeVersion,
 					inline: true,
 				},
 				{
-					name: '🌐 Guilds',
+					name: dict.statusCommand.guilds,
 					value: `${guildCount}`,
 					inline: true,
 				},
 				{
-					name: '⏱️ Uptime',
+					name: dict.statusCommand.uptime,
 					value: formatUptime(uptime),
 					inline: true,
 				},
 				{
-					name: '🏓 Ping',
+					name: dict.statusCommand.ping,
 					value: `${interaction.client.ws.ping}ms`,
 					inline: true,
 				},
 				{
-					name: '🔔 Telemetry',
-					value: formatTelemetryStatus(telemetry?.getStatus?.()),
+					name: dict.statusCommand.telemetry,
+					value: formatTelemetryStatus(dict, telemetry?.getStatus?.()),
 					inline: true,
 				},
 				{
-					name: '📊 Active Events',
+					name: dict.statusCommand.database,
+					value: formatConfigDatabaseStatus(dict, guildConfig),
+					inline: true,
+				},
+				{
+					name: dict.statusCommand.activeEvents,
 					value: `${activeEventsCount}`,
 					inline: true,
 				},
 				{
-					name: '👥 Total Participants',
+					name: dict.statusCommand.totalParticipants,
 					value: `${totalParticipants}`,
 					inline: true,
 				},
 				{
-					name: '💾 Memory Usage',
+					name: dict.statusCommand.memoryUsage,
 					value: [
 						`RSS: ${formatMemoryUsage(memoryUsage.rss)}`,
 						`Heap: ${formatMemoryUsage(memoryUsage.heapUsed)} / ${formatMemoryUsage(memoryUsage.heapTotal)}`,
@@ -110,7 +120,7 @@ export async function handleStatusCommand(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.STATUS_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.statusError);
 	}
 }
 
@@ -144,10 +154,21 @@ function formatMemoryUsage(bytes: number) {
 	return `${mb.toFixed(2)} MB`;
 }
 
-function formatTelemetryStatus(status?: TelemetryStatus) {
-	if (!status) return '❌ Disabled';
-	if (status.remoteEnabled && status.databaseEnabled) return '✅ HTTP/DB';
-	if (status.remoteEnabled) return '✅ HTTP';
-	if (status.databaseEnabled) return '✅ DB';
-	return '❌ Disabled';
+function formatTelemetryStatus(dict: Dictionary, status?: TelemetryStatus) {
+	if (!status) return dict.statusCommand.telemetryDisabled;
+	if (status.remoteEnabled && status.databaseEnabled)
+		return dict.statusCommand.telemetryHttpDb;
+	if (status.remoteEnabled) return dict.statusCommand.telemetryHttp;
+	if (status.databaseEnabled) return dict.statusCommand.telemetryDb;
+	return dict.statusCommand.telemetryDisabled;
+}
+
+function formatConfigDatabaseStatus(
+	dict: Dictionary,
+	guildConfig?: GuildConfigStore,
+) {
+	if (!guildConfig) return dict.statusCommand.databaseNotConfigured;
+	return guildConfig.isConnected()
+		? dict.statusCommand.databaseConnected
+		: dict.statusCommand.databaseDisconnected;
 }

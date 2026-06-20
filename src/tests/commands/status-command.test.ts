@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleStatusCommand } from '../../commands/status-command.js';
-import { ERROR_MESSAGES } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 
 vi.mock('../../utils/helpers.js', () => ({
 	safeReplyToInteraction: vi.fn(),
@@ -128,6 +128,55 @@ describe('status-command', () => {
 		});
 	});
 
+	describe('config database status', () => {
+		function getDatabaseFieldValue() {
+			const call = mockInteraction.editReply.mock.calls[0][0] as {
+				embeds: { data: { fields: { name: string; value: string }[] } }[];
+			};
+			return call.embeds[0].data.fields.find(
+				(f) => f.name === t('en').statusCommand.database,
+			)?.value;
+		}
+
+		it('shows connected when the config store is connected', async () => {
+			await handleStatusCommand(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockTelemetry as never,
+				{ isConnected: vi.fn(() => true) } as never,
+			);
+
+			expect(getDatabaseFieldValue()).toBe(
+				t('en').statusCommand.databaseConnected,
+			);
+		});
+
+		it('shows disconnected when the config store is down', async () => {
+			await handleStatusCommand(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockTelemetry as never,
+				{ isConnected: vi.fn(() => false) } as never,
+			);
+
+			expect(getDatabaseFieldValue()).toBe(
+				t('en').statusCommand.databaseDisconnected,
+			);
+		});
+
+		it('shows not configured when there is no config store', async () => {
+			await handleStatusCommand(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockTelemetry as never,
+			);
+
+			expect(getDatabaseFieldValue()).toBe(
+				t('en').statusCommand.databaseNotConfigured,
+			);
+		});
+	});
+
 	describe('error handling', () => {
 		it('should handle errors gracefully', async () => {
 			mockInteraction.deferReply.mockRejectedValue(new Error('Network error'));
@@ -141,7 +190,7 @@ describe('status-command', () => {
 
 			expect(safeReplyToInteraction).toHaveBeenCalledWith(
 				mockInteraction,
-				ERROR_MESSAGES.STATUS_ERROR,
+				t('en').errors.statusError,
 			);
 		});
 	});

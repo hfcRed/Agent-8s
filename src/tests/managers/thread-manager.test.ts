@@ -35,7 +35,11 @@ describe('ThreadManager', () => {
 				},
 			} as unknown as TextChannel;
 
-			const result = await threadManager.createEventThread(channel, 'ABC12');
+			const result = await threadManager.createEventThread(
+				channel,
+				'ABC12',
+				'en',
+			);
 
 			expect(result).toEqual({ id: 'thread-123' });
 			expect(createSpy).toHaveBeenCalledWith(
@@ -54,7 +58,11 @@ describe('ThreadManager', () => {
 				},
 			} as unknown as TextChannel;
 
-			const result = await threadManager.createEventThread(channel, 'ABC12');
+			const result = await threadManager.createEventThread(
+				channel,
+				'ABC12',
+				'en',
+			);
 
 			expect(result).toBeNull();
 		});

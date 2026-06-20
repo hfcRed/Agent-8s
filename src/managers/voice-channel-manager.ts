@@ -6,7 +6,8 @@ import {
 	PermissionFlagsBits,
 	type TextChannel,
 } from 'discord.js';
-import { VOICE_CHANNEL_NAME, VOICE_CHANNEL_NAMES } from '../constants.js';
+import { VOICE_CHANNEL_KEYS } from '../constants.js';
+import { type Locale, t } from '../i18n/index.js';
 import { ErrorSeverity, handleError } from '../utils/error-handler.js';
 import {
 	LOW_RETRY_OPTIONS,
@@ -25,15 +26,17 @@ export class VoiceChannelManager {
 		participantIds: string[],
 		shortId: string,
 		appClient: Client,
+		locale: Locale,
 	) {
 		const voiceChannels: string[] = [];
+		const dict = t(locale);
 
-		for (let i = 0; i < VOICE_CHANNEL_NAMES.length; i++) {
+		for (const key of VOICE_CHANNEL_KEYS) {
 			try {
 				const voiceChannel = await withRetry(
 					() =>
 						guild.channels.create({
-							name: VOICE_CHANNEL_NAME(VOICE_CHANNEL_NAMES[i], shortId),
+							name: `${dict.channels[key]} - ${shortId}`,
 							type: ChannelType.GuildVoice,
 							parent: parentChannel.parent,
 							permissionOverwrites: [
@@ -74,7 +77,7 @@ export class VoiceChannelManager {
 					severity: ErrorSeverity.MEDIUM,
 					error,
 					metadata: {
-						channelName: VOICE_CHANNEL_NAMES[i],
+						channelName: dict.channels[key],
 						guildId: guild.id,
 						shortId,
 					},

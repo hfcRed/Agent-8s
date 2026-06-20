@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ParticipantData } from '../../event/event-manager.js';
 import { EventRecorder } from '../../telemetry/event-recorder.js';
 import type { TelemetryEventData } from '../../telemetry/telemetry.js';
 
@@ -83,8 +84,8 @@ describe('EventRecorder', () => {
 				eventId: 'event-789',
 				userId: 'user-999',
 				participants: [
-					{ userId: 'user1', role: 'Slayer', rank: null },
-					{ userId: 'user2', role: 'Support', rank: null },
+					{ userId: 'user1', role: 'slayer', rank: null },
+					{ userId: 'user2', role: 'support', rank: null },
 				],
 			};
 
@@ -152,9 +153,9 @@ describe('EventRecorder', () => {
 		});
 
 		it('should serialize participants as JSON', async () => {
-			const participants = [
-				{ userId: 'user1', role: 'Slayer', rank: '1' },
-				{ userId: 'user2', role: 'Support', rank: '2' },
+			const participants: ParticipantData[] = [
+				{ userId: 'user1', role: 'slayer', rank: '1' },
+				{ userId: 'user2', role: 'support', rank: '2' },
 			];
 
 			const eventData: TelemetryEventData = {

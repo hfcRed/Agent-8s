@@ -1,16 +1,14 @@
 import { type Client, EmbedBuilder } from 'discord.js';
 import {
 	COLORS,
-	FIELD_NAMES,
+	MAX_EVENT_LIFETIME_HOURS,
 	MAX_PARTICIPANTS,
 	MAX_SPECTATORS,
-	PARTICIPANT_FIELD_NAME,
-	START_MESSAGES,
-	STATUS_MESSAGES,
-	SUCCESS_MESSAGES,
+	type RoleKey,
 	TIMINGS,
-	TITLES,
 } from '../constants.js';
+import { getEventDictionary, isBilingual } from '../i18n/bilingual.js';
+import { DEFAULT_LOCALE, type Locale } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
 import {
@@ -37,7 +35,7 @@ export interface EventTimer {
 
 export interface ParticipantData {
 	userId: string;
-	role: string;
+	role: RoleKey;
 	rank: string | null;
 }
 
@@ -69,6 +67,8 @@ export class EventManager {
 	private spectatorsEnabled = new Map<string, boolean>();
 	private updateTimeouts = new Map<string, NodeJS.Timeout>();
 	private terminalStates = new Map<string, TerminalStates>();
+	private locales = new Map<string, Locale>();
+	private secondLocales = new Map<string, Locale>();
 
 	constructor(private client: Client) {}
 
@@ -107,7 +107,7 @@ export class EventManager {
 	addParticipant(
 		eventId: string,
 		userId: string,
-		participantData: { userId: string; role: string; rank: string | null },
+		participantData: ParticipantData,
 	) {
 		const participants = this.participants.get(eventId);
 		if (participants) {
@@ -453,6 +453,8 @@ export class EventManager {
 		this.info.delete(eventId);
 		this.spectatorsEnabled.delete(eventId);
 		this.terminalStates.delete(eventId);
+		this.locales.delete(eventId);
+		this.secondLocales.delete(eventId);
 
 		const timeout = this.getTimeout(eventId);
 		if (timeout) {
@@ -486,6 +488,34 @@ export class EventManager {
 		this.spectatorsEnabled.set(eventId, enabled);
 	}
 
+	getCasual(eventId: string) {
+		return this.casual.get(eventId) ?? true;
+	}
+
+	getLocale(eventId: string) {
+		return this.locales.get(eventId) ?? DEFAULT_LOCALE;
+	}
+
+	setLocale(eventId: string, locale: Locale) {
+		this.locales.set(eventId, locale);
+	}
+
+	deleteLocale(eventId: string) {
+		this.locales.delete(eventId);
+	}
+
+	getSecondLocale(eventId: string) {
+		return this.secondLocales.get(eventId);
+	}
+
+	setSecondLocale(eventId: string, locale: Locale) {
+		this.secondLocales.set(eventId, locale);
+	}
+
+	deleteSecondLocale(eventId: string) {
+		this.secondLocales.delete(eventId);
+	}
+
 	setTerminalState(
 		eventId: string,
 		state: 'cancelled' | 'finished' | 'expired' | 'shutdown',
@@ -516,52 +546,57 @@ export class EventManager {
 		const participantCount = participants.length;
 
 		const terminalState = this.getTerminalState(eventId);
+		const dict = getEventDictionary(
+			this.getLocale(eventId),
+			this.getSecondLocale(eventId),
+		);
 
 		let color: string = COLORS.OPEN;
-		let status: string = STATUS_MESSAGES.OPEN;
+		let status: string = dict.status.open;
 
 		if (terminalState) {
 			switch (terminalState) {
 				case 'cancelled':
 					color = COLORS.CANCELLED;
-					status = STATUS_MESSAGES.CANCELLED;
+					status = dict.status.cancelled;
 					break;
 				case 'finished':
 					color = COLORS.FINISHED;
-					status = STATUS_MESSAGES.FINISHED;
+					status = dict.status.finished;
 					break;
 				case 'expired':
 					color = COLORS.CANCELLED;
-					status = STATUS_MESSAGES.EXPIRED;
+					status = dict.status.expired(MAX_EVENT_LIFETIME_HOURS);
 					break;
 				case 'shutdown':
 					color = COLORS.CANCELLED;
-					status = STATUS_MESSAGES.SHUTDOWN;
+					status = dict.status.shutdown;
 					break;
 			}
 		} else if (timerData.hasStarted && participantCount === MAX_PARTICIPANTS) {
 			color = COLORS.STARTED;
-			status = STATUS_MESSAGES.STARTED;
+			status = dict.status.started;
 		} else if (participantCount === MAX_PARTICIPANTS) {
-			status = STATUS_MESSAGES.READY;
+			status = dict.status.ready;
 		}
 
-		let startMessage: string = START_MESSAGES.WHEN_FULL;
+		let startMessage: string = dict.start.whenFull;
 		if (timerData.hasStarted) {
-			startMessage = START_MESSAGES.AT_TIME(timerData.startTime);
+			startMessage = dict.start.atTime(timerData.startTime);
 		} else if (timerData.duration) {
 			const startTimestamp = timerData.startTime + timerData.duration;
-			startMessage = START_MESSAGES.AT_TIME(startTimestamp);
+			startMessage = dict.start.atTime(startTimestamp);
 		}
 
+		const participantSuffix = isBilingual(dict) ? '\n' : '';
 		const participantList = participants
 			.map(
 				(p) =>
-					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>${p.userId === creatorId ? ' 👑' : ''}`,
+					`- ${getEmoteForRank(this.getGuildId(eventId), p.rank)}<@${p.userId}>${p.userId === creatorId ? ' 👑' : ''}${participantSuffix}`,
 			)
 			.join('\n');
 		const roleList = participants
-			.map((p) => `- ${p.role || 'None'}`)
+			.map((p) => `- ${dict.roles[p.role] ?? dict.roles.none}`)
 			.join('\n');
 
 		const embed = new EmbedBuilder()
@@ -569,25 +604,25 @@ export class EventManager {
 				name: username,
 				iconURL: avatarUrl,
 			})
-			.setTitle(casualMode ? TITLES.CASUAL : TITLES.COMPETITIVE)
+			.setTitle(casualMode ? dict.titles.casual : dict.titles.competitive)
 			.addFields([
 				{
-					name: PARTICIPANT_FIELD_NAME(participantCount),
+					name: dict.fields.participantsCount(participantCount),
 					value: participantList,
 					inline: true,
 				},
 				{
-					name: FIELD_NAMES.ROLE,
+					name: dict.fields.role,
 					value: roleList,
 					inline: true,
 				},
 				{
-					name: FIELD_NAMES.START,
+					name: dict.fields.start,
 					value: startMessage,
 					inline: false,
 				},
 				{
-					name: FIELD_NAMES.STATUS,
+					name: dict.fields.status,
 					value: status,
 					inline: false,
 				},
@@ -603,7 +638,7 @@ export class EventManager {
 				.map((userId) => `- <@${userId}>`)
 				.join('\n');
 			embed.addFields({
-				name: FIELD_NAMES.SPECTATORS,
+				name: dict.fields.spectators,
 				value: spectatorsValue,
 				inline: false,
 			});
@@ -612,7 +647,7 @@ export class EventManager {
 		if (queue.length > 0) {
 			const queueValue = queue.map((userId) => `- <@${userId}>`).join('\n');
 			embed.addFields({
-				name: FIELD_NAMES.QUEUE,
+				name: dict.fields.queue,
 				value: queueValue,
 				inline: false,
 			});
@@ -627,16 +662,27 @@ export class EventManager {
 
 		if (!timerData || terminalState) return [];
 
+		const dict = getEventDictionary(
+			this.getLocale(eventId),
+			this.getSecondLocale(eventId),
+		);
+
 		if (timerData.hasStarted) {
 			const spectators = this.getSpectatorsEnabled(eventId);
 
-			return [...createEventStartedButtons(spectators), createRoleSelectMenu()];
+			return [
+				...createEventStartedButtons(dict, spectators),
+				createRoleSelectMenu(dict),
+			];
 		}
 
 		const timeInMinutes = timerData.duration
 			? timerData.duration / TIMINGS.MINUTE_IN_MS
 			: undefined;
-		return [createEventButtons(timeInMinutes), createRoleSelectMenu()];
+		return [
+			createEventButtons(dict, timeInMinutes),
+			createRoleSelectMenu(dict),
+		];
 	}
 
 	async transferOwnership(
@@ -688,7 +734,10 @@ export class EventManager {
 				if (thread) {
 					await threadManager.sendMessage(
 						thread,
-						SUCCESS_MESSAGES.OWNERSHIP_TRANSFERRED(newOwnerId),
+						getEventDictionary(
+							this.getLocale(eventId),
+							this.getSecondLocale(eventId),
+						).ownership.transferred(newOwnerId),
 					);
 				}
 			}

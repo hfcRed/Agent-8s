@@ -4,12 +4,12 @@ import type {
 	Guild,
 	TextChannel,
 } from 'discord.js';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants.js';
 import {
 	cleanupEvent,
 	promoteNextFromQueue,
 } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
+import { resolveLocale, t } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -25,6 +25,8 @@ export async function handleDropoutAllCommand(
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		await interaction.deferReply({ flags: ['Ephemeral'] });
 
@@ -70,11 +72,11 @@ export async function handleDropoutAllCommand(
 
 		if (ownedEventClosed || droppedOut || queuesCleaned || spectatorsCleaned) {
 			await interaction.editReply({
-				content: SUCCESS_MESSAGES.DROPOUT_ALL_SUCCESS,
+				content: dict.success.dropoutAllSuccess,
 			});
 		} else {
 			await interaction.editReply({
-				content: ERROR_MESSAGES.DROPOUT_ALL_NOT_IN_EVENTS,
+				content: dict.errors.dropoutAllNotInEvents,
 			});
 		}
 	} catch (error) {
@@ -88,7 +90,7 @@ export async function handleDropoutAllCommand(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.DROPOUT_ALL_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.dropoutAllError);
 	}
 }
 

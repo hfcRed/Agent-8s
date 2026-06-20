@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { ChatInputCommandInteraction, GuildMember } from 'discord.js';
-import { ERROR_MESSAGES, TIMINGS, WEAPON_ROLES } from '../constants.js';
+import type { GuildConfigStore } from '../config/guild-config-store.js';
+import { DEFAULT_ROLE_KEY, TIMINGS } from '../constants.js';
 import { createEventStartTimeout } from '../event/event-lifecycle.js';
 import type { EventManager } from '../event/event-manager.js';
+import { getEventDictionary } from '../i18n/bilingual.js';
+import { resolveLocale, t } from '../i18n/index.js';
 import type { ThreadManager } from '../managers/thread-manager.js';
 import type { VoiceChannelManager } from '../managers/voice-channel-manager.js';
 import type { TelemetryService } from '../telemetry/telemetry.js';
@@ -24,15 +27,32 @@ export async function handleCreateCommand(
 	threadManager: ThreadManager,
 	voiceChannelManager: VoiceChannelManager,
 	telemetry?: TelemetryService,
+	guildConfig?: GuildConfigStore,
 ) {
+	const dict = t(resolveLocale(interaction.locale));
+
 	try {
 		if (eventManager.isUserInAnyEvent(interaction.user.id)) {
 			await interaction.reply({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: dict.errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 			return;
 		}
+
+		const configuredLocale = interaction.guildId
+			? guildConfig?.getLocale(interaction.guildId)
+			: undefined;
+		const locale = configuredLocale ?? resolveLocale(interaction.guildLocale);
+
+		const configuredSecondLocale = interaction.guildId
+			? guildConfig?.getSecondLocale(interaction.guildId)
+			: undefined;
+		const secondLocale =
+			configuredSecondLocale && configuredSecondLocale !== locale
+				? configuredSecondLocale
+				: undefined;
+		const eventDict = getEventDictionary(locale, secondLocale);
 
 		const casual = !!interaction.options.getBoolean('casual', false);
 		const spectators = !!interaction.options.getBoolean('spectators', false);
@@ -41,8 +61,8 @@ export async function handleCreateCommand(
 			interaction.options.getInteger('time', false) ?? undefined;
 		const startTime = Date.now();
 
-		const buttonRow = createEventButtons(timeInMinutes);
-		const selectRow = createRoleSelectMenu();
+		const buttonRow = createEventButtons(eventDict, timeInMinutes);
+		const selectRow = createRoleSelectMenu(eventDict);
 
 		const rankId = getExcaliburRankOfUser(
 			interaction.guild?.id,
@@ -56,6 +76,7 @@ export async function handleCreateCommand(
 			interaction.user.displayAvatarURL(),
 			interaction.user.id,
 			casual,
+			eventDict,
 			timeInMinutes,
 			info,
 		);
@@ -74,6 +95,10 @@ export async function handleCreateCommand(
 		eventManager.setMatchId(message.id, matchId);
 		eventManager.setChannelId(message.id, message.channelId);
 		eventManager.setMessageData(message.id, casual, spectators, info);
+		eventManager.setLocale(message.id, locale);
+		if (secondLocale) {
+			eventManager.setSecondLocale(message.id, secondLocale);
+		}
 
 		await eventManager.removeUserFromAllQueues(interaction.user.id, telemetry);
 
@@ -92,7 +117,7 @@ export async function handleCreateCommand(
 					interaction.user.id,
 					{
 						userId: interaction.user.id,
-						role: WEAPON_ROLES[0],
+						role: DEFAULT_ROLE_KEY,
 						rank: rankId,
 					},
 				],
@@ -135,6 +160,6 @@ export async function handleCreateCommand(
 			},
 		});
 
-		await safeReplyToInteraction(interaction, ERROR_MESSAGES.CREATE_ERROR);
+		await safeReplyToInteraction(interaction, dict.errors.createError);
 	}
 }

@@ -6,16 +6,9 @@ import {
 	StringSelectMenuBuilder,
 	StringSelectMenuOptionBuilder,
 } from 'discord.js';
-import {
-	COLORS,
-	FIELD_NAMES,
-	PARTICIPANT_FIELD_NAME,
-	START_MESSAGES,
-	STATUS_MESSAGES,
-	TIMINGS,
-	TITLES,
-	WEAPON_ROLES,
-} from '../constants.js';
+import { COLORS, DEFAULT_ROLE_KEY, ROLE_KEYS, TIMINGS } from '../constants.js';
+import { isBilingual } from '../i18n/bilingual.js';
+import type { Dictionary } from '../i18n/index.js';
 import { getEmoteForRank } from './helpers.js';
 
 export function createEventEmbed(
@@ -25,37 +18,36 @@ export function createEventEmbed(
 	avatarUrl: string,
 	userId: string,
 	casual: boolean,
+	dict: Dictionary,
 	timeInMinutes?: number,
 	info?: string,
 ) {
 	const startTime = Date.now();
 	const embedFields = [
 		{
-			name: PARTICIPANT_FIELD_NAME(1),
-			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}> 👑`,
+			name: dict.fields.participantsCount(1),
+			value: `- ${getEmoteForRank(guildId, rankId)}<@${userId}> 👑${isBilingual(dict) ? '\n' : ''}`,
 			inline: true,
 		},
 		{
-			name: FIELD_NAMES.ROLE,
-			value: `- ${WEAPON_ROLES[0]}`,
+			name: dict.fields.role,
+			value: `- ${dict.roles[DEFAULT_ROLE_KEY]}`,
 			inline: true,
 		},
 		{
-			name: FIELD_NAMES.START,
+			name: dict.fields.start,
 			value: timeInMinutes
-				? START_MESSAGES.AT_TIME(
-						startTime + timeInMinutes * TIMINGS.MINUTE_IN_MS,
-					)
-				: START_MESSAGES.WHEN_FULL,
+				? dict.start.atTime(startTime + timeInMinutes * TIMINGS.MINUTE_IN_MS)
+				: dict.start.whenFull,
 		},
-		{ name: FIELD_NAMES.STATUS, value: STATUS_MESSAGES.OPEN },
+		{ name: dict.fields.status, value: dict.status.open },
 	];
 	const embed = new EmbedBuilder()
 		.setAuthor({
 			name: username,
 			iconURL: avatarUrl,
 		})
-		.setTitle(casual ? TITLES.CASUAL : TITLES.COMPETITIVE)
+		.setTitle(casual ? dict.titles.casual : dict.titles.competitive)
 		.addFields(embedFields)
 		.setColor(COLORS.OPEN);
 
@@ -64,22 +56,22 @@ export function createEventEmbed(
 	return embed;
 }
 
-export function createEventButtons(timeInMinutes?: number) {
+export function createEventButtons(dict: Dictionary, timeInMinutes?: number) {
 	const buttons = [
 		new ButtonBuilder()
 			.setEmoji('📝')
 			.setCustomId('signup')
-			.setLabel('Sign Up')
+			.setLabel(dict.buttons.signUp)
 			.setStyle(ButtonStyle.Primary),
 		new ButtonBuilder()
 			.setEmoji('🚪')
 			.setCustomId('signout')
-			.setLabel('Sign Out')
+			.setLabel(dict.buttons.signOut)
 			.setStyle(ButtonStyle.Danger),
 		new ButtonBuilder()
 			.setEmoji('❌')
 			.setCustomId('cancel')
-			.setLabel('Cancel Event')
+			.setLabel(dict.buttons.cancelEvent)
 			.setStyle(ButtonStyle.Secondary),
 	];
 
@@ -88,7 +80,7 @@ export function createEventButtons(timeInMinutes?: number) {
 			new ButtonBuilder()
 				.setEmoji('▶️')
 				.setCustomId('startnow')
-				.setLabel('Start Now')
+				.setLabel(dict.buttons.startNow)
 				.setStyle(ButtonStyle.Success),
 		);
 	}
@@ -96,32 +88,35 @@ export function createEventButtons(timeInMinutes?: number) {
 	return new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons);
 }
 
-export function createEventStartedButtons(spectators: boolean = false) {
+export function createEventStartedButtons(
+	dict: Dictionary,
+	spectators: boolean = false,
+) {
 	const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()
 			.setEmoji('📝')
 			.setCustomId('dropin')
-			.setLabel('Drop In')
+			.setLabel(dict.buttons.dropIn)
 			.setStyle(ButtonStyle.Primary),
 		new ButtonBuilder()
 			.setEmoji('🚪')
 			.setCustomId('dropout')
-			.setLabel('Drop Out')
+			.setLabel(dict.buttons.dropOut)
 			.setStyle(ButtonStyle.Danger),
 		new ButtonBuilder()
 			.setEmoji('⏳')
 			.setCustomId('joinqueue')
-			.setLabel('Join Queue')
+			.setLabel(dict.buttons.joinQueue)
 			.setStyle(ButtonStyle.Secondary),
 		new ButtonBuilder()
 			.setEmoji('❌')
 			.setCustomId('leavequeue')
-			.setLabel('Leave Queue')
+			.setLabel(dict.buttons.leaveQueue)
 			.setStyle(ButtonStyle.Secondary),
 		new ButtonBuilder()
 			.setEmoji('🏁')
 			.setCustomId('finish')
-			.setLabel('Finish Event')
+			.setLabel(dict.buttons.finishEvent)
 			.setStyle(ButtonStyle.Success),
 	);
 
@@ -131,28 +126,29 @@ export function createEventStartedButtons(spectators: boolean = false) {
 		new ButtonBuilder()
 			.setEmoji('👁️')
 			.setCustomId('spectate')
-			.setLabel('Spectate')
+			.setLabel(dict.buttons.spectate)
 			.setStyle(ButtonStyle.Secondary),
 		new ButtonBuilder()
 			.setEmoji('🚫')
 			.setCustomId('stopspectating')
-			.setLabel('Stop Spectating')
+			.setLabel(dict.buttons.stopSpectating)
 			.setStyle(ButtonStyle.Secondary),
 	);
 
 	return [row1, row2];
 }
 
-export function createRoleSelectMenu() {
+export function createRoleSelectMenu(dict: Dictionary) {
 	const select = new StringSelectMenuBuilder()
 		.setCustomId('select')
-		.setPlaceholder('Select a weapon role')
+		.setPlaceholder(dict.select.placeholder)
 		.addOptions(
-			WEAPON_ROLES.map((role) =>
-				new StringSelectMenuOptionBuilder()
-					.setLabel(role)
-					.setValue(role.toLowerCase()),
-			),
+			ROLE_KEYS.map((key) => {
+				const [primary, secondary] = dict.roles[key].split('\n- ');
+				return new StringSelectMenuOptionBuilder()
+					.setLabel(secondary ? `${primary} (${secondary})` : primary)
+					.setValue(key);
+			}),
 		);
 
 	return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);

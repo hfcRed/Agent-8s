@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleCreateCommand } from '../../commands/create-command.js';
-import { ERROR_MESSAGES } from '../../constants.js';
+import { t } from '../../i18n/index.js';
 
 vi.mock('../../utils/embed-utils.js', () => ({
 	createEventButtons: vi.fn(() => ({ components: [] })),
@@ -77,6 +77,8 @@ describe('create-command', () => {
 			setParticipants: vi.fn(),
 			setGuildId: vi.fn(),
 			setMessageData: vi.fn(),
+			setLocale: vi.fn(),
+			setSecondLocale: vi.fn(),
 			getParticipants: vi.fn(() => new Map()),
 			removeUserFromAllQueues: vi.fn().mockResolvedValue(undefined),
 		};
@@ -110,11 +112,11 @@ describe('create-command', () => {
 			);
 
 			expect(mockInteraction.reply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: t('en').errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 			expect(mockInteraction.reply).toHaveBeenCalledWith({
-				content: ERROR_MESSAGES.ALREADY_SIGNED_UP,
+				content: t('en').errors.alreadySignedUp,
 				flags: ['Ephemeral'],
 			});
 		});
@@ -171,6 +173,55 @@ describe('create-command', () => {
 					role: expect.any(String),
 				}),
 			);
+		});
+	});
+
+	describe('guild language config', () => {
+		it('stores both locales when the guild has a second language configured', async () => {
+			const mockGuildConfig = {
+				getLocale: vi.fn(() => 'en'),
+				getSecondLocale: vi.fn(() => 'ja'),
+			};
+
+			await handleCreateCommand(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+				mockGuildConfig as never,
+			);
+
+			expect(mockEventManager.setLocale).toHaveBeenCalledWith(
+				'message123',
+				'en',
+			);
+			expect(mockEventManager.setSecondLocale).toHaveBeenCalledWith(
+				'message123',
+				'ja',
+			);
+		});
+
+		it('does not set a second locale when none is configured', async () => {
+			const mockGuildConfig = {
+				getLocale: vi.fn(() => 'ja'),
+				getSecondLocale: vi.fn(() => undefined),
+			};
+
+			await handleCreateCommand(
+				mockInteraction as never,
+				mockEventManager as never,
+				mockThreadManager as never,
+				mockVoiceChannelManager as never,
+				mockTelemetry as never,
+				mockGuildConfig as never,
+			);
+
+			expect(mockEventManager.setLocale).toHaveBeenCalledWith(
+				'message123',
+				'ja',
+			);
+			expect(mockEventManager.setSecondLocale).not.toHaveBeenCalled();
 		});
 	});
 
